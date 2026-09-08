@@ -101,6 +101,13 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .nav-module-header span { flex: 1; white-space: normal; line-height: 1.25; }
 .nav-module-header svg { color: var(--color-primary); }
 .nav-module-body { display: flex; flex-direction: column; gap: 2px; padding-left: 4px; }
+/* Sub-headings inside a module body (Pest Control: Daily Report / Service
+   Reports / Trend Analysis / Training & Reference). */
+.nav-sub-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-faint); padding: 9px 12px 3px 14px; font-weight: 700; }
+.nav-module-body a { font-size: 13px; }
+/* Pest Control module pages */
+.pest-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start; }
+.doc-table tr.is-today td { background: var(--color-primary-light); }
 .app-sidebar-foot { padding: 12px 18px; font-size: 10.5px; color: var(--color-text-faint); border-top: 1px solid var(--color-border); }
 .app-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .app-topbar {

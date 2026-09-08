@@ -157,12 +157,23 @@ def main():
         page.screenshot(path="tests/shots/09_training_detail.png", full_page=True)
 
         # --- Reports ---
-        page.click("text=Reports")
+        # (href selector: the sidebar's "Service Reports" sub-heading also
+        # contains "Reports", so text=Reports would hit that div first.)
+        page.click("a[href='#/reports']")
         page.wait_for_timeout(300)
         page.screenshot(path="tests/shots/10_reports.png", full_page=True)
-        page.click("text=Rodent Trend")
+        page.click(".pill-tab:has-text('Rodent Catch Trend')")
         page.wait_for_timeout(200)
         page.screenshot(path="tests/shots/11_reports_rodent.png", full_page=True)
+
+        # --- Pest Control module pages ---
+        page.click("a[href='#/pest-control']")
+        page.wait_for_timeout(300)
+        check("Pest Control overview renders its four groups", all(x in page.locator(".app-content").inner_text() for x in ["Daily Report", "Service Reports", "Trend Analysis", "Training & Reference"]))
+        page.screenshot(path="tests/shots/15_pest_control_overview.png", full_page=True)
+        page.click("a[href='#/pest/trend/fly-catcher']")
+        page.wait_for_timeout(300)
+        page.screenshot(path="tests/shots/16_pest_fly_catcher_infestation.png", full_page=True)
 
         # --- Master data ---
         page.click("text=Master Data")

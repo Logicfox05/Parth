@@ -51,7 +51,7 @@ yet); keep every existing entry in the array, only changing the ones the
 user mentioned. ${DATE_TIME_RULE}`,
   "service-report": `
 Fields: serviceName (string, e.g. "Rodent Control", "General Pest Control",
-"Fly Control", "Lizard Control"). lines (array of { slNo, areaName,
+"Fly Control"). lines (array of { slNo, areaName,
 materialName, qtyUsed, methodOfApplication, remarks }) — one line per area
 treated; slNo is a plain sequential number (1, 2, 3, ...), not an id.
 technicianSign (string, technician's name). customerSign (string,
@@ -136,6 +136,19 @@ Valid navigation targets (use EXACTLY this shape, "path/param" meaning substitut
   monthly (overall records report), daily (Daily Monitoring summary), rodent (Rodent Trend),
   flycatcher (Fly Catcher Trend), chemical (Chemical Usage), gap (CAPA Status), training (Training Status),
   lamination (Lamination QC). Default to "monthly" if the user didn't ask for a specific kind of report.
+- /pest-control — the Pest Control module overview: Daily Report, Service Reports, Trend Analysis, Training & Reference
+- /pest/daily — the Daily Pest Control Monitoring Record (F/HR/17) register for the current month
+- /pest/daily/{year}/{month0} — that register for a specific month
+- /pest/service/rodent — the Rat / Mice service reports (Rodent Control Service, by Gurudev Pest Control). Use for
+  "rat", "mice", "rodent service", "rodent report"
+- /pest/service/general — the Ants & Cockroaches service reports (General Pest Control Services). Use for "ants",
+  "cockroach", "general pest"
+- /pest/service/fly — the Fly Control service reports (spraying visits). Use for "fly service", "fly control report"
+- /pest/service/{rodent|general|fly}/{year} — those service reports for a specific year
+- /pest/trend/rodent — Rodent Catch Report and Trend Analysis (rodents per month, per location, per trap box)
+- /pest/trend/fly-catcher — Fly Catcher Infestation: the fortnightly F/HR/18 inspection records and flies per
+  unit (PC-01..PC-13) per month. Use for "fly catcher", "flies caught", "infestation"
+- /pest/trend/{rodent|fly-catcher}/{year} — those trends for a specific year
 - /gap — CAPA (Corrective & Preventive Action) home: choose Internal or External
 - /gap/internal — CAPA Internal: pest-control inspection findings reports
 - /gap/external — CAPA External: customer complaint handling checklists (F/MKT/05)

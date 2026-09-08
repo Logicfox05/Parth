@@ -1,6 +1,7 @@
 import { ensureSeeded as ensureDocsSeeded } from "./repositories/documentRepository";
 import { ensureSeeded as ensureMasterSeeded } from "./repositories/masterRepository";
-import { ensureSeeded as ensureRecordsSeeded } from "./repositories/recordRepository";
+import { ensureSeeded as ensureRecordsSeeded, recordRepository } from "./repositories/recordRepository";
+import { RETIRED_DOCUMENT_IDS } from "./seed/documentDefinitions";
 import { ensureRecordsGeneratedForMonth } from "../engine/recordGenerator";
 import { prepareDueRecords } from "../engine/assistantPrepare";
 import { todayISO } from "../utils/date";
@@ -15,6 +16,11 @@ export function bootstrap(): void {
   ensureDocsSeeded();
   ensureMasterSeeded();
   ensureRecordsSeeded();
+  // Records of a document that has been withdrawn (e.g. the retired Lizard
+  // Control service-report variant) would be unreachable — no page lists
+  // them and no definition is left to render them — so drop them, Live and
+  // Demo alike. Idempotent: nothing to remove on every later boot.
+  for (const id of RETIRED_DOCUMENT_IDS) recordRepository.removeWhere({ documentId: id });
 
   const today = new Date(todayISO());
   ensureRecordsGeneratedForMonth(today.getFullYear(), today.getMonth(), { isDemo: false });

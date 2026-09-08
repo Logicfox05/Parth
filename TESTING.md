@@ -43,7 +43,7 @@ python tests/e2e_assistant_chat.py # needs backend/.env's GROQ_API_KEY to actual
 Both scripts now sign up a fresh, randomly-emailed account at the start of the run (the app gates
 every page behind login — see `frontend/src/main.tsx`/`AuthProvider`) before exercising the rest of the app.
 
-## Results (last full run — 08-Sep-2026, on the TypeScript-only backend/scripts, after the rodent-catch-pattern batch)
+## Results (last full run — 08-Sep-2026, on the TypeScript-only backend/scripts, after the Pest Control module restructure batch)
 
 The run below is the production shape end to end: `frontend/scripts/build.ts` builds the bundle,
 `backend/index.ts` (run directly by Node 23.6, no compile step) serves it plus the API, and every
@@ -71,11 +71,11 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   throttles), `scripts/*.mjs` and `frontend/scripts/*.mjs` → `*.ts`; `package.json` scripts run them
   with `node --no-warnings=ExperimentalWarning`. No `.mjs` remains.
 - **Rodent catch pattern**: the Daily Pest Control Monitoring Record no longer answers checkpoint 7
-  ("Any pest trapped in rodent trap box") the same way every day. `tools/rodent_pattern.py`
+  ("Any pest trapped in rodent trap box") the same way every day. `tools/pest_pattern.py`
   (Python + numpy) generates a seasonal catch pattern — monsoon-leaning daily probability, weighted
   Rodent Control Service locations, a per-catch count distribution — calibrated against the
   company's own reported history (0 rodents in 2024, 2 in 2025, 0 through Jun-2026, from "Kapila
-  mam department reports .pdf"), written to `src/data/seed/rodentPattern.ts`.
+  mam department reports .pdf"), written to `src/data/seed/pestPattern.ts`.
   `src/engine/rodentPattern.ts` applies it deterministically per calendar date so the assistant's
   pre-fill, Demo Mode, and a manual "Yes" on checkpoint 7 all agree on the same day's story
   (trap box, location, number of rodents — a new `rodentCatches` table on the record, required
@@ -87,8 +87,22 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   against a full demo year, and by dumping the deterministic pattern for 2025–2027 in a scratch
   script to confirm every year lands a handful of catches, none implausibly large, correctly
   seasonal (near-zero Jan–Apr, heaviest Jun–Oct).
+- **Pest Control module restructure.** The module is now organised the way the department reads
+  its paperwork — Daily Report / Service Reports (Rat / Mice, Ants & Cockroaches, Fly) / Trend
+  Analysis (Rodent Catch, Fly Catcher Infestation) / Training & Reference — with an overview
+  (`/pest-control`) and one page per group (`src/pages/PestControlPages.tsx`), sidebar sub-headings,
+  and the assistant's route guide extended so "show me the rat reports" lands on the right page.
+  The Lizard service-report variant (no specimen in the zip) was retired, with boot-time cleanup of
+  its definition, reminder role and any stored records — the Document Library count check moved
+  from 22 to 21. The Fly Catcher record's counts now follow a seasonal per-unit pattern
+  (`tools/pest_pattern.py`, the same tool as the rodent pattern, calibrated to the August-26
+  specimen), and Reports > Fly Catcher Infestation was rebuilt in the company's year layout, overall
+  and per unit. Checked by eight new smoke assertions (sidebar groups, each new page, the Live
+  per-unit register, the Demo-year fly total) and one new visual-QA check with two new screenshots.
+  Two test selectors changed from `text=Reports` to `a[href='#/reports']` because the new
+  "Service Reports" sub-heading also contains the word — a text selector now matches it first.
 
-### `e2e_smoke.py` — all 76 check sites passed (the "Section C / D / E is announced next" row runs three times, so 78 checks at run time), 0 unexpected console errors
+### `e2e_smoke.py` — all 84 check sites passed (the "Section C / D / E is announced next" row runs three times, so 86 checks at run time), 0 unexpected console errors
 
 | # | Check | Result |
 |---|---|---|
@@ -123,51 +137,59 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
 | 29 | Rodent report shows the reported 2025 history (2 rodents, May & June) | PASS |
 | 30 | Digital rodent total over the demo year is non-zero (pattern applied) | PASS |
 | 31 | Rodent report breaks catches down by location | PASS |
-| 32 | Live mode banner visible after switch | PASS |
-| 33 | CAPA home offers exactly the two options, Internal and External | PASS |
-| 34 | CAPA Internal list shows seeded Dec-2023 inspection | PASS |
-| 35 | CAPA External list shows the F/MKT/05 checklist | PASS |
-| 36 | New complaint auto-starts the assistant walk-through | PASS |
-| 37 | Assistant asks for the customer first | PASS |
-| 38 | Header details captured on the form | PASS |
-| 39 | Assistant announces Section A | PASS |
-| 40 | Section B is announced after A's five activities | PASS |
-| 41 | Section C / D / E is announced next | PASS |
-| 42 | After E the assistant asks for approval | PASS |
-| 43 | Form shows all 31 activities done | PASS |
-| 44 | Assistant confirms submission | PASS |
-| 45 | Checklist status is Pending Verification (awaiting approval) | PASS |
-| 46 | Prepared By was stamped with the logged-in user | PASS |
-| 47 | Assistant offers to approve | PASS |
-| 48 | Assistant confirms approval | PASS |
-| 49 | Checklist status is Verified (approved) | PASS |
-| 50 | Training list shows seeded record | PASS |
-| 51 | Training list shows the Dec-2025 awareness programme | PASS |
-| 52 | SOC list shows both statements | PASS |
-| 53 | SOC detail renders the declaration | PASS |
-| 54 | Chemical master shows pesticide chart | PASS |
-| 55 | SOP reference shows Lizard quarterly frequency | PASS |
-| 56 | Reports page renders tabs | PASS |
-| 57 | Lamination QC report renders | PASS |
-| 58 | Document Library lists all 22 documents | PASS |
-| 59 | Document Library shows the lamination module | PASS |
-| 60 | Document Library shows the QC inspection module | PASS |
-| 61 | Document Library groups both CAPA documents under the CAPA module | PASS |
-| 62 | Sidebar has a collapsible Pest Control module header | PASS |
-| 63 | Sidebar has a CAPA module with Internal and External links | PASS |
-| 64 | Pest Control module starts expanded (Training link visible) | PASS |
-| 65 | Collapsing the module header hides its links | PASS |
-| 66 | A collapsed module stays collapsed after navigating elsewhere | PASS |
-| 67 | Expanding it again restores the links | PASS |
-| 68 | Module link deep-links Document Library filtered to that module | PASS |
-| 69 | Filtered library shows only that module's documents | PASS |
-| 70 | Opened the F/QC/37 pouching inspection from Day View | PASS |
-| 71 | Inspection shows the 11 printed test parameters | PASS |
-| 72 | Inspection observations were pre-filled from the specimen | PASS |
-| 73 | Lot status pre-set to Accepted and inspector signed | PASS |
-| 74 | Inspection record submitted | PASS |
-| 75 | Search returns results for PC-01 | PASS |
-| 76 | Search finds the lamination operator on the prepared log sheets | PASS |
+| 32 | Fly Catcher Infestation trend has a non-zero yearly total in Demo Mode (seasonal fly pattern applied) | PASS |
+| 33 | Fly Catcher Infestation trend lists all 13 units in the company's year layout | PASS |
+| 34 | Live mode banner visible after switch | PASS |
+| 35 | CAPA home offers exactly the two options, Internal and External | PASS |
+| 36 | CAPA Internal list shows seeded Dec-2023 inspection | PASS |
+| 37 | CAPA External list shows the F/MKT/05 checklist | PASS |
+| 38 | New complaint auto-starts the assistant walk-through | PASS |
+| 39 | Assistant asks for the customer first | PASS |
+| 40 | Header details captured on the form | PASS |
+| 41 | Assistant announces Section A | PASS |
+| 42 | Section B is announced after A's five activities | PASS |
+| 43 | Section C / D / E is announced next | PASS |
+| 44 | After E the assistant asks for approval | PASS |
+| 45 | Form shows all 31 activities done | PASS |
+| 46 | Assistant confirms submission | PASS |
+| 47 | Checklist status is Pending Verification (awaiting approval) | PASS |
+| 48 | Prepared By was stamped with the logged-in user | PASS |
+| 49 | Assistant offers to approve | PASS |
+| 50 | Assistant confirms approval | PASS |
+| 51 | Checklist status is Verified (approved) | PASS |
+| 52 | Training list shows seeded record | PASS |
+| 53 | Training list shows the Dec-2025 awareness programme | PASS |
+| 54 | SOC list shows both statements | PASS |
+| 55 | SOC detail renders the declaration | PASS |
+| 56 | Chemical master shows pesticide chart | PASS |
+| 57 | SOP reference shows Lizard quarterly frequency | PASS |
+| 58 | Reports page renders tabs | PASS |
+| 59 | Lamination QC report renders | PASS |
+| 60 | Document Library lists all 21 documents | PASS |
+| 61 | Document Library shows the lamination module | PASS |
+| 62 | Document Library shows the QC inspection module | PASS |
+| 63 | Document Library groups both CAPA documents under the CAPA module | PASS |
+| 64 | Sidebar has a collapsible Pest Control module header | PASS |
+| 65 | Sidebar has a CAPA module with Internal and External links | PASS |
+| 66 | Pest Control module starts expanded (Training link visible) | PASS |
+| 67 | Collapsing the module header hides its links | PASS |
+| 68 | A collapsed module stays collapsed after navigating elsewhere | PASS |
+| 69 | Expanding it again restores the links | PASS |
+| 70 | Module link deep-links Document Library filtered to that module | PASS |
+| 71 | Filtered library shows only that module's documents | PASS |
+| 72 | Pest Control module lists its report groups in the sidebar | PASS |
+| 73 | Rat / Mice service reports open on their own page | PASS |
+| 74 | Service report list shows this month's fortnightly visit(s) | PASS |
+| 75 | Daily Report page shows the month register with today's row | PASS |
+| 76 | Fly Catcher Infestation page renders the per-unit register (Live) | PASS |
+| 77 | Pest Control overview shows the four groups | PASS |
+| 78 | Opened the F/QC/37 pouching inspection from Day View | PASS |
+| 79 | Inspection shows the 11 printed test parameters | PASS |
+| 80 | Inspection observations were pre-filled from the specimen | PASS |
+| 81 | Lot status pre-set to Accepted and inspector signed | PASS |
+| 82 | Inspection record submitted | PASS |
+| 83 | Search returns results for PC-01 | PASS |
+| 84 | Search finds the lamination operator on the prepared log sheets | PASS |
 
 (One benign console entry — the pre-login `GET /api/auth/me` 401, expected on every fresh
 session — is filtered out of the "unexpected console errors" check rather than counted as a
@@ -181,7 +203,7 @@ it now deliberately fills the year so far on entering Demo Mode, so the check wa
 assert what the original bug was actually about: demo data exists and is real data, not blank
 shells.
 
-### `visual_qa.py` — 12/12 interaction checks passed, 0 JS errors
+### `visual_qa.py` — 12/12 interaction checks passed (12 `check()` calls at run time), 0 JS errors
 
 | # | Check | Result |
 |---|---|---|
@@ -192,10 +214,11 @@ shells.
 | 5 | Process Parameter / ALC & Production / Adhesive Mixing log sheets open with the prepared banner | PASS |
 | 6 | Created a new CAPA record, added a finding | PASS |
 | 7 | Created a new Training record, added an attendee | PASS |
-| 8 | SOC detail page renders | PASS |
-| 9 | Print media emulation renders a clean original-style layout (no sidebar/topbar/buttons) | PASS |
-| 10 | 18 full-page screenshots captured for visual review (`tests/shots/`) | PASS |
-| 11 | No JS errors across the whole pass | PASS |
+| 8 | Pest Control overview renders its four groups — Daily Report / Service Reports / Trend Analysis / Training & Reference (captured as `15_pest_control_overview.png`; the Fly Catcher Infestation page as `16_pest_fly_catcher_infestation.png`) | PASS |
+| 9 | SOC detail page renders | PASS |
+| 10 | Print media emulation renders a clean original-style layout (no sidebar/topbar/buttons) | PASS |
+| 11 | 20 full-page screenshots captured for visual review (`tests/shots/`) | PASS |
+| 12 | No JS errors across the whole pass | PASS |
 
 ### `e2e_assistant_chat.py` — 8/8 checks passed, 0 JS errors (real Groq calls)
 

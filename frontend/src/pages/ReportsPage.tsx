@@ -9,9 +9,9 @@ import { countFindings } from "../engine/checkpoints";
 import { logSheetOutOfBandCount } from "../engine/validation";
 import { summarise } from "../engine/guidedChecklist";
 import { COMPLAINT_DOC_ID } from "../data/seed/complaintChecklist";
-import { rodentStatsForYear, type RodentMonth } from "../data/selectors";
+import { flyStatsForYear, rodentStatsForYear, type RodentMonth } from "../data/selectors";
 import { totalRodents } from "../engine/rodentPattern";
-import { RODENT_HISTORY_REPORTED, RODENT_HISTORY_SOURCE, RODENT_REPORT_MONTHS } from "../data/seed/rodentPattern";
+import { FLY_REPORT_SOURCE, RODENT_HISTORY_REPORTED, RODENT_HISTORY_SOURCE, RODENT_REPORT_MONTHS } from "../data/seed/pestPattern";
 import { MONTH_NAMES, daysInMonth, pad2, formatDisplayDate } from "../utils/date";
 import { toCSV, downloadCSV } from "../utils/csv";
 import { MiniBarChart } from "../components/reports/MiniBarChart";
@@ -19,7 +19,6 @@ import { DemoTag } from "../components/common/DemoTag";
 import type {
   ComplaintChecklistData,
   DailyPestMonitoringData,
-  FlyCatcherData,
   GapInspectionData,
   LogSheetData,
   RecordInstance,
@@ -31,8 +30,8 @@ type Tab = "monthly" | "daily" | "rodent" | "flycatcher" | "chemical" | "gap" | 
 const TABS: { key: Tab; label: string }[] = [
   { key: "monthly", label: "Monthly Records Report" },
   { key: "daily", label: "Daily Monitoring Summary" },
-  { key: "rodent", label: "Rodent Trend" },
-  { key: "flycatcher", label: "Fly Catcher Trend" },
+  { key: "rodent", label: "Rodent Catch Trend" },
+  { key: "flycatcher", label: "Fly Catcher Infestation" },
   { key: "chemical", label: "Chemical Usage" },
   { key: "gap", label: "CAPA Status" },
   { key: "training", label: "Training Status" },
@@ -375,7 +374,8 @@ function DailyMonitoringReport({ isDemo, year, month }: { isDemo: boolean; year:
 // The reported history rows are transcribed verbatim from that page; the
 // digital row is added up from the Daily Pest Control Monitoring Records'
 // checkpoint-7 catch details (box, location, number of rodents).
-function RodentTrendReport({ isDemo, year }: { isDemo: boolean; year: number }) {
+// Exported: also rendered by Pest Control > Trend Analysis (src/pages/PestControlPages.tsx).
+export function RodentTrendReport({ isDemo, year }: { isDemo: boolean; year: number }) {
   const stats = rodentStatsForYear(year, isDemo);
   const reported = RODENT_HISTORY_REPORTED;
   const exportCSV = () => {
@@ -514,37 +514,120 @@ function RodentTrendReport({ isDemo, year }: { isDemo: boolean; year: number }) 
   );
 }
 
-function FlyCatcherTrendReport({ isDemo, year, month }: { isDemo: boolean; year: number; month: number }) {
-  const dim = daysInMonth(year, month);
-  const records = recordRepository.query({
-    documentId: "fly-catcher",
-    isDemo,
-    fromDate: `${year}-${pad2(month + 1)}-01`,
-    toDate: `${year}-${pad2(month + 1)}-${pad2(dim)}`,
-  }) as RecordInstance<FlyCatcherData>[];
-
-  const byPc = new Map<string, number>();
-  for (const r of records) {
-    for (const e of r.data.entries) {
-      byPc.set(e.pcId, (byPc.get(e.pcId) ?? 0) + (e.catchCountApprox ?? 0));
-    }
-  }
-  const labels = Array.from(byPc.keys()).sort();
-  const values = labels.map((l) => byPc.get(l) ?? 0);
+// Fly Catcher Infestation — the same Source / Unit / Target Pest / Year /
+// Jan..Dec / Total layout the company uses for its Rodent Catch Report,
+// applied to the fortnightly F/HR/18 counts: one overall row, then every
+// unit PC-01..PC-13 with its location. Exported: also rendered by Pest
+// Control > Trend Analysis (src/pages/PestControlPages.tsx).
+export function FlyCatcherTrendReport({ isDemo, year, month }: { isDemo: boolean; year: number; month: number }) {
+  const stats = flyStatsForYear(year, isDemo);
+  const monthUnits = stats.byUnit.map((u) => ({ label: u.pcId, value: u.months[month] }));
+  const monthTotal = stats.months[month];
+  const exportCSV = () => {
+    const header = ["Source", "Unit", "Target Pest", "Year", ...RODENT_REPORT_MONTHS, "Total"];
+    const rows: (string | number)[][] = [
+      ["Fly catcher glue boards, PC-01 to PC-13 (F/HR/18) — all units", "Number (approx. flies)", "Flies", year, ...stats.months, stats.total],
+      ...stats.byUnit.map((u) => [`${u.pcId} — ${u.location}`, "Number (approx. flies)", "Flies", year, ...u.months, u.total]),
+    ];
+    downloadCSV(`fly-catcher-infestation-${year}.csv`, toCSV(header, rows));
+  };
+  const busiest = stats.byUnit.slice().sort((a, b) => b.total - a.total)[0];
 
   return (
     <div className="card">
       <div className="card-header">
-        <h3 className="text-lg">
-          Fly Catcher Trend — {MONTH_NAMES[month]} {year}
-        </h3>
+        <h3 className="text-lg">Fly Catcher Infestation Trend — {year}</h3>
+        <button className="btn btn-secondary btn-sm" onClick={exportCSV}>
+          <FiDownload size={13} /> Export CSV
+        </button>
+      </div>
+      <div className="doc-table" style={{ border: "none", borderBottom: "1px solid var(--color-border)" }}>
+        <table className="compact">
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th>Unit</th>
+              <th>Target Pest</th>
+              <th>Year</th>
+              {RODENT_REPORT_MONTHS.map((m) => (
+                <th key={m} style={{ textAlign: "center" }}>
+                  {m}
+                </th>
+              ))}
+              <th style={{ textAlign: "center" }}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style={{ background: "var(--color-surface-alt)" }}>
+              <td className="text-sm font-semibold">
+                Fly catcher glue boards, PC-01 … PC-13 (F/HR/18) <span className="text-faint text-xs">(digital, all units)</span>
+              </td>
+              <td className="text-sm">Number (approx. flies)</td>
+              <td className="text-sm">Flies</td>
+              <td className="text-sm">{year}</td>
+              {stats.months.map((n, i) => (
+                <td key={i} className={`text-sm ${n ? "font-semibold" : "text-faint"}`} style={{ textAlign: "center" }}>
+                  {n}
+                </td>
+              ))}
+              <td className="text-sm font-semibold" style={{ textAlign: "center" }}>
+                {stats.total}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
       <div className="card-pad">
-        {labels.length === 0 ? (
-          <p className="text-muted text-sm">No Fly Catcher records for this month yet.</p>
+        <p className="text-xs text-muted mb-2">
+          {stats.total} flies caught in {year} across {stats.visits} inspection{stats.visits === 1 ? "" : "s"}
+          {busiest && busiest.total > 0 ? `; busiest unit ${busiest.pcId} (${busiest.location}) with ${busiest.total}` : ""}. Counts are the technician's approximate
+          per-board count at each fortnightly cleaning, added up per month.
+        </p>
+        <MiniBarChart labels={MONTH_NAMES.map((n) => n.slice(0, 3))} values={stats.months} color="var(--color-warning)" />
+
+        <h4 className="text-sm font-semibold mt-4 mb-2">Per unit — {year}</h4>
+        <div className="doc-table">
+          <table className="compact fly-units">
+            <thead>
+              <tr>
+                <th>PC ID</th>
+                <th>Location</th>
+                {RODENT_REPORT_MONTHS.map((m) => (
+                  <th key={m} style={{ textAlign: "center" }}>
+                    {m}
+                  </th>
+                ))}
+                <th style={{ textAlign: "center" }}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats.byUnit.map((u) => (
+                <tr key={u.pcId}>
+                  <td className="text-sm font-semibold">{u.pcId}</td>
+                  <td className="text-sm">{u.location}</td>
+                  {u.months.map((n, i) => (
+                    <td key={i} className={`text-sm ${n ? "" : "text-faint"}`} style={{ textAlign: "center" }}>
+                      {n}
+                    </td>
+                  ))}
+                  <td className="text-sm font-semibold" style={{ textAlign: "center" }}>
+                    {u.total}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <h4 className="text-sm font-semibold mt-4 mb-2">
+          {MONTH_NAMES[month]} {year} — flies per unit
+        </h4>
+        {monthTotal === 0 ? (
+          <p className="text-muted text-sm">No flies counted in {MONTH_NAMES[month]} {year} yet (no inspection recorded, or every board was clean).</p>
         ) : (
-          <MiniBarChart labels={labels} values={values} color="var(--color-warning)" />
+          <MiniBarChart labels={monthUnits.map((u) => u.label)} values={monthUnits.map((u) => u.value)} color="var(--color-warning)" />
         )}
+        <p className="text-xs text-faint mt-3">Layout follows the company's Rodent Catch Report; source register: {FLY_REPORT_SOURCE}.</p>
       </div>
     </div>
   );

@@ -17,6 +17,7 @@ import { createDefaultData } from "./recordDefaults";
 import { resolveResponsibleEmployees } from "./documentInfo";
 import { fixedMaterialForServiceArea } from "./serviceMaterials";
 import { describeRodentEvent, rodentEventFor, totalRodents } from "./rodentPattern";
+import { flyCatchFor, flySeasonLabel } from "./flyPattern";
 import { formatDisplayDate } from "../utils/date";
 import { generateId } from "../utils/id";
 import { makeRng, type Rng } from "../utils/random";
@@ -171,12 +172,15 @@ function fillFlyCatcher(
   dueDate: string,
   master: MasterData,
   previous: RecordInstance<FlyCatcherData> | undefined,
-  rng: Rng
+  _rng: Rng
 ): AutoFillResult {
   const base = createDefaultData(doc, dueDate, master) as FlyCatcherData;
   const cleaner = master.employees.find((e) => e.id === "emp-vijay")?.name ?? "Vijay";
   const verifier = master.employees.find((e) => e.id === "emp-checker-1")?.name ?? "Roshni";
   let missingDates = 0;
+  // Catch counts follow the seasonal fly pattern per unit (engine/flyPattern.ts,
+  // calibrated to the August-26 specimen) so the Fly Catcher Infestation
+  // trend has a real shape — not a uniform random number per box.
   const entries = base.entries.map((e) => {
     const prev = previous?.data.entries.find((p) => p.pcId === e.pcId);
     const install = prev?.tubeLightInstallDate ?? null;
@@ -184,7 +188,7 @@ function fillFlyCatcher(
     if (!install || !due) missingDates += 1;
     return {
       ...e,
-      catchCountApprox: rng.int(0, 4),
+      catchCountApprox: flyCatchFor(e.pcId, dueDate),
       tubeLightInstallDate: install,
       tubeLightDueDate: due,
       cleaningDoneBy: prev?.cleaningDoneBy?.trim() || cleaner,
@@ -192,8 +196,10 @@ function fillFlyCatcher(
     };
   });
   const counts = entries.map((e) => e.catchCountApprox ?? 0);
+  const total = counts.reduce((s, n) => s + n, 0);
+  const month = Number(dueDate.slice(5, 7)) - 1;
   const notes = [
-    `Filled all ${entries.length} fly catcher units (PC-01 to PC-${String(entries.length).padStart(2, "0")}) with approximate catch counts ${Math.min(...counts)}–${Math.max(...counts)}.`,
+    `Filled all ${entries.length} fly catcher units (PC-01 to PC-${String(entries.length).padStart(2, "0")}) with approximate catch counts ${Math.min(...counts)}–${Math.max(...counts)} (${total} flies in total — ${flySeasonLabel(month)}).`,
     `Cleaning done by ${cleaner}, verified by ${verifier}.`,
   ];
   if (missingDates > 0) {
@@ -209,7 +215,7 @@ function fillFlyCatcher(
 }
 
 // ---------------------------------------------------------------------------
-// 3. Pest Control Service Report (Rodent / General / Fly / Lizard)
+// 3. Pest Control Service Report (Rat / Mice, Ants & Cockroaches, Fly)
 
 function typicalQty(materialName: string, rng: Rng): string {
   if (materialName === "Glue Board") return `${rng.int(3, 4)}`;

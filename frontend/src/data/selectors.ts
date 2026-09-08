@@ -1,8 +1,9 @@
 // Cross-cutting read helpers used by Dashboard / Reports / Search so pages
 // don't duplicate aggregation logic.
-import type { DailyPestMonitoringData, GapFinding, GapInspectionData, RecordInstance } from "../types";
+import type { DailyPestMonitoringData, FlyCatcherData, GapFinding, GapInspectionData, RecordInstance } from "../types";
 import { recordRepository } from "./repositories/recordRepository";
 import { documentRepository } from "./repositories/documentRepository";
+import { masterRepository } from "./repositories/masterRepository";
 import { todayISO, compareISO, pad2 } from "../utils/date";
 import { totalRodents } from "../engine/rodentPattern";
 
@@ -89,6 +90,66 @@ export function rodentsInMonth(year: number, month: number, isDemo: boolean): nu
   return (recordRepository.query({ documentId: "daily-pest-monitoring", isDemo, fromDate: from, toDate: to }) as RecordInstance<DailyPestMonitoringData>[])
     .filter((r) => !r.data.isHoliday && r.data.checkpoints[7]?.value === "Yes")
     .reduce((s, r) => s + Math.max(totalRodents(r.data.rodentCatches), r.data.rodentCatches?.length ? 0 : 1), 0);
+}
+
+// Flies counted on the Fortnightly Fly Catcher Inspection & Cleaning Record
+// (F/HR/18, "Flies Catch Count Approx." per unit per visit) — what Pest
+// Control > Trend Analysis > Fly Catcher Infestation adds up. Every unit in
+// Master Data is listed (with zeros) so the per-unit table is always the
+// full PC-01..PC-13 register, even before any inspection is recorded.
+export interface FlyUnitStats {
+  pcId: string;
+  location: string;
+  months: number[]; // Jan..Dec
+  total: number;
+}
+
+export interface FlyYearStats {
+  year: number;
+  months: number[]; // Jan..Dec, all units
+  total: number;
+  visits: number; // inspection records with at least one count filled in
+  byUnit: FlyUnitStats[];
+}
+
+export function flyStatsForYear(year: number, isDemo: boolean): FlyYearStats {
+  const master = masterRepository.get();
+  const records = recordRepository.query({
+    documentId: "fly-catcher",
+    isDemo,
+    fromDate: `${year}-01-01`,
+    toDate: `${year}-12-31`,
+  }) as RecordInstance<FlyCatcherData>[];
+  const units = new Map<string, FlyUnitStats>();
+  for (const pc of master.pcLocations) {
+    const floor = pc.floor && pc.floor !== "TO BE CONFIRMED" ? ` (${pc.floor})` : "";
+    units.set(pc.id, { pcId: pc.id, location: `${pc.location}${floor}`, months: Array(12).fill(0), total: 0 });
+  }
+  const months: number[] = Array(12).fill(0);
+  let visits = 0;
+  for (const r of records) {
+    const m = Number(r.dueDate.slice(5, 7)) - 1;
+    let counted = false;
+    for (const e of r.data.entries) {
+      if (e.catchCountApprox === null || e.catchCountApprox === undefined) continue;
+      const n = Number(e.catchCountApprox) || 0;
+      counted = true;
+      let u = units.get(e.pcId);
+      if (!u) {
+        u = { pcId: e.pcId, location: "Location not in Master Data", months: Array(12).fill(0), total: 0 };
+        units.set(e.pcId, u);
+      }
+      u.months[m] += n;
+      u.total += n;
+      months[m] += n;
+    }
+    if (counted) visits += 1;
+  }
+  return { year, months, total: months.reduce((s, n) => s + n, 0), visits, byUnit: Array.from(units.values()) };
+}
+
+export function fliesInMonth(year: number, month: number, isDemo: boolean): number {
+  return flyStatsForYear(year, isDemo).months[month] ?? 0;
 }
 
 export function allGapFindings(isDemo: boolean): { record: RecordInstance<GapInspectionData>; finding: GapFinding }[] {

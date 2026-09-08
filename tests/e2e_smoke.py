@@ -220,12 +220,14 @@ def main():
 
         # ---- 6b. Rodent catch pattern, in the company's own report layout ----
         # The demo year's Daily Pest Control Monitoring Records follow the
-        # generated seasonal catch pattern (tools/rodent_pattern.py), so the
-        # Rodent Trend report must show the reported history rows AND a
+        # generated seasonal catch pattern (tools/pest_pattern.py), so the
+        # Rodent Catch Trend report must show the reported history rows AND a
         # non-zero digital total with per-location detail.
-        page.click("text=Reports")
+        # (href selector: the sidebar's "Service Reports" sub-heading also
+        # contains the word "Reports", so a text= selector would hit it first.)
+        page.click("a[href='#/reports']")
         page.wait_for_timeout(300)
-        page.click(".pill-tab:has-text('Rodent Trend')")
+        page.click(".pill-tab:has-text('Rodent Catch Trend')")
         page.wait_for_timeout(400)
         # inner_text honours the table-header text-transform (uppercase), so
         # compare case-insensitively.
@@ -235,6 +237,16 @@ def main():
         digital_total = re.search(r"\((\d+) in total across (\d+) days?", rodent_report)
         check("Digital rodent total over the demo year is non-zero (pattern applied)", digital_total is not None and int(digital_total.group(1)) > 0)
         check("Rodent report breaks catches down by location", "where they were found" in rodent_report and ("canteen" in rodent_report or "rm inward" in rodent_report or "store" in rodent_report))
+
+        # The fly catcher counts follow the seasonal per-unit pattern from the
+        # same tool, so the Fly Catcher Infestation trend over the demo year
+        # must add up to something (and list every unit in the company layout).
+        page.click(".pill-tab:has-text('Fly Catcher Infestation')")
+        page.wait_for_timeout(400)
+        fly_report = page.locator(".app-content").inner_text().lower()
+        fly_total = re.search(r"(\d+) flies caught in", fly_report)
+        check("Fly Catcher Infestation trend has a non-zero yearly total in Demo Mode (seasonal fly pattern applied)", fly_total is not None and int(fly_total.group(1)) > 0)
+        check("Fly Catcher Infestation trend lists all 13 units in the company's year layout", "target pest" in fly_report and page.locator("table.fly-units tbody tr").count() == 13)
 
         # switch back to live and confirm demo doesn't leak
         page.click("text=Live Mode")
@@ -328,7 +340,7 @@ def main():
         check("SOP reference shows Lizard quarterly frequency", "Quarterly" in page.content())
 
         # ---- 11. Reports ----
-        page.click("text=Reports")
+        page.click("a[href='#/reports']")
         page.wait_for_timeout(300)
         check("Reports page renders tabs", "Monthly Records Report" in page.content())
         page.click(".pill-tab:has-text('Lamination QC')")
@@ -338,7 +350,7 @@ def main():
         # ---- 12. Document Library ----
         page.click("text=Document Library")
         page.wait_for_timeout(300)
-        check("Document Library lists all 22 documents", page.locator(".doc-table tbody tr").count() == 22)
+        check("Document Library lists all 21 documents", page.locator(".doc-table tbody tr").count() == 21)
         check("Document Library shows the lamination module", "Lamination — Quality Control" in page.content())
         check("Document Library shows the QC inspection module", "Quality Control — Inspection Records" in page.content())
         check("Document Library groups both CAPA documents under the CAPA module", page.locator(".app-content h3:has-text('CAPA (Corrective')").count() == 1)
@@ -365,6 +377,28 @@ def main():
         # the sidebar itself always lists every module's name regardless of
         # which page is open, so checking the whole page would always fail.
         check("Filtered library shows only that module's documents", "Lamination — Production" not in page.locator(".app-content").inner_text())
+
+        # ---- 12c. Pest Control module: Daily Report / Service Reports / Trend Analysis ----
+        # The module is organised the way the department reads its paperwork
+        # (src/pages/PestControlPages.tsx); each group has its own page.
+        check(
+            "Pest Control module lists its report groups in the sidebar",
+            all(page.locator(f".nav-sub-label:has-text('{h}')").count() == 1 for h in ["Daily Report", "Service Reports", "Trend Analysis", "Training & Reference"]),
+        )
+        page.click("a:has-text('Rat / Mice')")
+        page.wait_for_timeout(300)
+        check("Rat / Mice service reports open on their own page", "#/pest/service/rodent" in page.url and "Rodent Control Service" in page.locator(".app-content").inner_text())
+        check("Service report list shows this month's fortnightly visit(s)", page.locator(".doc-table tbody tr").count() >= 1)
+        page.click("a:has-text('Daily Pest Control Monitoring')")
+        page.wait_for_timeout(300)
+        check("Daily Report page shows the month register with today's row", "#/pest/daily" in page.url and page.locator(".doc-table tbody tr.is-today").count() == 1)
+        page.click("a:has-text('Fly Catcher Infestation')")
+        page.wait_for_timeout(300)
+        check("Fly Catcher Infestation page renders the per-unit register (Live)", "#/pest/trend/fly-catcher" in page.url and page.locator("table.fly-units tbody tr").count() == 13)
+        page.click("a[href='#/pest-control']")
+        page.wait_for_timeout(300)
+        overview = page.locator(".app-content").inner_text()
+        check("Pest Control overview shows the four groups", all(x in overview for x in ["Daily Report", "Service Reports", "Trend Analysis", "Training & Reference"]))
 
         # ---- 12b. A fixed-parameter inspection record (F/QC/37), prepared by the assistant ----
         page.click("text=Record Calendar")

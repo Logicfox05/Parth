@@ -58,15 +58,30 @@ The app behaves like a personal assistant rather than a blank form:
   Compliance each expand/collapse independently; a module you close stays closed until you open it
   again (remembered per browser). Modules without their own list page link into Document Library
   pre-filtered to just that module (`/library/{module-slug}`).
+- **The Pest Control module is laid out the way the department reads its paperwork** (`/pest-control`
+  overview, `src/pages/PestControlPages.tsx`): **Daily Report** — the Daily Pest Control Monitoring
+  Record as a month register (`/pest/daily`); **Service Reports** — Gurudev Pest Control's three
+  fortnightly visit reports, Rat / Mice (Rodent Control Service), Ants & Cockroaches (General Pest
+  Control Services) and Fly Control (`/pest/service/{rodent|general|fly}`), each with last visit,
+  next due, materials and areas; **Trend Analysis** — the Rodent Catch Report and Trend Analysis and
+  the Fly Catcher Infestation trend (`/pest/trend/{rodent|fly-catcher}`), both in the company's own
+  Source / Unit / Target Pest / Year / Jan–Dec / Total layout; **Training & Reference** — Training
+  Records, Chemical Master, SOP. The assistant navigates there from plain speech ("show me the rat
+  reports", "fly catcher infestation for this year").
 
 ## What's implemented
 
-**Documents (22 configured):**
+**Documents (21 configured):**
 
-- Pest Control (9): Daily Pest Control Monitoring Record (F/HR/17), Fortnightly Fly Catcher Record
-  (F/HR/18), Service Reports (Rodent / General / Fly / Lizard), Training Record (**Yearly**, with both
-  the Dec-2025 technician certificate and the 24-Dec-2025 awareness programme loaded as history),
-  Chemical Master, SOP.
+- Pest Control (8), in the module's four groups — *Daily Report*: Daily Pest Control Monitoring
+  Record (F/HR/17). *Service Reports*: Rat / Mice (Rodent Control Service), Ants & Cockroaches
+  (General Pest Control Services), Fly Control Services — the three reports in the April-2026
+  service-report workbook. *Trend Analysis*: Fortnightly Fly Catcher Inspection & Cleaning Record
+  (F/HR/18), which feeds the Fly Catcher Infestation trend (the Rodent Catch trend is computed from
+  the daily record). *Training & Reference*: Training Record (**Yearly**, with both the Dec-2025
+  technician certificate and the 24-Dec-2025 awareness programme loaded as history), Chemical
+  Master, SOP. (A Lizard Control service-report variant that existed earlier was retired — no
+  specimen for it exists in the uploaded files; the SOP's lizard section is still in SOP Reference.)
 - CAPA (Corrective & Preventive Action) (2): **Internal** — Pest Control Inspection Findings Report
   (the Dec-2023 GAP report as history); **External** — Customer Complaint Handling Checklist
   (F/MKT/05, Rev 00 / 21.07.2026): 31 activities in five sections A–E plus Prepared-by / Approved-by,
@@ -96,7 +111,8 @@ row, no new component.
   tables rather than a generic form:
   1. Daily Pest Control Monitoring Record (F/HR/17) — 10 checkpoints, daily.
   2. Fortnightly Fly Catcher Inspection & Cleaning Record (F/HR/18) — PC‑01…PC‑13.
-  3. Pest Control Service Report — Rodent / General Pest / Fly / Lizard Control variants.
+  3. Pest Control Service Report — Rat / Mice (Rodent), Ants & Cockroaches (General Pest) and Fly
+     Control variants.
   4. GAP / Corrective Action report (with the real Dec‑2023 findings loaded as history).
   5. Training Record (with the real Dec‑2025 technician certificate loaded as history).
   6. Chemical Master (Pesticide Application Chart) + SOP reference.
@@ -113,12 +129,15 @@ row, no new component.
   digital total, a bar chart, and where-found / which-box breakdowns), Fly Catcher Trend, Chemical
   Usage, CAPA Status, Training Status, **Lamination QC** — all computed from stored data, with CSV
   export and original-style print.
-- **Rodent pattern**: the Daily Pest Control Monitoring Record's pre-fill (and Demo Mode) follows a
-  generated seasonal catch pattern — mostly quiet days, a few catches a year clustered in the
-  monsoon, each with trap box, location and number of rodents — produced by `tools/rodent_pattern.py`
-  (Python + numpy, calibrated against the company's reported 0 / 2 / 0 rodents for 2024 / 2025 /
-  Jan–Jun 2026) and applied deterministically per date by `src/engine/rodentPattern.ts`. Answering
-  Yes to checkpoint 7 by hand opens the same catch-details table.
+- **Pest patterns**: the Daily Pest Control Monitoring Record's pre-fill (and Demo Mode) follows a
+  generated seasonal rodent-catch pattern — mostly quiet days, a few catches a year clustered in the
+  monsoon, each with trap box, location and number of rodents — and the Fly Catcher record's counts
+  follow a seasonal per-unit fly pattern (busy entrances and dispatch gates in the monsoon, near-empty
+  boards in winter). Both are produced by `tools/pest_pattern.py` (Python + numpy; rodents calibrated
+  against the company's reported 0 / 2 / 0 rodents for 2024 / 2025 / Jan–Jun 2026, flies against the
+  August-2026 F/HR/18 specimen) into `src/data/seed/pestPattern.ts`, and applied deterministically per
+  date by `src/engine/rodentPattern.ts` / `flyPattern.ts`. Answering Yes to checkpoint 7 by hand opens
+  the same catch-details table.
 - **Master Data** screen (Employees, Chemicals, PC IDs, Rodent Stations, Areas, Checkpoints,
   Documents) seeded from source, editable for the fields safe to edit in a prototype.
 - **Global search** across records, dates, PC IDs, employees, status.

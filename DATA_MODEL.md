@@ -138,8 +138,21 @@ only so records saved before the field existed still load; validation requires a
 (`rodentStatsForYear`, `rodentsInMonth`) adds these up for Reports > Rodent Catch Report and the
 Dashboard tile. The values the assistant / Demo Mode put there come from `engine/rodentPattern.ts`
 (`rodentEventFor(dateISO)`, seeded per calendar date) using the parameters in
-`data/seed/rodentPattern.ts`, which is **generated** by `tools/rodent_pattern.py` — edit the Python
-and re-run it rather than the `.ts`.
+`data/seed/pestPattern.ts`, which is **generated** by `tools/pest_pattern.py` — edit the Python
+and re-run it rather than the `.ts`. The same generated module carries the fly-catcher pattern
+(`FLY_MONTHLY_FACTOR`, `FLY_UNIT_BASE`) that `engine/flyPattern.ts` (`flyCatchFor(pcId, dateISO)`)
+turns into `FlyCatcherEntry.catchCountApprox`; `data/selectors.ts` (`flyStatsForYear`, `fliesInMonth`)
+adds those up per unit / per month for the Fly Catcher Infestation trend.
+
+`DocumentDefinition.section?: string` is an optional sub-grouping inside a module — Pest Control uses
+"Daily Report" / "Service Reports" / "Trend Analysis" / "Training & Reference" (order in
+`PEST_CONTROL_SECTIONS`, `data/seed/documentDefinitions.ts`). The Document Library sorts a module's
+rows by it; the Pest Control pages (`pages/PestControlPages.tsx`, routes `/pest-control`,
+`/pest/daily[/{y}/{m0}]`, `/pest/service/{rodent|general|fly}[/{y}]`, `/pest/trend/{rodent|fly-catcher}[/{y}]`,
+validated in `store/router.tsx`) are the module's own front door — they read the same
+`recordRepository` and never copy data. `RETIRED_DOCUMENT_IDS` (same seed file) lists withdrawn
+document ids: `documentRepository.ensureSeeded` drops the definition, `masterRepository.ensureSeeded`
+its reminder-role entry, and `bootstrap()` any records still stored for it.
 
 ## Record lifecycle (state diagram)
 

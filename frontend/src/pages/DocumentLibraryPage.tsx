@@ -12,9 +12,23 @@ function openTarget(docId: string, kind: string): string {
   if (kind === "sop-reference") return "/sop";
   if (kind === "compliance-statement") return `/soc/${docId}`;
   if (kind === "gap-inspection") return "/gap";
+  if (kind === "complaint-checklist") return "/gap/external";
   if (kind === "training-record") return "/training";
+  // Pest Control documents have their own pages (src/pages/PestControlPages.tsx).
+  if (kind === "daily-pest-monitoring") return "/pest/daily";
+  if (kind === "fly-catcher") return "/pest/trend/fly-catcher";
+  if (kind === "service-report") return `/pest/service/${docId.replace(/^service-report-/, "")}`;
   return "/calendar";
 }
+
+// Within a module, documents are listed in the order of their sections (the
+// department's own grouping — see DocumentDefinition.section); documents
+// without a section keep their seed order after any sectioned ones.
+const SECTION_ORDER = ["Daily Report", "Service Reports", "Trend Analysis", "Training & Reference"];
+const sectionRank = (section: string | undefined) => {
+  const i = section ? SECTION_ORDER.indexOf(section) : -1;
+  return i === -1 ? SECTION_ORDER.length : i;
+};
 
 export function DocumentLibraryPage({ moduleSlug: activeSlug }: { moduleSlug?: string }) {
   const { navigate } = useRouter();
@@ -46,6 +60,7 @@ export function DocumentLibraryPage({ moduleSlug: activeSlug }: { moduleSlug?: s
     arr.push(d);
     byModule.set(d.module, arr);
   }
+  for (const [module, list] of byModule) byModule.set(module, list.slice().sort((a, b) => sectionRank(a.section) - sectionRank(b.section)));
 
   return (
     <div>
@@ -107,9 +122,10 @@ export function DocumentLibraryPage({ moduleSlug: activeSlug }: { moduleSlug?: s
                     <React.Fragment key={d.id}>
                       <tr className="card-clickable" onClick={() => setExpandedId(isOpen ? null : d.id)}>
                         <td>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 wrap">
                             {isOpen ? <FiChevronUp size={12} /> : <FiChevronDown size={12} />}
                             <span className="font-semibold">{d.name}</span>
+                            {d.section && <span className="text-xs text-faint">· {d.section}</span>}
                           </div>
                         </td>
                         <td className={d.formatNo === "TO BE CONFIRMED" ? "tbc" : ""}>

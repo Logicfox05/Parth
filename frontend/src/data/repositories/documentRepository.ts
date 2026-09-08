@@ -1,5 +1,5 @@
 import type { DocumentDefinition } from "../../types";
-import { SEED_DOCUMENTS } from "../seed/documentDefinitions";
+import { RETIRED_DOCUMENT_IDS, SEED_DOCUMENTS } from "../seed/documentDefinitions";
 import { readJSON, writeJSON } from "../storageAdapter";
 
 const KEY = "documents";
@@ -18,11 +18,14 @@ function saveAll(docs: DocumentDefinition[]): void {
 // pick up newly digitized formats (e.g. the lamination QC/production log
 // sheets added from "Audit documents.zip") and schedule changes (Training
 // moving from As Required to Yearly) without anyone clearing localStorage.
-// Any definition that isn't in the seed (none today) is kept untouched.
+// Any definition that isn't in the seed is kept untouched — unless it has
+// been explicitly retired (RETIRED_DOCUMENT_IDS), in which case it is
+// dropped so a withdrawn document doesn't keep generating records.
 export function ensureSeeded(): void {
   const existing = loadAll();
   const seedIds = new Set(SEED_DOCUMENTS.map((d) => d.id));
-  const extras = existing.filter((d) => !seedIds.has(d.id));
+  const retired = new Set(RETIRED_DOCUMENT_IDS);
+  const extras = existing.filter((d) => !seedIds.has(d.id) && !retired.has(d.id));
   const next = [...SEED_DOCUMENTS, ...extras];
   if (JSON.stringify(next) !== JSON.stringify(existing)) saveAll(next);
 }

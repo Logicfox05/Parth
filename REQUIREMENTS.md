@@ -88,6 +88,20 @@ REPORT               Reports > Fly Catcher Trend
   replacement could happen between visits).
 - Sample names observed: Cleaning Done By = "Vijay"; Verified By reads like "Roshni" — **TO BE
   CONFIRMED** exact spelling (same caveat as above).
+- **Specimen counts (August-26, transcribed):** visit 03/08/26 then 17/08/26 — PC-01 1, 1; PC-02 0, 1;
+  PC-03 2, 2; PC-04 1, 1; PC-05 3, 0; PC-06 1, 1; PC-07 1, 1; PC-08 0, 1; PC-09 1, 0; PC-10 2, 1;
+  PC-11 2, 0; PC-12 1, 1; PC-13 1, 0. Tube light installed 24/12/25, replacement due 23/12/26 on
+  every unit (ditto marks on the second row).
+- **Fly Catcher Infestation trend + fly pattern.** This record is the data behind **Pest Control >
+  Trend Analysis > Fly Catcher Infestation** (`/pest/trend/fly-catcher`, also Reports > Fly Catcher
+  Infestation): the per-unit counts are added up per month in the same Source / Unit / Target Pest /
+  Year / Jan–Dec / Total layout as the company's Rodent Catch Report, overall and per unit PC-01…PC-13
+  with its location. The assistant's pre-fill (and Demo Mode) fills "Flies Catch Count Approx." from a
+  generated seasonal per-unit pattern in `tools/pest_pattern.py` → `src/data/seed/pestPattern.ts`,
+  applied by `src/engine/flyPattern.ts`: the August-26 specimen above is taken as the peak-month mean
+  per unit (August is the monsoon peak), other months scaled down by a seasonal factor (February ≈ a
+  third), entrances / dispatch gates weighted up, Poisson-distributed per unit per visit and seeded
+  by unit + date so the same inspection always shows the same counts.
 
 ## 3. Pesticide Application Chart (Chemical Master)
 
@@ -121,8 +135,9 @@ DOCUMENT STRUCTURE   5 sections (General Pest Control, Rodent Control, Fly Contr
 DIGITAL TEMPLATE     kind: "sop-reference" (reference only) — src/pages/SopReferencePage.tsx,
                       content in src/data/seed/sopContent.ts
 DATABASE FIELDS      n/a (static reference content)
-WORKFLOW             As Required / reference. Used to configure checkpoints, chemicals and the
-                      Lizard Control Service document's frequency.
+WORKFLOW             As Required / reference. Used to configure checkpoints and chemicals (its
+                      Lizard-control cadence is noted in §5 — no service-report document exists
+                      for it in the uploaded files).
 REPORT               n/a
 ```
 
@@ -143,13 +158,15 @@ SOURCE DOCUMENT      Service ReportApril 2026.xls (6 sheets: 1st/2nd Service x R
 DOCUMENT STRUCTURE   Header (provider/unit/service name/date) + Sl.No/Area/Material/Qty/Method/
                       Remarks table (fixed area list per service type) + technician/customer signatures
 DIGITAL TEMPLATE     kind: "service-report" — src/components/records/ServiceReportRecordView.tsx
-                      (4 DocumentDefinition variants: Rodent / General / Fly / Lizard)
+                      (3 DocumentDefinition variants: Rat / Mice (Rodent), Ants & Cockroaches
+                      (General), Fly — each listed on its own page under Pest Control > Service
+                      Reports, /pest/service/{rodent|general|fly})
 DATABASE FIELDS      ServiceReportData: serviceName, lines[] {slNo, areaName, materialName,
                       qtyUsed, methodOfApplication, remarks}, technicianSign, customerSign
 WORKFLOW             Frequency: Fortnightly (anchor day 4 & 18 — matches 04.04.2026 & 18.04.2026
-                      specimens exactly). Lizard Control Services variant: Quarterly (per SOP),
-                      with an empty area list (no specimen supplied — user adds areas manually).
-REPORT               Reports > Monthly Pest Control Report, Reports > Chemical Usage
+                      specimens exactly).
+REPORT               Pest Control > Service Reports (last visit / next due / materials / areas per
+                      service), Reports > Monthly Records Report, Reports > Chemical Usage
 ```
 
 - No Format No. / Revision No. on this contractor-supplied template — **TO BE CONFIRMED**.
@@ -177,6 +194,14 @@ REPORT               Reports > Monthly Pest Control Report, Reports > Chemical U
   for General Pest Control, Beta-Cyfluthrin 2.45% SC / "Spraying" for Fly Control (see
   `src/engine/serviceMaterials.ts`). Quantity Used and Remarks remain free-text, entered by the
   technician per area per visit, exactly as before.
+- **Lizard / Mosquito — no service-report document.** The SOP describes Lizard Control (quarterly)
+  and Mosquito Control services, but the uploaded files contain no service-report specimen for
+  either — the April-2026 workbook has Rodent / General / Fly sheets only. A "Lizard Control
+  Services" variant that had been created from the SOP text alone was **retired on 08-Sep-2026**
+  when the module was reorganised around the three reports the department actually receives
+  (`RETIRED_DOCUMENT_IDS` in `src/data/seed/documentDefinitions.ts`; any records a browser still
+  held for it are removed at boot). **TO BE CONFIRMED**: whether Gurudev Pest Control issues a
+  separate report for lizard / mosquito visits — if so it is one more variant, no new component.
 
 ## 6. GAP Analysis Report (Pest Control), December 2023
 
@@ -248,7 +273,7 @@ REPORT               Reports > Rodent Trend (see note below)
 - **Reported figures (transcribed from the page):** 2024 — 0 every month, total 0. 2025 — MAY 1,
   JUN 1, all other months 0, total 2. 2026 — 0 for JAN–JUN, later months not yet reported. The bar
   chart on the page shows the same (May 1, Jun 1, Total 2). These rows are embedded verbatim
-  (`src/data/seed/rodentPattern.ts`, `RODENT_HISTORY_REPORTED`) and shown "(as reported)" in
+  (`src/data/seed/pestPattern.ts`, `RODENT_HISTORY_REPORTED`) and shown "(as reported)" in
   **Reports > Rodent Catch Report and Trend Analysis**, above the digital row.
 - **The catch count is now captured on the daily record.** Answering Yes to checkpoint 7 opens a
   "Rodent catch details" table — trap box no. (RB-01…RB-100), location (one of the 16 Rodent
@@ -257,11 +282,11 @@ REPORT               Reports > Rodent Trend (see note below)
   the company's own Source / Unit / Target Pest / Year / Jan–Dec / Total layout.
 - **Rodent activity pattern (pre-fill and Demo Mode).** A register that says "no rodents" every
   day tells an auditor nothing, so the assistant's pre-fill and Demo Mode follow a generated
-  seasonal pattern: `tools/rodent_pattern.py` (Python, numpy) produces the parameters — a monsoon-
+  seasonal pattern: `tools/pest_pattern.py` (Python, numpy) produces the parameters — a monsoon-
   peaking daily catch probability (~10 catch days a year), location weights favouring the canteen,
   inward-goods and storage areas, a per-day count distribution (mostly 1, sometimes 2–3), and the
   conditional signs for checkpoints 8 (dead rodent, with location) and 9 (bait-cake biting, with
-  box no.) — written to `src/data/seed/rodentPattern.ts`. `src/engine/rodentPattern.ts` applies it
+  box no.) — written to `src/data/seed/pestPattern.ts`. `src/engine/rodentPattern.ts` applies it
   deterministically per calendar date, so the same day always shows the same event and a month
   reads as one consistent story. Calibrated against the reported history above (low, monsoon-
   leaning incidence) but deliberately a little richer so the trend is visible in a demo year.
@@ -498,6 +523,38 @@ DIGITAL TEMPLATE     Master Data > Holidays (already loaded; union of both copie
   treated as holidays.
 
 ---
+
+## 20. Pest Control module structure (08-Sep-2026)
+
+```
+SOURCE DOCUMENTS     The pest-control files in "Audit documents.zip": Kapila mam department reports
+                      .pdf (p.1 Rodent Catch Report & Trend, pp.2-4 Daily Pest Control Monitoring
+                      Record, pp.5-6 Fortnightly Fly Catcher Inspection & Cleaning Record), Service
+                      Report-April 2026.xls (Rodent / General / Fly, 1st & 2nd service), Standard
+                      Operating Procedure…docx, Chemical Cahrt new.docx, Training - Yrl (1).doc
+DIGITAL TEMPLATE     src/pages/PestControlPages.tsx (overview + one page per group); sidebar group
+                      with sub-headings (src/components/layout/Sidebar.tsx); DocumentDefinition.section
+WORKFLOW             Unchanged — the frequency engine still generates the records; these pages are
+                      the department's way in
+```
+
+The module is now organised the way the department reads its paperwork, in four groups
+(`DocumentDefinition.section`), each with its own page:
+
+| Group | Documents | Page |
+|---|---|---|
+| **Daily Report** | Daily Pest Control Monitoring Record (F/HR/17), daily | `/pest/daily[/{year}/{month0}]` — the month register: date, status, findings, rodents (box · location), checker, time; "Open today's record" |
+| **Service Reports** | Rat / Mice (Rodent Control Service); Ants & Cockroaches (General Pest Control Services); Fly Control Services — Gurudev Pest Control, fortnightly (4th & 18th) | `/pest/service/{rodent|general|fly}[/{year}]` — next visit due, last visit, visits completed, material / fixed areas / pests covered, then the year's visits |
+| **Trend Analysis** | Rodent Catch Report and Trend Analysis (computed from the daily record's checkpoint 7 — §8); Fly Catcher Infestation (from the Fortnightly Fly Catcher Inspection & Cleaning Record, F/HR/18 — §2) | `/pest/trend/rodent[/{year}]`, `/pest/trend/fly-catcher[/{year}]` — both in the company's Source / Unit / Target Pest / Year / Jan–Dec / Total layout |
+| **Training & Reference** | Training Record (yearly, §7 / §15); Pesticide Application Chart (§3); SOP (§4) | `/training`, `/chemical-master`, `/sop` |
+
+`/pest-control` is the module overview: today's daily record and its status, this month's days
+recorded / awaiting submit / findings / rodents, each service's last visit and next due, this
+year's rodent and fly totals, the last training. Everything the earlier flat "Pest Control" list
+held is still here — nothing from the zip was dropped; the one document removed is the Lizard
+service-report variant that had no source specimen (§5). The assistant's route guide
+(`backend/assistant.ts`) knows every page, so "show me the rat reports" / "fly catcher infestation
+for this year" navigate straight there.
 
 ## Master data provenance summary
 

@@ -18,6 +18,7 @@ import { periodKeyFor } from "../engine/recordGenerator";
 import { fixedMaterialForServiceArea } from "../engine/serviceMaterials";
 import { autoFillRecord } from "../engine/autoFill";
 import { describeRodentEvent, rodentEventFor } from "../engine/rodentPattern";
+import { flyCatchFor } from "../engine/flyPattern";
 import { generateId } from "../utils/id";
 import { compareISO, todayISO } from "../utils/date";
 
@@ -101,13 +102,20 @@ function buildDailyData(dueDate: string, isHoliday: boolean): DailyPestMonitorin
   };
 }
 
-function buildFlyCatcherData(monthYear: string): FlyCatcherData {
+const MONTH_LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+function buildFlyCatcherData(dueDate: string): FlyCatcherData {
   const master = masterRepository.get();
+  const year = Number(dueDate.slice(0, 4));
+  const month = Number(dueDate.slice(5, 7)) - 1;
   return {
-    monthYear,
+    // Same "August-26" style as the paper register's Month & Year box.
+    monthYear: `${MONTH_LONG[month]}-${String(year).slice(2)}`,
     entries: master.pcLocations.map((pc) => ({
       pcId: pc.id,
-      catchCountApprox: chance(0.7) ? Math.floor(Math.random() * 3) : Math.floor(Math.random() * 10),
+      // The same seasonal per-unit pattern the Live assistant uses, so the
+      // demo year's Fly Catcher Infestation trend has a believable shape.
+      catchCountApprox: flyCatchFor(pc.id, dueDate),
       tubeLightInstallDate: "2025-12-24",
       tubeLightDueDate: "2026-12-23",
       cleaningDoneBy: pick(["Vijay", "Ramesh"]),
@@ -175,7 +183,7 @@ export function generateDemoRecordsForMonth(year: number, month: number): number
       const isHoliday = doc.kind === "daily-pest-monitoring" && new Date(dueDate).getDay() === 0 && chance(0.15);
       let data: unknown;
       if (doc.kind === "daily-pest-monitoring") data = buildDailyData(dueDate, isHoliday);
-      else if (doc.kind === "fly-catcher") data = buildFlyCatcherData(`${year}-${month + 1}`);
+      else if (doc.kind === "fly-catcher") data = buildFlyCatcherData(dueDate);
       else if (doc.kind === "service-report") data = buildServiceReportData(doc);
       else if (doc.kind === "log-sheet" || doc.kind === "training-record") {
         // Same engine the Live assistant uses, so demo log sheets look

@@ -7,7 +7,7 @@ import {
   RODENT_LOCATIONS,
   RODENT_MONTHLY_RATE,
   RODENT_SECOND_LOCATION_P,
-} from "../data/seed/rodentPattern";
+} from "../data/seed/pestPattern";
 import { makeRng, type Rng } from "../utils/random";
 import { generateId } from "../utils/id";
 

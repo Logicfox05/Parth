@@ -54,9 +54,13 @@ export function useRouter(): RouterValue {
 // their own case (root, optional id), not as a zero-segment-only route.
 const SIMPLE_ROUTES = new Set([
   "", "dashboard", "process-flow", "library", "calendar", "reports",
-  "chemical-master", "sop", "master-data", "demo", "search",
+  "chemical-master", "sop", "master-data", "demo", "search", "pest-control",
 ]);
 const REPORT_TABS = new Set(["monthly", "daily", "rodent", "flycatcher", "chemical", "gap", "training", "lamination"]);
+// Pest Control module pages (src/pages/PestControlPages.tsx):
+// /pest/daily[/{year}/{month0}], /pest/service/{slug}[/{year}], /pest/trend/{slug}[/{year}]
+const PEST_SERVICE_SLUGS = new Set(["rodent", "general", "fly"]);
+const PEST_TREND_SLUGS = new Set(["rodent", "fly-catcher"]);
 const YEAR_RE = /^\d{4}$/;
 const MONTH0_RE = /^(?:0?[0-9]|1[01])$/; // 0-11, optional leading zero
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -88,6 +92,14 @@ export function isValidAppRoute(path: string): boolean {
     case "soc":
     case "training":
       return rest.length === 0 || (rest.length === 1 && /^[a-zA-Z0-9_-]+$/.test(rest[0]));
+    case "pest": {
+      const [area, slug, year, month] = rest;
+      if (area === "daily") return rest.length === 1 || (rest.length === 3 && YEAR_RE.test(slug) && MONTH0_RE.test(year));
+      if (area === "service") return !!slug && PEST_SERVICE_SLUGS.has(slug) && (rest.length === 2 || (rest.length === 3 && YEAR_RE.test(year)));
+      if (area === "trend") return !!slug && PEST_TREND_SLUGS.has(slug) && (rest.length === 2 || (rest.length === 3 && YEAR_RE.test(year)));
+      void month;
+      return false;
+    }
     default:
       return rest.length === 0 && SIMPLE_ROUTES.has(root);
   }

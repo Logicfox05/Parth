@@ -22,6 +22,13 @@ import { ReportsPage } from "./pages/ReportsPage";
 import { MasterDataPage } from "./pages/MasterDataPage";
 import { DemoModePage } from "./pages/DemoModePage";
 import { SearchPage } from "./pages/SearchPage";
+import {
+  DailyMonitoringListPage,
+  FlyCatcherTrendPage,
+  PestControlOverviewPage,
+  RodentTrendPage,
+  ServiceReportListPage,
+} from "./pages/PestControlPages";
 
 function NotFoundPage() {
   return (
@@ -67,6 +74,19 @@ function RouteSwitch() {
       return <GapRecordPage recordId={rest[0]} />;
     case "training":
       return rest[0] ? <TrainingRecordPage recordId={rest[0]} /> : <TrainingListPage />;
+    case "pest-control":
+      return <PestControlOverviewPage />;
+    case "pest":
+      // The Pest Control module's own pages — Daily Report / Service Reports /
+      // Trend Analysis. Keyed like Calendar/Reports so a deep link to another
+      // month/year/service remounts cleanly.
+      if (rest[0] === "daily") {
+        return <DailyMonitoringListPage key={rest.join("/")} year={rest[1] ? Number(rest[1]) : undefined} month={rest[2] ? Number(rest[2]) : undefined} />;
+      }
+      if (rest[0] === "service") return <ServiceReportListPage key={rest.join("/")} slug={rest[1] ?? ""} year={rest[2] ? Number(rest[2]) : undefined} />;
+      if (rest[0] === "trend" && rest[1] === "rodent") return <RodentTrendPage key={rest.join("/")} year={rest[2] ? Number(rest[2]) : undefined} />;
+      if (rest[0] === "trend" && rest[1] === "fly-catcher") return <FlyCatcherTrendPage key={rest.join("/")} year={rest[2] ? Number(rest[2]) : undefined} />;
+      return <NotFoundPage />;
     case "chemical-master":
       return <ChemicalMasterPage />;
     case "sop":

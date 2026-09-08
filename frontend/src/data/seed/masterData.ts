@@ -179,7 +179,6 @@ export const SEED_MASTER_DATA: MasterData = {
     "service-report-rodent": "Technician",
     "service-report-general": "Technician",
     "service-report-fly": "Technician",
-    "service-report-lizard": "Technician",
     "gap-inspection": "Signatory",
     "capa-customer-complaint": "QA",
     "training-record": "Training Coordinator",

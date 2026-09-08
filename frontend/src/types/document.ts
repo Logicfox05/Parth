@@ -28,6 +28,11 @@ export interface DocumentDefinition {
   // Reference-only documents (Chemical Master, SOP) have no due dates / record
   // lifecycle — they open straight into a reference viewer.
   isReferenceOnly?: boolean;
+  // Optional sub-grouping inside a module, the way the department itself
+  // talks about its paperwork — e.g. Pest Control's "Daily Report",
+  // "Service Reports", "Trend Analysis", "Training & Reference". Drives the
+  // Document Library's ordering and the module overview pages.
+  section?: string;
 }
 
 export type ScheduleConfig =

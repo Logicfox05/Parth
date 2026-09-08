@@ -1,8 +1,28 @@
 import type { DocumentDefinition } from "../../types";
 
+// Document ids that once shipped in this seed and have since been withdrawn.
+// documentRepository / masterRepository / bootstrap use this to clear the
+// definition, its reminder-role entry and any records a browser still holds
+// for it, so a retired document doesn't linger as an orphan.
+//   service-report-lizard — the SOP describes a Lizard Control service, but
+//   the uploaded files contain no service-report specimen for it (the April-
+//   2026 workbook covers Rodent / General / Fly only); retired 08-Sep-2026
+//   when the Pest Control module was reorganised around the three service
+//   reports the department actually receives.
+export const RETIRED_DOCUMENT_IDS: string[] = ["service-report-lizard"];
+
+// The Pest Control module's sub-groups, in display order — see DocumentDefinition.section.
+export const PEST_CONTROL_SECTIONS = ["Daily Report", "Service Reports", "Trend Analysis", "Training & Reference"] as const;
+
 // Every controlled document / form actually identified in the uploaded
 // source files. See REQUIREMENTS.md for full source-to-digital traceability.
 export const SEED_DOCUMENTS: DocumentDefinition[] = [
+  // ---------------------------------------------------------------------
+  // Pest Control — organised the way the department reads its paperwork:
+  //   Daily Report → Service Reports (Rat / Mice, Ants & Cockroaches, Fly)
+  //   → Trend Analysis (Rodent catch, Fly catcher infestation)
+  //   → Training & Reference. See src/pages/PestControlPages.tsx.
+  // ---------------------------------------------------------------------
   {
     id: "daily-pest-monitoring",
     kind: "daily-pest-monitoring",
@@ -12,58 +32,47 @@ export const SEED_DOCUMENTS: DocumentDefinition[] = [
     revisionDate: "2021-12-01",
     department: "Production / HR",
     module: "Pest Control",
+    section: "Daily Report",
     frequency: "Daily",
     status: "Configured",
     description:
-      "Daily check of 10 pest/rodent monitoring points, reported to Production Supervisor / Pest Control Agency.",
+      "The Daily Report: 10 pest / rodent monitoring checkpoints every day (door proofing, gaps, fly catchers, rodent traps — with box, location and number of rodents whenever one is trapped), reported to the Production Supervisor / Pest Control Agency. Feeds the Rodent Catch trend.",
     sourceFile: "Kapila mam department reports .pdf (pages 2-4, photographed)",
     schedule: { type: "daily" },
   },
   {
-    id: "fly-catcher",
-    kind: "fly-catcher",
-    name: "Fortnightly — Fly Catcher Inspection & Cleaning Record",
-    formatNo: "F/HR/18",
-    revisionNo: "02",
-    revisionDate: "2024-12-15",
-    department: "Housekeeping",
-    module: "Pest Control",
-    frequency: "Fortnightly",
-    status: "Configured",
-    description:
-      "Fortnightly inspection and cleaning of fly catcher units PC-01 through PC-13, catch count and tube light validity.",
-    sourceFile: "Kapila mam department reports .pdf (pages 5-6, photographed)",
-    schedule: { type: "fortnightly", anchorDayOfMonth: 3 },
-  },
-  {
     id: "service-report-rodent",
     kind: "service-report",
-    name: "Pest Control Service Report — Rodent Control Service",
+    name: "Pest Control Service Report — Rat / Mice (Rodent Control Service)",
     formatNo: "TO BE CONFIRMED",
     revisionNo: "TO BE CONFIRMED",
     revisionDate: null,
     department: "Pest Control Service Provider (Gurudev Pest Control)",
     module: "Pest Control",
+    section: "Service Reports",
     frequency: "Fortnightly",
     status: "Configured",
-    description: "Contractor service report — Rodent Control Service (Rat, Mice, Bandicoots), 16 fixed areas.",
-    sourceFile: "Service ReportApril 2026.xls",
+    description:
+      "Gurudev Pest Control's fortnightly Rodent Control Service report (Rat, Mice & Bandicoots): glue boards — bromadiolone cake at Offline punching & QC Inspection — across 16 fixed areas, quantity used, remarks, technician and customer signatures.",
+    sourceFile: "Service Report-April 2026.xls (1st & 2nd Service sheets)",
     schedule: { type: "fortnightly", anchorDayOfMonth: 4 },
     variantKey: "Rodent Control Service",
   },
   {
     id: "service-report-general",
     kind: "service-report",
-    name: "Pest Control Service Report — General Pest Control Services",
+    name: "Pest Control Service Report — Ants & Cockroaches (General Pest Control Services)",
     formatNo: "TO BE CONFIRMED",
     revisionNo: "TO BE CONFIRMED",
     revisionDate: null,
     department: "Pest Control Service Provider (Gurudev Pest Control)",
     module: "Pest Control",
+    section: "Service Reports",
     frequency: "Fortnightly",
     status: "Configured",
-    description: "Contractor service report — General Pest Control (Red & Black Ants, Cockroaches), 9 fixed areas.",
-    sourceFile: "Service ReportApril 2026.xls",
+    description:
+      "Gurudev Pest Control's fortnightly General Pest Control Services report (Red & Black Ants, Cockroaches): Deltamethrin 2.5% SC spraying across 9 fixed areas, quantity used, remarks, technician and customer signatures.",
+    sourceFile: "Service Report-April 2026.xls (1st & 2nd Service sheets)",
     schedule: { type: "fortnightly", anchorDayOfMonth: 4 },
     variantKey: "General Pest Control Services",
   },
@@ -76,29 +85,31 @@ export const SEED_DOCUMENTS: DocumentDefinition[] = [
     revisionDate: null,
     department: "Pest Control Service Provider (Gurudev Pest Control)",
     module: "Pest Control",
+    section: "Service Reports",
     frequency: "Fortnightly",
     status: "Configured",
-    description: "Contractor service report — Fly Control Services (House Fly), 9 fixed areas.",
-    sourceFile: "Service ReportApril 2026.xls",
+    description:
+      "Gurudev Pest Control's fortnightly Fly Control Services report (House Fly): Beta-Cyfluthrin 2.45% SC spraying across 9 fixed areas, quantity used, remarks, technician and customer signatures.",
+    sourceFile: "Service Report-April 2026.xls (1st & 2nd Service sheets)",
     schedule: { type: "fortnightly", anchorDayOfMonth: 4 },
     variantKey: "Fly Control Services",
   },
   {
-    id: "service-report-lizard",
-    kind: "service-report",
-    name: "Pest Control Service Report — Lizard Control Services",
-    formatNo: "TO BE CONFIRMED",
-    revisionNo: "TO BE CONFIRMED",
-    revisionDate: null,
-    department: "Pest Control Service Provider (Gurudev Pest Control)",
+    id: "fly-catcher",
+    kind: "fly-catcher",
+    name: "Fortnightly — Fly Catcher Inspection & Cleaning Record",
+    formatNo: "F/HR/18",
+    revisionNo: "02",
+    revisionDate: "2024-12-15",
+    department: "Housekeeping",
     module: "Pest Control",
-    frequency: "Quarterly",
+    section: "Trend Analysis",
+    frequency: "Fortnightly",
     status: "Configured",
     description:
-      "Lizard Control Services (House Lizard). SOP states frequency 'recommended is quarterly, may vary by location.' No filled specimen or fixed area list was supplied — areas TO BE CONFIRMED, add manually.",
-    sourceFile: "Standard Operating Procedure for Pest Control Services..docx",
-    schedule: { type: "quarterly", anchorMonth: 0, dayOfMonth: 4 },
-    variantKey: "Lizard Control Services",
+      "Fortnightly inspection and cleaning of fly catcher units PC-01 through PC-13 — approximate flies caught per unit (the Fly Catcher Infestation trend adds these up per unit and per month), tube light install / due dates, cleaning done by and verified by.",
+    sourceFile: "Kapila mam department reports .pdf (pages 5-6, photographed)",
+    schedule: { type: "fortnightly", anchorDayOfMonth: 3 },
   },
   {
     id: "gap-inspection",
@@ -140,6 +151,7 @@ export const SEED_DOCUMENTS: DocumentDefinition[] = [
     revisionDate: null,
     department: "HR / Pest Control Service Provider",
     module: "Pest Control",
+    section: "Training & Reference",
     frequency: "Yearly",
     status: "Configured",
     description:
@@ -156,6 +168,7 @@ export const SEED_DOCUMENTS: DocumentDefinition[] = [
     revisionDate: null,
     department: "Pest Control Service Provider",
     module: "Pest Control",
+    section: "Training & Reference",
     frequency: "As Required",
     status: "Configured",
     description: "Reference chart: Service Type -> Pest Covered -> Chemicals -> Dilution Ratio.",
@@ -172,6 +185,7 @@ export const SEED_DOCUMENTS: DocumentDefinition[] = [
     revisionDate: null,
     department: "Pest Control Service Provider",
     module: "Pest Control",
+    section: "Training & Reference",
     frequency: "As Required",
     status: "Configured",
     description: "General Pest Control, Rodent Control, Fly Control, Mosquito Control, Lizard Control — chemicals, process, preventive measures.",

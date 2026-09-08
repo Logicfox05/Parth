@@ -13,7 +13,6 @@ const VARIANT_DEFAULTS: Record<string, FixedMaterial> = {
   "Rodent Control Service": { materialName: "Glue Board", methodOfApplication: "Trouble gum placement" },
   "General Pest Control Services": { materialName: "Deltamethrin 2.5% SC", methodOfApplication: "Spraying" },
   "Fly Control Services": { materialName: "Beta-Cyfluthrin 2.45% SC", methodOfApplication: "Spraying" },
-  "Lizard Control Services": { materialName: "Kothrine (Deltamethrin 2.5% SC)", methodOfApplication: "Spraying" },
 };
 
 // One documented exception: the Dec-2023/April-2026 specimens show this

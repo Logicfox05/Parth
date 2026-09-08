@@ -10,7 +10,7 @@ export interface AssistantTarget {
   documentKind: string;
   // The specific DocumentDefinition.id — distinct from documentKind, since
   // one kind (e.g. "service-report") covers several formats (Rodent/
-  // General/Fly/Lizard Control). Needed to look up the exact document for
+  // General/Fly Control). Needed to look up the exact document for
   // the "about this document" (What/How/Who/When) card.
   documentId: string;
   currentData: unknown;

@@ -16,6 +16,11 @@ import {
   FiChevronDown,
   FiChevronRight,
   FiUsers,
+  FiClipboard,
+  FiTruck,
+  FiTrendingUp,
+  FiActivity,
+  FiHome,
 } from "react-icons/fi";
 import type { IconType } from "react-icons";
 import { Link, useRouter } from "../../store/router";
@@ -26,6 +31,13 @@ interface NavItem {
   label: string;
   icon: IconType;
 }
+
+// A module's body is a list of links, optionally broken up by small
+// sub-headings — the Pest Control module uses these for the groups the
+// department itself thinks in (Daily Report / Service Reports / Trend
+// Analysis / Training & Reference).
+type NavEntry = NavItem | { heading: string };
+const isHeading = (e: NavEntry): e is { heading: string } => "heading" in e;
 
 const NAV_MAIN: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: FiGrid },
@@ -50,12 +62,26 @@ const MODULE_ORDER = [
   "Quality — Compliance",
 ] as const;
 
-const MODULE_LINKS: Record<(typeof MODULE_ORDER)[number], NavItem[]> = {
+const MODULE_LINKS: Record<(typeof MODULE_ORDER)[number], NavEntry[]> = {
+  // Organised the way the pest-control paperwork actually falls (see
+  // src/pages/PestControlPages.tsx): the daily report, Gurudev Pest
+  // Control's three service reports, the two trend analyses drawn from
+  // them, and the training / reference material.
   "Pest Control": [
+    { to: "/pest-control", label: "Overview", icon: FiHome },
+    { heading: "Daily Report" },
+    { to: "/pest/daily", label: "Daily Pest Control Monitoring", icon: FiClipboard },
+    { heading: "Service Reports" },
+    { to: "/pest/service/rodent", label: "Rat / Mice — Rodent Control", icon: FiTruck },
+    { to: "/pest/service/general", label: "Ants & Cockroaches — General Pest", icon: FiTruck },
+    { to: "/pest/service/fly", label: "Fly Control", icon: FiTruck },
+    { heading: "Trend Analysis" },
+    { to: "/pest/trend/rodent", label: "Rodent Catch Trend", icon: FiTrendingUp },
+    { to: "/pest/trend/fly-catcher", label: "Fly Catcher Infestation", icon: FiActivity },
+    { heading: "Training & Reference" },
     { to: "/training", label: "Training Records", icon: FiAward },
     { to: "/chemical-master", label: "Chemical Master", icon: FiDroplet },
     { to: "/sop", label: "SOP Reference", icon: FiFileText },
-    { to: "/library/pest-control", label: "All Pest Control Documents", icon: FiBookOpen },
   ],
   "CAPA (Corrective & Preventive Action)": [
     { to: "/gap/internal", label: "Internal — Inspection Findings", icon: FiAlertCircle },
@@ -85,10 +111,17 @@ function loadOpenState(): Record<string, boolean> {
   return readJSON<Record<string, boolean>>(SIDEBAR_STATE_KEY, {});
 }
 
-function NavGroup({ items, path }: { items: NavItem[]; path: string }) {
+function NavGroup({ items, path }: { items: NavEntry[]; path: string }) {
   return (
     <>
-      {items.map((item) => {
+      {items.map((item, i) => {
+        if (isHeading(item)) {
+          return (
+            <div key={`heading-${i}`} className="nav-sub-label">
+              {item.heading}
+            </div>
+          );
+        }
         const Icon = item.icon;
         const active = path === item.to || path.startsWith(item.to + "/");
         return (

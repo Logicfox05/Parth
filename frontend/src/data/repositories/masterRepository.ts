@@ -1,5 +1,6 @@
 import type { MasterData } from "../../types";
 import { SEED_MASTER_DATA } from "../seed/masterData";
+import { RETIRED_DOCUMENT_IDS } from "../seed/documentDefinitions";
 import { readJSON, writeJSON } from "../storageAdapter";
 
 const KEY = "master";
@@ -48,6 +49,13 @@ export function ensureSeeded(): void {
   for (const [docId, keyword] of Object.entries(SEED_MASTER_DATA.documentRoleKeywords)) {
     if (next.documentRoleKeywords[docId] === undefined) {
       next.documentRoleKeywords[docId] = keyword;
+      changed = true;
+    }
+  }
+  // A retired document's reminder assignment has nothing left to point at.
+  for (const docId of RETIRED_DOCUMENT_IDS) {
+    if (next.documentRoleKeywords[docId] !== undefined) {
+      delete next.documentRoleKeywords[docId];
       changed = true;
     }
   }
