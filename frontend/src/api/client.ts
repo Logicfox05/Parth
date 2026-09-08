@@ -1,0 +1,87 @@
+// Thin fetch wrapper for the auth API (backend/index.ts). Requests are
+// same-origin in both dev (proxied, see frontend/scripts/dev-server.ts) and
+// production (backend/index.ts serves the built frontend itself), so no
+// base URL configuration is needed.
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const res = await fetch(`/api${path}`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+
+  if (res.status === 204) return undefined as T;
+
+  let body: unknown = null;
+  try {
+    body = await res.json();
+  } catch {
+    /* empty/non-JSON body */
+  }
+
+  if (!res.ok) {
+    const message =
+      body && typeof body === "object" && "error" in body && typeof (body as { error: unknown }).error === "string"
+        ? (body as { error: string }).error
+        : `Request failed (${res.status})`;
+    throw new ApiError(message, res.status);
+  }
+
+  return body as T;
+}
+
+export const api = {
+  get: <T>(path: string) => request<T>(path, { method: "GET" }),
+  post: <T>(path: string, data?: unknown) =>
+    request<T>(path, { method: "POST", body: data === undefined ? undefined : JSON.stringify(data) }),
+};
+
+export type AssistantAction = "fill" | "navigate" | "reply";
+
+export interface AssistantChatResult {
+  action: AssistantAction;
+  patch?: Record<string, unknown>;
+  route?: string;
+  reply: string;
+}
+
+export interface AssistantChatRequest {
+  message: string;
+  today: string;
+  currentRoute: string;
+  documentKind?: string;
+  currentData?: unknown;
+}
+
+export interface ChecklistAnswerResult {
+  done: boolean;
+  notRequired: boolean;
+  date: string | null;
+  comment: string;
+}
+
+export const assistantApi = {
+  chat: (req: AssistantChatRequest) => api.post<AssistantChatResult>("/assistant/chat", req),
+  checklistAnswer: (activity: string, answer: string, today: string) =>
+    api.post<ChecklistAnswerResult>("/assistant/checklist-answer", { activity, answer, today }),
+};
+
+export interface DigestReminderInput {
+  documentName: string;
+  dueDate: string;
+  urgency: string;
+  assignedEmployees: { name: string; email?: string }[];
+}
+
+export const reminderDigestApi = {
+  send: (reminders: DigestReminderInput[]) =>
+    api.post<{ sent: boolean; reason?: string; recipientCount?: number }>("/reminders/send-digest", { reminders }),
+};

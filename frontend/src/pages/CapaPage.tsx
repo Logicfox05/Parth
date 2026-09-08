@@ -1,0 +1,560 @@
+import React, { useMemo, useState } from "react";
+import { FiArrowLeft, FiArrowRight, FiPlus, FiZap, FiUsers, FiSearch } from "react-icons/fi";
+import { useAppStore } from "../store/AppStore";
+import { useRouter } from "../store/router";
+import { recordRepository } from "../data/repositories/recordRepository";
+import { documentRepository } from "../data/repositories/documentRepository";
+import { refreshGapFindingStatuses, openCorrectiveActionsCount } from "../data/selectors";
+import { COMPLAINT_DOC_ID, COMPLAINT_FOOTER_NOTE, COMPLAINT_ACTIVITY_COUNT, newComplaintChecklistData } from "../data/seed/complaintChecklist";
+import type { ChecklistItem, ComplaintChecklistData, RecordInstance } from "../types";
+import { saveDraft, submitRecord, verifyRecord, rejectRecord, resumeAfterRejection } from "../engine/recordLifecycle";
+import { summarise } from "../engine/guidedChecklist";
+import { RecordActionBar } from "../components/records/RecordActionBar";
+import { DocumentHeader } from "../components/documents/DocumentHeader";
+import { StatusBadge } from "../components/common/StatusBadge";
+import { DemoTag } from "../components/common/DemoTag";
+import { useSetAssistantTarget } from "../store/AssistantContext";
+import { startGuidedChecklist } from "../components/common/DocumentAssistant";
+import { generateId } from "../utils/id";
+import { formatDisplayDate, todayISO } from "../utils/date";
+
+const GAP_DOC_ID = "gap-inspection";
+
+// ---------------------------------------------------------------------------
+// /gap — the CAPA module's front door: Internal or External.
+
+export function CapaHomePage() {
+  const { mode, version } = useAppStore();
+  const { navigate } = useRouter();
+  const isDemo = mode === "demo";
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stats = useMemo(() => {
+    refreshGapFindingStatuses(isDemo);
+    const internal = recordRepository.query({ documentId: GAP_DOC_ID, isDemo });
+    const external = recordRepository.query({ documentId: COMPLAINT_DOC_ID, isDemo }) as RecordInstance<ComplaintChecklistData>[];
+    return {
+      internalCount: internal.length,
+      openFindings: openCorrectiveActionsCount(isDemo),
+      externalCount: external.length,
+      awaitingApproval: external.filter((r) => r.status === "Submitted" || r.status === "Pending Verification").length,
+      inProgress: external.filter((r) => ["Scheduled", "Due", "In Progress"].includes(r.status)).length,
+    };
+  }, [isDemo, version]);
+
+  return (
+    <div>
+      <h1 className="text-2xl mb-1">CAPA (Corrective and Preventive Action)</h1>
+      <p className="text-muted mb-5">Where did the issue come from? Pick one — the assistant takes it from there.</p>
+
+      <div className="flex gap-4 wrap">
+        <div className="card capa-option" onClick={() => navigate("/gap/internal")}>
+          <div className="card-pad">
+            <div className="flex items-center gap-2 mb-2">
+              <FiSearch size={18} style={{ color: "var(--color-primary)" }} />
+              <h2 className="text-xl">Internal</h2>
+            </div>
+            <p className="text-sm text-muted mb-3">
+              Findings raised by our own or our service provider's pest control inspections (e.g. the Dec-2023 GAP report), each
+              with a corrective action tracked to closure.
+            </p>
+            <div className="flex gap-3 wrap mb-3">
+              <div className="stat-tile" style={{ padding: "10px 14px", minWidth: 110 }}>
+                <div className="stat-value" style={{ fontSize: 20 }}>{stats.internalCount}</div>
+                <div className="stat-label">Reports</div>
+              </div>
+              <div className="stat-tile" style={{ padding: "10px 14px", minWidth: 110 }}>
+                <div className="stat-value" style={{ fontSize: 20, color: stats.openFindings ? "var(--color-danger)" : "var(--color-success)" }}>{stats.openFindings}</div>
+                <div className="stat-label">Open findings</div>
+              </div>
+            </div>
+            <button className="btn btn-primary btn-sm">
+              Open Internal <FiArrowRight size={12} />
+            </button>
+          </div>
+        </div>
+
+        <div className="card capa-option external" onClick={() => navigate("/gap/external")}>
+          <div className="card-pad">
+            <div className="flex items-center gap-2 mb-2">
+              <FiUsers size={18} style={{ color: "var(--color-accent)" }} />
+              <h2 className="text-xl">External</h2>
+            </div>
+            <p className="text-sm text-muted mb-3">
+              Customer complaints, handled on the Customer Complaint Handling Checklist (F/MKT/05). The assistant walks you
+              through sections A to E — receipt, investigation, CAPA, customer communication, closure — then asks for approval.
+            </p>
+            <div className="flex gap-3 wrap mb-3">
+              <div className="stat-tile" style={{ padding: "10px 14px", minWidth: 110 }}>
+                <div className="stat-value" style={{ fontSize: 20 }}>{stats.externalCount}</div>
+                <div className="stat-label">Complaints</div>
+              </div>
+              <div className="stat-tile" style={{ padding: "10px 14px", minWidth: 110 }}>
+                <div className="stat-value" style={{ fontSize: 20, color: "var(--color-warning)" }}>{stats.awaitingApproval}</div>
+                <div className="stat-label">Awaiting approval</div>
+              </div>
+              <div className="stat-tile" style={{ padding: "10px 14px", minWidth: 110 }}>
+                <div className="stat-value" style={{ fontSize: 20, color: "var(--color-info)" }}>{stats.inProgress}</div>
+                <div className="stat-label">In progress</div>
+              </div>
+            </div>
+            <button className="btn btn-primary btn-sm" style={{ background: "var(--color-accent)" }}>
+              Open External <FiArrowRight size={12} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// /gap/external — the complaint checklists.
+
+function progressOf(data: ComplaintChecklistData): { answered: number; total: number } {
+  const s = summarise(data);
+  return { answered: s.done + s.notRequired, total: s.total };
+}
+
+export function ComplaintListPage() {
+  const { mode, bump } = useAppStore();
+  const { navigate } = useRouter();
+  const isDemo = mode === "demo";
+  const records = recordRepository.query({ documentId: COMPLAINT_DOC_ID, isDemo }) as RecordInstance<ComplaintChecklistData>[];
+  const doc = documentRepository.getById(COMPLAINT_DOC_ID)!;
+
+  const createNew = () => {
+    const now = new Date().toISOString();
+    const rec: RecordInstance<ComplaintChecklistData> = {
+      id: generateId("complaint"),
+      documentId: COMPLAINT_DOC_ID,
+      periodKey: generateId("period"),
+      dueDate: todayISO(),
+      status: "In Progress",
+      isDemo,
+      data: newComplaintChecklistData(),
+      createdAt: now,
+      updatedAt: now,
+    };
+    recordRepository.upsert(rec as RecordInstance);
+    bump();
+    navigate(`/gap/complaint/${rec.id}`);
+  };
+
+  return (
+    <div>
+      <button className="btn btn-ghost btn-sm mb-3" onClick={() => navigate("/gap")}>
+        <FiArrowLeft size={13} /> CAPA
+      </button>
+      <div className="flex items-center justify-between mb-4 gap-3 wrap">
+        <div>
+          <h1 className="text-2xl mb-1">External — Customer Complaints</h1>
+          <p className="text-muted">
+            {doc.name.replace(/^CAPA — External: /, "")} · {doc.formatNo} (Rev {doc.revisionNo} / {formatDisplayDate(doc.revisionDate)})
+          </p>
+        </div>
+        <button className="btn btn-primary" onClick={createNew}>
+          <FiPlus size={14} /> New Complaint
+        </button>
+      </div>
+
+      <div className="doc-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Complaint No.</th>
+              <th>Customer</th>
+              <th>Job</th>
+              <th>Received</th>
+              <th style={{ width: 180 }}>Progress</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {records.length === 0 && (
+              <tr>
+                <td colSpan={7} className="text-muted text-center" style={{ padding: 24 }}>
+                  No customer complaints logged yet. "New Complaint" opens a fresh checklist and the assistant starts asking.
+                </td>
+              </tr>
+            )}
+            {records
+              .slice()
+              .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+              .map((r) => {
+                const p = progressOf(r.data);
+                return (
+                  <tr key={r.id} className="card-clickable" onClick={() => navigate(`/gap/complaint/${r.id}`)}>
+                    <td className="font-semibold">
+                      {r.data.complaintNo || <span className="text-muted">—</span>} {r.isDemo && <DemoTag />}
+                    </td>
+                    <td>{r.data.customerName || <span className="text-muted">—</span>}</td>
+                    <td className="text-sm">{r.data.jobName || "—"}</td>
+                    <td className="text-sm">{r.data.complaintReceivedDate ? formatDisplayDate(r.data.complaintReceivedDate) : "—"}</td>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        <div className="progress-bar" style={{ flex: 1 }}>
+                          <div style={{ width: `${Math.round((p.answered / p.total) * 100)}%` }} />
+                        </div>
+                        <span className="text-xs text-muted" style={{ whiteSpace: "nowrap" }}>
+                          {p.answered}/{p.total}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <StatusBadge status={r.status} />
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <button className="btn btn-ghost btn-sm">Open</button>
+                    </td>
+                  </tr>
+                );
+              })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// /gap/complaint/:id — one checklist, the paper form on screen, with the
+// assistant's walk-through wired in.
+
+export function ComplaintChecklistPage({ recordId }: { recordId: string }) {
+  const { currentUser, bump } = useAppStore();
+  const { navigate } = useRouter();
+  const [record, setRecord] = useState<RecordInstance<ComplaintChecklistData> | undefined>(
+    () => recordRepository.getById(recordId) as RecordInstance<ComplaintChecklistData> | undefined
+  );
+  const [errors, setErrors] = useState<string[]>([]);
+  const doc = documentRepository.getById(COMPLAINT_DOC_ID)!;
+
+  const editable = !!record && ["Scheduled", "Due", "In Progress"].includes(record.status);
+  const canApprove = !!record && ["Submitted", "Pending Verification"].includes(record.status);
+
+  const persist = (next: RecordInstance<ComplaintChecklistData>) => {
+    setRecord(next);
+    recordRepository.upsert(next as RecordInstance);
+    bump();
+  };
+  const setData = (data: ComplaintChecklistData) => {
+    if (!record) return;
+    persist({ ...record, data });
+  };
+  const patch = (p: Partial<ComplaintChecklistData>) => record && setData({ ...record.data, ...p });
+
+  // Submit stamps Prepared By with the logged-in user if they haven't typed
+  // a name; approval (Verify) stamps Approved By with the approver. Both
+  // still go through the normal lifecycle validation.
+  const doSubmit = (): { ok: boolean; errors: string[] } => {
+    const current = recordRepository.getById(recordId) as RecordInstance<ComplaintChecklistData> | undefined;
+    if (!current) return { ok: false, errors: ["Record not found."] };
+    const prepared = {
+      name: current.data.preparedBy.name.trim() || currentUser,
+      designation: current.data.preparedBy.designation,
+      date: current.data.preparedBy.date ?? todayISO(),
+    };
+    const withSignoff = { ...current, data: { ...current.data, preparedBy: prepared } };
+    recordRepository.upsert(withSignoff as RecordInstance);
+    const { record: updated, result } = submitRecord(doc, withSignoff as RecordInstance, currentUser);
+    if (!result.valid) {
+      setRecord(withSignoff);
+      setErrors(result.errors);
+      bump();
+      return { ok: false, errors: result.errors };
+    }
+    setErrors([]);
+    setRecord(updated as RecordInstance<ComplaintChecklistData>);
+    bump();
+    return { ok: true, errors: [] };
+  };
+
+  const doApprove = (): { ok: boolean; errors: string[] } => {
+    const current = recordRepository.getById(recordId) as RecordInstance<ComplaintChecklistData> | undefined;
+    if (!current) return { ok: false, errors: ["Record not found."] };
+    const approved = {
+      name: current.data.approvedBy.name.trim() || currentUser,
+      designation: current.data.approvedBy.designation.trim() || "QA Head",
+      date: todayISO(),
+    };
+    const withSignoff = { ...current, data: { ...current.data, approvedBy: approved } };
+    recordRepository.upsert(withSignoff as RecordInstance);
+    const { record: updated, result } = verifyRecord(doc, withSignoff as RecordInstance, currentUser);
+    if (!result.valid) {
+      setRecord(withSignoff);
+      setErrors(result.errors);
+      bump();
+      return { ok: false, errors: result.errors };
+    }
+    setErrors([]);
+    setRecord(updated as RecordInstance<ComplaintChecklistData>);
+    bump();
+    return { ok: true, errors: [] };
+  };
+
+  const doSendBack = (reason: string) => {
+    const current = recordRepository.getById(recordId);
+    if (!current) return;
+    setRecord(rejectRecord(current, currentUser, reason) as RecordInstance<ComplaintChecklistData>);
+    bump();
+  };
+
+  const answered = record ? summarise(record.data) : null;
+  const isFresh = !!record && editable && !record.data.customerName && !record.data.complaintNo && answered?.done === 0 && answered?.notRequired === 0;
+
+  useSetAssistantTarget(
+    record
+      ? {
+          documentKind: "complaint-checklist",
+          documentId: doc.id,
+          currentData: record.data,
+          onApply: (p) => patch(p as Partial<ComplaintChecklistData>),
+          checklist: {
+            recordId: record.id,
+            title: `Complaint ${record.data.complaintNo || "(new)"}${record.data.customerName ? ` · ${record.data.customerName}` : ""}`,
+            getData: () => (recordRepository.getById(recordId) as RecordInstance<ComplaintChecklistData> | undefined)?.data ?? record.data,
+            setData,
+            editable,
+            canApprove,
+            submit: doSubmit,
+            approve: doApprove,
+            sendBack: doSendBack,
+            autoStart: isFresh,
+          },
+        }
+      : null
+  );
+
+  if (!record) {
+    return (
+      <div className="empty-state">
+        <h2 className="text-xl mb-2">Complaint checklist not found</h2>
+        <button className="btn btn-secondary" onClick={() => navigate("/gap/external")}>
+          <FiArrowLeft size={13} /> Back
+        </button>
+      </div>
+    );
+  }
+
+  const data = record.data;
+  const progress = progressOf(data);
+
+  const updateItem = (sectionIndex: number, itemIndex: number, p: Partial<ChecklistItem>) => {
+    setData({
+      ...data,
+      sections: data.sections.map((s, si) =>
+        si === sectionIndex ? { ...s, items: s.items.map((it, ii) => (ii === itemIndex ? { ...it, ...p } : it)) } : s
+      ),
+    });
+  };
+
+  const headerField = (label: string, key: keyof ComplaintChecklistData, type: "text" | "date" = "text") => (
+    <div className="field">
+      <label>{label}</label>
+      <input
+        type={type}
+        className="input input-sm"
+        disabled={!editable}
+        value={(data[key] as string | null) ?? ""}
+        onChange={(e) => patch({ [key]: e.target.value || (type === "date" ? null : "") } as Partial<ComplaintChecklistData>)}
+      />
+    </div>
+  );
+
+  return (
+    <div className={record.isDemo ? "demo-watermark" : ""}>
+      <div className="flex items-center justify-between mb-3 no-print">
+        <button className="btn btn-ghost btn-sm" onClick={() => navigate("/gap/external")}>
+          <FiArrowLeft size={13} /> Back to complaints
+        </button>
+        <div className="flex items-center gap-2">
+          {record.isDemo && <DemoTag />}
+          <StatusBadge status={record.status} />
+        </div>
+      </div>
+
+      {errors.length > 0 && (
+        <div className="card mb-4 no-print" style={{ borderColor: "var(--color-danger)", background: "var(--color-danger-bg)" }}>
+          <div className="card-pad">
+            <strong className="text-danger">Please fix the following:</strong>
+            <ul style={{ margin: "8px 0 0 18px" }}>
+              {errors.map((e, i) => (
+                <li key={i} className="text-danger text-sm">
+                  {e}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {record.status === "Rejected" && record.rejectionReason && (
+        <div className="card mb-4" style={{ borderColor: "var(--color-danger)", background: "var(--color-danger-bg)" }}>
+          <div className="card-pad text-sm">
+            <strong>Sent back</strong> by {record.rejectedBy} — {record.rejectionReason}
+          </div>
+        </div>
+      )}
+
+      <DocumentHeader doc={doc} dateLabel={formatDisplayDate(record.dueDate)} pageLabel="1 of 1 (digital)" />
+
+      <div className="card mt-4 no-print" style={{ borderLeft: "4px solid var(--color-accent)" }}>
+        <div className="card-pad flex items-center justify-between gap-4 wrap">
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="progress-bar" style={{ flex: 1 }}>
+                <div style={{ width: `${Math.round((progress.answered / progress.total) * 100)}%` }} />
+              </div>
+              <span className="text-sm font-semibold" style={{ whiteSpace: "nowrap" }}>
+                {progress.answered} / {progress.total}
+              </span>
+            </div>
+            <div className="text-xs text-muted">
+              {answered?.done ?? 0} done · {answered?.notRequired ?? 0} not required · {answered?.blank ?? 0} to go, across sections A–E
+            </div>
+          </div>
+          {editable && (
+            <button className="btn btn-primary" onClick={() => startGuidedChecklist()}>
+              <FiZap size={14} /> Walk me through it (A → E)
+            </button>
+          )}
+          {canApprove && (
+            <button className="btn btn-success" onClick={() => startGuidedChecklist()}>
+              <FiZap size={14} /> Review &amp; approve with the assistant
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="card mt-4">
+        <div className="card-pad">
+          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "10px 16px" }}>
+            {headerField("Customer Name", "customerName")}
+            {headerField("Complaint No.", "complaintNo")}
+            {headerField("Job Name", "jobName")}
+            {headerField("Job Code", "jobCode")}
+            {headerField("Complaint Received Date", "complaintReceivedDate", "date")}
+            {headerField("PO No.", "poNo")}
+          </div>
+        </div>
+      </div>
+
+      {data.sections.map((s, si) => (
+        <div key={s.key} className="card mt-4">
+          <div className="card-header">
+            <span className="checklist-section-title">
+              {s.key}. {s.title}
+            </span>
+            <span className="text-xs text-muted">
+              {s.items.filter((it) => it.done || it.notRequired).length} / {s.items.length}
+            </span>
+          </div>
+          <div className="doc-table" style={{ border: "none" }}>
+            <table className="compact">
+              <thead>
+                <tr>
+                  <th style={{ width: 56 }}>Sr. No.</th>
+                  <th>Activity</th>
+                  <th style={{ width: 70 }}>Done</th>
+                  <th style={{ width: 140 }}>Date</th>
+                  <th>Comments</th>
+                </tr>
+              </thead>
+              <tbody>
+                {s.items.map((it, ii) => (
+                  <tr key={it.srNo} className={it.done ? "checklist-done" : ""}>
+                    <td className="text-muted">{it.srNo}</td>
+                    <td className="text-sm">
+                      {it.activity}
+                      {it.notRequired && <span className="badge badge-Scheduled" style={{ marginLeft: 6 }}>Not required</span>}
+                    </td>
+                    <td style={{ textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={it.done}
+                        disabled={!editable}
+                        onChange={(e) => updateItem(si, ii, { done: e.target.checked, notRequired: e.target.checked ? false : it.notRequired, date: e.target.checked ? it.date ?? todayISO() : it.date })}
+                      />
+                    </td>
+                    <td>
+                      <input type="date" className="input input-sm" disabled={!editable} value={it.date ?? ""} onChange={(e) => updateItem(si, ii, { date: e.target.value || null })} />
+                    </td>
+                    <td>
+                      <input className="input input-sm" disabled={!editable} value={it.comment} onChange={(e) => updateItem(si, ii, { comment: e.target.value })} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+
+      <div className="card mt-4">
+        <div className="card-header">
+          <span className="checklist-section-title">APPROVAL</span>
+        </div>
+        <div className="card-pad">
+          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
+            <div>
+              <div className="text-xs text-muted font-semibold mb-2">PREPARED BY</div>
+              <div className="field mb-2">
+                <label>Name</label>
+                <input className="input input-sm" disabled={!editable} value={data.preparedBy.name} placeholder={currentUser} onChange={(e) => patch({ preparedBy: { ...data.preparedBy, name: e.target.value } })} />
+              </div>
+              <div className="field mb-2">
+                <label>Designation</label>
+                <input className="input input-sm" disabled={!editable} value={data.preparedBy.designation} onChange={(e) => patch({ preparedBy: { ...data.preparedBy, designation: e.target.value } })} />
+              </div>
+              <div className="field">
+                <label>Sign &amp; Date</label>
+                <input type="date" className="input input-sm" disabled={!editable} value={data.preparedBy.date ?? ""} onChange={(e) => patch({ preparedBy: { ...data.preparedBy, date: e.target.value || null } })} />
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-muted font-semibold mb-2">APPROVED BY</div>
+              <div className="field mb-2">
+                <label>Name</label>
+                <input className="input input-sm" disabled value={data.approvedBy.name} placeholder="Stamped on approval" />
+              </div>
+              <div className="field mb-2">
+                <label>Designation</label>
+                <input className="input input-sm" disabled={!canApprove} value={data.approvedBy.designation} placeholder="QA Head" onChange={(e) => patch({ approvedBy: { ...data.approvedBy, designation: e.target.value } })} />
+              </div>
+              <div className="field">
+                <label>Sign &amp; Date</label>
+                <input type="date" className="input input-sm" disabled value={data.approvedBy.date ?? ""} />
+              </div>
+              <div className="text-xs text-muted mt-2">Approval is the Verify step — the approver's name and date are stamped automatically.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p className="text-xs text-muted mt-3" style={{ fontStyle: "italic" }}>
+        {COMPLAINT_FOOTER_NOTE}
+      </p>
+      <div className="text-xs text-faint mt-1">
+        Format number: {doc.formatNo} ({doc.revisionNo} / {formatDisplayDate(doc.revisionDate)}) · {COMPLAINT_ACTIVITY_COUNT} activities · Source: {doc.sourceFile}
+      </div>
+
+      <RecordActionBar
+        status={record.status}
+        dirty={false}
+        isDemo={record.isDemo}
+        onSave={() => persist(saveDraft(record, data) as RecordInstance<ComplaintChecklistData>)}
+        onSubmit={() => doSubmit()}
+        onVerify={() => doApprove()}
+        onReject={doSendBack}
+        onResume={() => persist(resumeAfterRejection(record) as RecordInstance<ComplaintChecklistData>)}
+        onPrint={() => window.print()}
+        onDelete={() => {
+          recordRepository.remove(record.id);
+          bump();
+          navigate("/gap/external");
+        }}
+      />
+    </div>
+  );
+}

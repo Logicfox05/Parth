@@ -1,0 +1,30 @@
+{
+  "name": "digital-controlled-record-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Digital Controlled Record System - Pest Control / Lamination QC & Production / CAPA / Compliance for Gujarat Printpack Publication Pvt. Ltd.",
+  "type": "module",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "engines": {
+    "node": ">=23.6"
+  },
+  "scripts": {
+    "dev": "node --no-warnings=ExperimentalWarning scripts/dev-all.ts",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "server": "npm run start --workspace=backend",
+    "build": "npm run build --workspace=frontend",
+    "start": "npm run build --workspace=frontend && npm run start --workspace=backend",
+    "typecheck": "npm run typecheck --workspace=frontend && tsc -p tsconfig.node.json",
+    "test:e2e": "node --no-warnings=ExperimentalWarning scripts/run-e2e.ts"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^26.5.0",
+    "@types/nodemailer": "^8.0.1"
+  }
+}

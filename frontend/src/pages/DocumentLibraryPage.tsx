@@ -1,0 +1,183 @@
+import React, { useState } from "react";
+import { FiChevronDown, FiChevronUp, FiExternalLink, FiSearch, FiX } from "react-icons/fi";
+import { documentRepository } from "../data/repositories/documentRepository";
+import { masterRepository } from "../data/repositories/masterRepository";
+import { useRouter } from "../store/router";
+import { getDocumentInfo } from "../engine/documentInfo";
+import { formatDisplayDate } from "../utils/date";
+import { moduleSlug } from "../utils/moduleSlug";
+
+function openTarget(docId: string, kind: string): string {
+  if (kind === "chemical-master") return "/chemical-master";
+  if (kind === "sop-reference") return "/sop";
+  if (kind === "compliance-statement") return `/soc/${docId}`;
+  if (kind === "gap-inspection") return "/gap";
+  if (kind === "training-record") return "/training";
+  return "/calendar";
+}
+
+export function DocumentLibraryPage({ moduleSlug: activeSlug }: { moduleSlug?: string }) {
+  const { navigate } = useRouter();
+  const [query, setQuery] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const docs = documentRepository.getAll();
+  const master = masterRepository.get();
+
+  const activeModule = activeSlug ? docs.find((d) => moduleSlug(d.module) === activeSlug)?.module : undefined;
+  // A slug that matches no real module (a stale/bad deep link) must show
+  // nothing, not silently fall through to the unfiltered list — otherwise
+  // the "Filtered to: {slug}" badge below would be showing next to the full
+  // library, implying a filter that isn't actually applied.
+  const activeSlugIsUnknown = !!activeSlug && !activeModule;
+
+  const needle = query.trim().toLowerCase();
+  const filtered = docs.filter((d) => {
+    if (activeSlugIsUnknown) return false;
+    if (activeModule && d.module !== activeModule) return false;
+    if (!needle) return true;
+    const info = getDocumentInfo(d, master);
+    const haystack = [d.name, d.formatNo, d.department, d.module, d.frequency, info.whoLabel].join(" ").toLowerCase();
+    return haystack.includes(needle);
+  });
+
+  const byModule = new Map<string, typeof docs>();
+  for (const d of filtered) {
+    const arr = byModule.get(d.module) ?? [];
+    arr.push(d);
+    byModule.set(d.module, arr);
+  }
+
+  return (
+    <div>
+      <h1 className="text-2xl mb-1">Document Library</h1>
+      <p className="text-muted mb-4">
+        Every controlled document identified from the uploaded source files. {docs.length} documents configured — click
+        a row for the full What / How / Who / When summary.
+      </p>
+
+      {activeSlug && (
+        <div className="flex items-center gap-2 mb-3">
+          <span className="badge badge-Verified">
+            Filtered to: {activeModule ?? activeSlug}
+          </span>
+          <button className="btn btn-ghost btn-sm" onClick={() => navigate("/library")}>
+            <FiX size={11} /> Clear filter
+          </button>
+        </div>
+      )}
+
+      <div style={{ position: "relative", maxWidth: 420 }} className="mb-5">
+        <FiSearch
+          size={14}
+          style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "var(--color-text-faint)" }}
+        />
+        <input
+          className="input"
+          style={{ paddingLeft: 32, width: "100%" }}
+          placeholder="Search by name, format no., department, or responsible person…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
+
+      {byModule.size === 0 && (
+        <div className="empty-state">No documents match "{query || activeSlug}".</div>
+      )}
+
+      {Array.from(byModule.entries()).map(([module, list]) => (
+        <div key={module} className="mb-6">
+          <h3 className="text-sm uppercase text-muted mb-2">{module}</h3>
+          <div className="doc-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Document Name</th>
+                  <th>Format No.</th>
+                  <th>Responsible (Who)</th>
+                  <th>Frequency (When)</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((d) => {
+                  const info = getDocumentInfo(d, master);
+                  const isOpen = expandedId === d.id;
+                  return (
+                    <React.Fragment key={d.id}>
+                      <tr className="card-clickable" onClick={() => setExpandedId(isOpen ? null : d.id)}>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            {isOpen ? <FiChevronUp size={12} /> : <FiChevronDown size={12} />}
+                            <span className="font-semibold">{d.name}</span>
+                          </div>
+                        </td>
+                        <td className={d.formatNo === "TO BE CONFIRMED" ? "tbc" : ""}>
+                          {d.formatNo}
+                          {d.revisionNo && d.revisionNo !== "TO BE CONFIRMED" ? ` (Rev ${d.revisionNo})` : ""}
+                        </td>
+                        <td className="text-sm">{info.whoLabel}</td>
+                        <td>
+                          <span className="badge badge-Due">{d.frequency}</span>
+                        </td>
+                        <td>
+                          <span className="badge badge-Verified">{d.status}</span>
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(openTarget(d.id, d.kind));
+                            }}
+                          >
+                            Open Document <FiExternalLink size={12} />
+                          </button>
+                        </td>
+                      </tr>
+                      {isOpen && (
+                        <tr className="no-print">
+                          <td colSpan={6} style={{ background: "var(--color-surface-alt)" }}>
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                                gap: 16,
+                                padding: "14px 6px",
+                              }}
+                            >
+                              <div>
+                                <div className="text-xs text-muted font-semibold">WHAT</div>
+                                <div className="text-sm">{info.what}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-muted font-semibold">HOW</div>
+                                <div className="text-sm">{info.how}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-muted font-semibold">WHO</div>
+                                <div className="text-sm">{info.whoLabel}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-muted font-semibold">WHEN</div>
+                                <div className="text-sm">{info.when}</div>
+                              </div>
+                            </div>
+                            <div className="text-xs text-faint" style={{ padding: "0 6px 10px" }}>
+                              Department: {d.department}
+                              {d.revisionDate ? ` · Revision date: ${formatDisplayDate(d.revisionDate)}` : ""}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

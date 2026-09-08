@@ -1,0 +1,138 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { useAppStore } from "../store/AppStore";
+import { useRouter } from "../store/router";
+import { recordRepository } from "../data/repositories/recordRepository";
+import { ensureRecordsGeneratedForMonth } from "../engine/recordGenerator";
+import { daysInMonth, MONTH_NAMES, pad2, todayISO, WEEKDAY_NAMES } from "../utils/date";
+
+export function CalendarPage({ year, month }: { year?: number; month?: number }) {
+  const now = new Date();
+  const [y, setY] = useState(year ?? now.getFullYear());
+  const [m, setM] = useState(month !== undefined ? month : now.getMonth());
+  const { mode, version, bump } = useAppStore();
+  const { navigate } = useRouter();
+  const isDemo = mode === "demo";
+  const today = todayISO();
+
+  useEffect(() => {
+    // Always Live here — see the matching comment in DashboardPage.tsx for
+    // why passing the viewed mode's isDemo through would silently defeat
+    // Demo Mode's own "Generate Demo Records" button.
+    ensureRecordsGeneratedForMonth(y, m, { isDemo: false });
+    bump();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [y, m, isDemo]);
+
+  const dim = daysInMonth(y, m);
+  const firstWeekday = new Date(y, m, 1).getDay();
+
+  const byDate = useMemo(() => {
+    const from = `${y}-${pad2(m + 1)}-01`;
+    const to = `${y}-${pad2(m + 1)}-${pad2(dim)}`;
+    const records = recordRepository.query({ fromDate: from, toDate: to, isDemo });
+    const map = new Map<string, typeof records>();
+    for (const r of records) {
+      const arr = map.get(r.dueDate) ?? [];
+      arr.push(r);
+      map.set(r.dueDate, arr);
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [y, m, isDemo, version, dim]);
+
+  const goPrev = () => {
+    if (m === 0) {
+      setY(y - 1);
+      setM(11);
+    } else setM(m - 1);
+  };
+  const goNext = () => {
+    if (m === 11) {
+      setY(y + 1);
+      setM(0);
+    } else setM(m + 1);
+  };
+
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(null);
+  for (let d = 1; d <= dim; d++) cells.push(d);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className="text-2xl mb-1">Record Calendar</h1>
+          <p className="text-muted">Select a date to view records due, completed, pending or overdue.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <select className="input input-sm" style={{ width: 90 }} value={y} onChange={(e) => setY(Number(e.target.value))}>
+            {[y - 1, y, y + 1].map((yy) => (
+              <option key={yy} value={yy}>
+                {yy}
+              </option>
+            ))}
+          </select>
+          <select className="input input-sm" style={{ width: 140 }} value={m} onChange={(e) => setM(Number(e.target.value))}>
+            {MONTH_NAMES.map((name, idx) => (
+              <option key={name} value={idx}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <button className="btn btn-secondary btn-sm btn-icon" onClick={goPrev}>
+            <FiChevronLeft size={15} />
+          </button>
+          <button className="btn btn-secondary btn-sm btn-icon" onClick={goNext}>
+            <FiChevronRight size={15} />
+          </button>
+        </div>
+      </div>
+
+      <div className="calendar-grid mb-1">
+        {WEEKDAY_NAMES.map((w) => (
+          <div key={w} className="calendar-weekday">
+            {w}
+          </div>
+        ))}
+      </div>
+      <div className="calendar-grid">
+        {cells.map((d, i) => {
+          if (d === null) return <div key={`e${i}`} className="calendar-cell empty" />;
+          const dateISO = `${y}-${pad2(m + 1)}-${pad2(d)}`;
+          const records = byDate.get(dateISO) ?? [];
+          const completed = records.filter((r) => ["Submitted", "Pending Verification", "Verified"].includes(r.status));
+          const overdue = records.filter((r) => dateISO < today && ["Scheduled", "Due", "In Progress"].includes(r.status));
+          const pending = records.filter((r) => dateISO >= today && ["Scheduled", "Due", "In Progress"].includes(r.status));
+          const isToday = dateISO === today;
+          return (
+            <div
+              key={dateISO}
+              className={`calendar-cell${isToday ? " today" : ""}`}
+              onClick={() => navigate(`/day/${dateISO}`)}
+            >
+              <div className="cal-date">{d}</div>
+              <div className="flex flex-col gap-1">
+                {completed.length > 0 && (
+                  <span className="cal-chip" style={{ background: "var(--color-success-bg)", color: "var(--color-success)" }}>
+                    {completed.length} Completed
+                  </span>
+                )}
+                {overdue.length > 0 && (
+                  <span className="cal-chip" style={{ background: "var(--color-danger-bg)", color: "var(--color-danger)" }}>
+                    {overdue.length} Overdue
+                  </span>
+                )}
+                {pending.length > 0 && (
+                  <span className="cal-chip" style={{ background: "var(--color-info-bg)", color: "var(--color-info)" }}>
+                    {pending.length} {isToday || dateISO < today ? "Due" : "Scheduled"}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

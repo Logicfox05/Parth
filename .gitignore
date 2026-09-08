@@ -1,0 +1,15 @@
+node_modules/
+.devbuild/
+dist/
+*.log
+.DS_Store
+tests/shots/
+backend/data/
+backend/.env
+
+# Raw upload — already extracted into source-documents/, which is tracked;
+# keeping both would just double the binary weight in the repo.
+Audit documents.zip
+
+# Claude Code project/session state, not part of the app.
+.claude/
