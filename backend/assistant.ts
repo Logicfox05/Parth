@@ -156,6 +156,7 @@ Valid navigation targets (use EXACTLY this shape, "path/param" meaning substitut
 - /chemical-master — the Chemical / Pesticide Application Chart
 - /sop — the Standard Operating Procedure reference
 - /soc — Statements of Compliance list
+- /assistant — the full-page Assistant chat (the user may already be there; rarely a navigation target)
 - /search — the global search screen
 - /master-data — admin reference data (employees, chemicals, PC IDs, holidays, ...)
 - /demo — Demo Mode (synthetic data for trying the app out)
@@ -215,12 +216,18 @@ export async function runAssistant({
   currentRoute,
   documentKind,
   currentData,
+  context,
 }: {
   message: string;
   today: string;
   currentRoute: string;
   documentKind?: string;
   currentData?: unknown;
+  // Plain-text digest of live app facts prepared by the frontend (today's
+  // working-day status, the weekly off, upcoming holidays / adjustment days,
+  // what's due) — see frontend/src/engine/assistantLocal.ts. Capped by the
+  // route handler.
+  context?: string;
 }): Promise<AssistantResult> {
   if (typeof message !== "string" || !message.trim()) throw new Error("Message is required.");
 
@@ -232,6 +239,10 @@ export async function runAssistant({
     "never make them hunt through menus for something you can already tell they want.",
     `Today's date is ${today} (ISO). The user is currently on the app route "${currentRoute}".`,
     ROUTE_GUIDE,
+    context && context.trim()
+      ? `Live facts from the app right now — rely on these for anything about dates, holidays, the weekly off, adjustment days or what is due, and never contradict them:\n${context.trim()}`
+      : "",
+    'Questions about holidays, the weekly off, adjustment (make-up working) days, or what is due today are answered from the live facts above with action "reply" — do not navigate for them unless the user asks to open a screen.',
     canFill
       ? `The user currently has a "${documentKind}" record open and editable. Field guide for it:${FIELD_GUIDES[documentKind]}\nIts current data (JSON): ${JSON.stringify(currentData ?? {})}`
       : "No document is currently open for editing, so you cannot fill in fields right now — if the message describes data entry, explain (in `reply`) that they should open the relevant record first, and if you can tell which screen that is, also navigate them there.",
@@ -242,7 +253,9 @@ export async function runAssistant({
     'Use "navigate" when the message is asking to see/open a different screen, date, month\'s reports, or module — "route" must be one of the exact shapes listed above; omit "patch".',
     'Use "reply" for anything else — greetings, thanks, questions you cannot act on, or a fill/navigate request you are not confident about; omit "patch" and "route" rather than guessing wrong.',
     "Field-filling rules (only used with action \"fill\"): each patch value must be the COMPLETE new value for that top-level field — for array fields, include every item (changed and unchanged), not just a diff. Omit any field you are not changing. Never invent data the user did not state or clearly imply. If you add a new array item whose shape has an \"id\" field, set it to a short string like \"new-1\" (not for plain numeric fields like slNo/sNo — continue the existing sequence).",
-  ].join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   const raw = await groqChatJSON({ system, user: message.trim() });
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {

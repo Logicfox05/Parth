@@ -40,6 +40,16 @@ export function dueBriefingSlot(now: Date, hasPending: () => boolean): BriefingS
   return slot;
 }
 
-export function recordBriefingShown(slot: BriefingSlot): void {
+export function recordBriefingShown(slot: BriefingSlot, now = new Date()): void {
   settingsRepository.markBriefingShown(todayISO(), slot);
+  // The very first briefing IS today's briefing for whichever slot the clock
+  // is in. Without this, a first-ever open at 17:10 shows the "first"
+  // briefing, and the moment it's dismissed the evening slot fires a second
+  // one straight over the page (the widget's overlay then swallows every
+  // click) — the assistant is meant to interrupt once per slot, not twice.
+  if (slot === "first") {
+    const s = settingsRepository.get();
+    const current = slotForTime(now, s.workdayStart, s.workdayEnd);
+    if (current) settingsRepository.markBriefingShown(todayISO(), current);
+  }
 }

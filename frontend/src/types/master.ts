@@ -53,6 +53,16 @@ export interface CompanyHoliday {
   name: string;
 }
 
+// "Everyone must report to the company on adjustment Day" — a date on the
+// leave calendar that would normally be the weekly off but is a WORKING day,
+// making up for a festival holiday. The opposite of a holiday.
+export interface AdjustmentDay {
+  id: string;
+  date: string; // ISO "YYYY-MM-DD"
+  forHoliday?: string; // the holiday it makes up for, as printed next to it
+  note?: string;
+}
+
 export interface MasterData {
   employees: Employee[];
   areas: AreaLocation[];
@@ -67,12 +77,24 @@ export interface MasterData {
   // read defensively (`?? {}`) since browsers that used the app before this
   // field existed won't have it in their stored data.
   documentRoleKeywords: Record<string, string>;
-  // Company-wide holidays — checked when generating a new Daily Monitoring
-  // record's default isHoliday flag, and when deciding whether a due/overdue
-  // reminder should fire (see src/engine/recordDefaults.ts,
-  // src/engine/reminders.ts). Read defensively (`?? []`) for the same
-  // pre-existing-data reason as documentRoleKeywords above.
+  // The company's working calendar — see src/engine/holidays.ts, the one
+  // place that decides whether a date is a working day:
+  //   holidays       festival holidays from the Gujarat Print Pack Leave
+  //                  Calendar 2026 (closed days)
+  //   weeklyOffDay   0 = Sunday … 6 = Saturday; the plant's weekly off is
+  //                  Thursday (4). Undefined in data stored before this field
+  //                  existed → treated as Thursday.
+  //   adjustmentDays Thursdays the plant WORKS to make up for a holiday.
+  // All read defensively (`?? []` / `?? 4`) for the same pre-existing-data
+  // reason as documentRoleKeywords above.
   holidays: CompanyHoliday[];
+  weeklyOffDay?: number;
+  adjustmentDays?: AdjustmentDay[];
+  // Ids of seeded holiday / adjustment-day rows an admin deleted on purpose.
+  // The seed merge (masterRepository.ensureSeeded) is additive by id, so
+  // without this a deleted seed row — e.g. the doubtful 20-11-2026
+  // adjustment day — would quietly come back on the next start.
+  removedSeedIds?: string[];
 }
 
 export type CheckpointResponseType = "yesno" | "yesno-note" | "number";

@@ -154,6 +154,31 @@ validated in `store/router.tsx`) are the module's own front door — they read t
 document ids: `documentRepository.ensureSeeded` drops the definition, `masterRepository.ensureSeeded`
 its reminder-role entry, and `bootstrap()` any records still stored for it.
 
+**The working calendar.** `MasterData.weeklyOffDay` (0–6, Thursday = 4), `holidays[]` (festival
+holidays) and `adjustmentDays[]` (`{ id, date, forHoliday, note }` — weekly-off days the plant works)
+are read only through `engine/holidays.ts`: `dayInfo(dateISO, master)` → `{ kind: "working" |
+"weekly-off" | "holiday" | "adjustment", isHoliday, label, short }`, `isCompanyHoliday`,
+`nextWorkingDay`, `upcomingHolidays`, and `effectiveDueDatesInMonth(doc, y, m, master)` → `{ scheduled,
+due, shifted, holiday }[]`. The record generator and Demo Mode build every record from the latter: the
+`periodKey` uses `scheduled` (idempotent), the record's `dueDate` uses `due` (moved to the next
+working day for non-daily cadences), and daily registers other than Daily Monitoring are skipped
+when `holiday` is set. `recordDefaults`, `autoFill`, `reminders` and `assistantBriefing` all ask
+`isCompanyHoliday` rather than looking at the holiday list directly. `engine/calendarMigration.ts`
+(`alignRecordsToWorkingCalendar`, run by `bootstrap()` every start, idempotent) brings records an
+earlier build or an earlier version of the calendar left on a closed day into line — only records no
+person has worked on (open status, never submitted, not edited since the assistant prepared them):
+non-daily ones move to the next working day, daily registers other than Daily Monitoring are removed,
+Daily Monitoring is re-marked as a holiday. `MasterData.removedSeedIds` records seeded holiday /
+adjustment rows an admin deleted so the additive seed merge never resurrects them.
+
+**The assistant's local layer.** `engine/assistantLocal.ts` answers a few intents on the client
+(holiday / weekly-off / adjustment questions with a date reference, "next holiday", "what's due
+today", "briefing", "help") and builds `buildAssistantContext()` — a ≤ 3.8 KB plain-text digest of live
+facts that both the widget and the full-page `pages/AssistantPage.tsx` send as `context` with every
+`/api/assistant/chat` call (the backend caps it at 4 KB and folds it into the system prompt). The
+page persists conversations under the `assistant-conversations` storage key (30 conversations × 200
+messages max).
+
 ## Record lifecycle (state diagram)
 
 ```

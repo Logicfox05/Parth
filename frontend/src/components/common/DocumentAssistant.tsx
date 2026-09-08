@@ -21,6 +21,7 @@ import {
   type GuidedPrompt,
   type GuidedStep,
 } from "../../engine/guidedChecklist";
+import { buildAssistantContext, localAnswer } from "../../engine/assistantLocal";
 import { formatDisplayDate, todayISO } from "../../utils/date";
 import { generateId } from "../../utils/id";
 import { openBriefing } from "./AssistantBriefingPopup";
@@ -66,8 +67,9 @@ export function DocumentAssistant() {
   const { hasTarget, targetKind, targetDocumentId, targetSignature, getTarget } = useAssistantTarget();
   const { elRef, style: dragStyle, dragHandleProps, didJustDrag, reclamp } = useDraggable(WIDGET_POSITION_KEY);
   const { user } = useAuth();
-  const { version, currentUser } = useAppStore();
+  const { version, currentUser, mode } = useAppStore();
   const { path, navigate } = useRouter();
+  const isDemo = mode === "demo";
 
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -331,6 +333,17 @@ export function DocumentAssistant() {
     }
 
     me(text);
+    // Calendar / workload / help QUESTIONS are answered right here from the
+    // app's own data — instant, and no network needed (engine/assistantLocal.ts).
+    // With a record open, an instruction like "mark today as holiday" is a
+    // fill request for the model, not a calendar question — only genuine
+    // questions take the local path then.
+    const looksLikeQuestion = /\?\s*$/.test(text) || /^(is|was|are|were|when|which|what|who|how|do|does|did|can|could|will|tell me|list)\b/i.test(text);
+    const local = !t || looksLikeQuestion ? localAnswer(text, isDemo, user?.name) : null;
+    if (local) {
+      bot(local.reply, local.chips);
+      return;
+    }
     setLoading(true);
     try {
       const result = await assistantApi.chat({
@@ -339,6 +352,7 @@ export function DocumentAssistant() {
         currentRoute: path,
         documentKind: t?.documentKind,
         currentData: t?.currentData,
+        context: buildAssistantContext(isDemo, user?.name),
       });
       if (result.action === "fill" && t) {
         const fields = Object.keys(result.patch ?? {});
@@ -381,6 +395,11 @@ export function DocumentAssistant() {
     : (targetKind && PLACEHOLDER_BY_KIND[targetKind]) || DEFAULT_PLACEHOLDER;
 
   const subtitle = getTarget()?.checklist?.title ?? (hasTarget ? "A record is open — tell me what to fill in" : "Ask, navigate, fill — in your own words");
+
+  // The full-page Assistant IS the chat on that screen — two chat boxes
+  // would just be confusing. (After every hook above, so the hook order is
+  // identical on every render.)
+  if (path === "/assistant") return null;
 
   return (
     <div ref={elRef} className="no-print" style={{ position: "fixed", right: 20, bottom: 20, zIndex: 50, ...dragStyle }}>

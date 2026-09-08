@@ -13,6 +13,8 @@ import { computeBriefing, briefingHeadline } from "../engine/assistantBriefing";
 import { findPreLaunchNoise, purgePreLaunchNoise } from "../engine/backlogCleanup";
 import { ensureDemoRecordsGeneratedForYear } from "../data/demoGenerator";
 import { openCorrectiveActionsCount, refreshGapFindingStatuses, moduleSummaries, rodentsInMonth } from "../data/selectors";
+import { masterRepository } from "../data/repositories/masterRepository";
+import { dayInfo, upcomingHolidays, weeklyOffDay, WEEKDAY_LONG } from "../engine/holidays";
 import { todayISO, formatDisplayDate, MONTH_NAMES } from "../utils/date";
 import { StatusBadge } from "../components/common/StatusBadge";
 import { DemoTag } from "../components/common/DemoTag";
@@ -114,6 +116,9 @@ export function DashboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const noiseCount = useMemo(() => (isDemo ? 0 : findPreLaunchNoise().length), [isDemo, version]);
   const liveStartDate = settingsRepository.get().liveStartDate;
+  const master = masterRepository.get();
+  const todayInfo = dayInfo(today, master);
+  const nextHolidays = upcomingHolidays(today, master, 2, 120);
 
   return (
     <div className={isDemo ? "demo-watermark" : ""}>
@@ -121,8 +126,21 @@ export function DashboardPage() {
         <div>
           <h1 className="text-2xl">Digital Controlled Record System</h1>
           <p className="text-muted mt-1">
-            {formatDisplayDate(today)} · Gujarat Printpack Publication Pvt. Ltd. — Pest Control · Lamination QC & Production · Compliance
+            {formatDisplayDate(today)} · {todayInfo.weekday}
+            {todayInfo.kind !== "working" && (
+              <span className={`badge ${todayInfo.isHoliday ? "badge-Scheduled" : "badge-Verified"}`} style={{ marginLeft: 6 }} title={todayInfo.label}>
+                {todayInfo.short}
+              </span>
+            )}{" "}
+            · Gujarat Printpack Publication Pvt. Ltd. — Pest Control · Lamination QC & Production · Compliance
           </p>
+          {nextHolidays.length > 0 && (
+            <p className="text-xs text-faint mt-1">
+              Next on the leave calendar:{" "}
+              {nextHolidays.map((h) => `${h.kind === "adjustment" ? "adjustment (working) day" : h.name} ${formatDisplayDate(h.date)} (${h.weekday.slice(0, 3)})`).join(" · ")} · weekly off every{" "}
+              {WEEKDAY_LONG[weeklyOffDay(master)]}
+            </p>
+          )}
         </div>
         <button className="btn btn-primary" onClick={() => navigate("/calendar")}>
           <FiCalendar size={15} /> Open Calendar

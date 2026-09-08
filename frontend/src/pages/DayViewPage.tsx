@@ -4,7 +4,9 @@ import { useAppStore } from "../store/AppStore";
 import { useRouter } from "../store/router";
 import { recordRepository } from "../data/repositories/recordRepository";
 import { documentRepository } from "../data/repositories/documentRepository";
+import { masterRepository } from "../data/repositories/masterRepository";
 import { ensureRecordsGeneratedForMonth } from "../engine/recordGenerator";
+import { dayInfo } from "../engine/holidays";
 import { routeForRecord } from "../engine/reminders";
 import { formatDisplayDate, fromISODate, todayISO } from "../utils/date";
 import { StatusBadge } from "../components/common/StatusBadge";
@@ -29,17 +31,36 @@ export function DayViewPage({ date }: { date?: string }) {
   const docs = documentRepository.getAll();
   const today = todayISO();
   const overdue = dateISO < today;
+  const day = dayInfo(dateISO, masterRepository.get());
 
   return (
     <div>
       <button className="btn btn-ghost btn-sm mb-3" onClick={() => navigate("/calendar")}>
         <FiArrowLeft size={13} /> Back to Calendar
       </button>
-      <h1 className="text-2xl mb-1">{formatDisplayDate(dateISO)}</h1>
-      <p className="text-muted mb-6">
+      <h1 className="text-2xl mb-1">
+        {formatDisplayDate(dateISO)} <span className="text-muted text-lg">· {day.weekday}</span>
+      </h1>
+      <p className="text-muted mb-4">
         {records.length} record(s) due on this date.
         {dateISO === today && <span className="badge badge-Due" style={{ marginLeft: 8 }}>Today</span>}
       </p>
+      {day.kind !== "working" && (
+        <div
+          className={`card mb-4 day-banner day-banner-${day.kind}`}
+          style={{
+            borderColor: day.isHoliday ? "var(--color-warning)" : "var(--color-success)",
+            background: day.isHoliday ? "var(--color-warning-bg)" : "var(--color-success-bg)",
+          }}
+        >
+          <div className="card-pad text-sm">
+            <strong>{day.label}.</strong>{" "}
+            {day.kind === "adjustment"
+              ? "Everyone reports to the company on this day (Gujarat Print Pack Leave Calendar 2026), so records are due exactly as on any working day."
+              : "The plant is closed — the Daily Pest Control Monitoring Record is pre-marked as a holiday, no other daily register is expected, and anything scheduled for this date was moved to the next working day."}
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <div className="card-header">

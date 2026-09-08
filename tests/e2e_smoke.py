@@ -13,10 +13,47 @@ ready, runs this script, then shuts the server down again.)
 import re
 import sys
 import time
+from datetime import date, datetime, timedelta
 from playwright.sync_api import sync_playwright, expect
 
 BASE = "http://localhost:8842"
 FAILURES = []
+
+# The company's working calendar (Master Data → Holidays, seeded from the
+# Gujarat Print Pack Leave Calendar 2026 — see REQUIREMENTS.md §16): Thursday
+# is the weekly off, except on adjustment days; plus the festival holidays.
+# Used to pick a WORKING day for the sections that open a day's records, so
+# the suite passes on a Thursday too.
+ADJUSTMENT_DAYS_2026 = {"2026-01-22", "2026-08-06", "2026-10-22", "2026-11-05", "2026-11-20"}
+FESTIVAL_HOLIDAYS_2026 = {
+    "2026-01-14", "2026-01-26", "2026-03-04", "2026-08-15", "2026-08-28", "2026-09-04", "2026-10-19", "2026-10-20",
+    "2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13",
+}
+
+
+def is_closed_day(d):
+    iso = d.isoformat()
+    if iso in FESTIVAL_HOLIDAYS_2026:
+        return True
+    return d.weekday() == 3 and iso not in ADJUSTMENT_DAYS_2026
+
+
+def next_working_day(d):
+    while is_closed_day(d):
+        d += timedelta(days=1)
+    return d
+
+
+WORK_DAY = next_working_day(date.today()).isoformat()
+# The assistant prepares records due today or earlier — so on a closed day
+# (when WORK_DAY is tomorrow or later) the opened records are blank shells and
+# the "prepared by the assistant" expectations don't apply.
+PREPARED_EXPECTED = WORK_DAY == date.today().isoformat()
+
+
+def open_work_day(page):
+    page.goto(f"{BASE}/index.html#/day/{WORK_DAY}")
+    page.wait_for_timeout(300)
 # A fresh, random account per run: signup enforces unique emails, and the
 # app now gates every page behind login (see src/main.tsx / AuthProvider).
 TEST_EMAIL = f"e2e-{int(time.time() * 1000)}@example.com"
@@ -98,11 +135,9 @@ def main():
         page.wait_for_timeout(300)
         check("No pre-launch backlog banner after browsing old calendar months", page.locator("text=Clean up").count() == 0)
 
-        page.click("text=Record Calendar")
-        page.wait_for_timeout(200)
-        today_cell = page.locator(".calendar-cell.today")
-        today_cell.first.click()
-        page.wait_for_timeout(300)
+        # The next WORKING day's records — today, unless today is the Thursday
+        # weekly off or a festival holiday (see the calendar helpers at the top).
+        open_work_day(page)
         check("Day view opens", "Records Due" in page.content())
 
         # ---- 3. Open Daily Pest Monitoring record, fill, save, submit ----
@@ -120,7 +155,7 @@ def main():
 
         if opened_record:
             check("Record page shows checkpoint table", page.locator(".doc-table").count() > 0)
-            check("Daily record was pre-filled by the assistant", "Your assistant has filled this in" in page.content())
+            check("Daily record was pre-filled by the assistant", "Your assistant has filled this in" in page.content() or not PREPARED_EXPECTED)
             # Fill all checkpoint selects
             selects = page.locator("table select.input")
             count = selects.count()
@@ -151,10 +186,7 @@ def main():
                 check("Record verified", "Verified" in page.content())
 
         # ---- 3b. A lamination log sheet (generic log-sheet kind), prepared by the assistant ----
-        page.click("text=Record Calendar")
-        page.wait_for_timeout(200)
-        page.locator(".calendar-cell.today").first.click()
-        page.wait_for_timeout(300)
+        open_work_day(page)
         rows = page.locator(".doc-table tbody tr")
         opened_log = False
         for i in range(rows.count()):
@@ -167,10 +199,11 @@ def main():
         if opened_log:
             check("Log sheet shows the F-QC-30 header", "F-QC-30" in page.content())
             check("Log sheet was pre-filled with 24 hourly rows", page.locator("table.log-sheet tbody tr").count() == 24)
-            check("Prepared banner explains what was filled", "hourly readings" in page.content())
-            page.click("button:has-text('Submit')")
-            page.wait_for_timeout(300)
-            check("Log sheet submitted (status Pending Verification)", "Pending Verification" in page.content())
+            check("Prepared banner explains what was filled", "hourly readings" in page.content() or not PREPARED_EXPECTED)
+            if PREPARED_EXPECTED:
+                page.click("button:has-text('Submit')")
+                page.wait_for_timeout(300)
+                check("Log sheet submitted (status Pending Verification)", "Pending Verification" in page.content())
 
         # ---- 4. Persistence across reload ----
         page.reload()
@@ -247,6 +280,19 @@ def main():
         fly_total = re.search(r"(\d+) flies caught in", fly_report)
         check("Fly Catcher Infestation trend has a non-zero yearly total in Demo Mode (seasonal fly pattern applied)", fly_total is not None and int(fly_total.group(1)) > 0)
         check("Fly Catcher Infestation trend lists all 13 units in the company's year layout", "target pest" in fly_report and page.locator("table.fly-units tbody tr").count() == 13)
+
+        # Holiday-aware scheduling: Thursday is the weekly off, so a fortnightly
+        # visit that falls on a Thursday moves to the next working day instead
+        # of vanishing. Every year has 4ths/18ths that are Thursdays (June in
+        # 2026, February in 2027, ...), so: the demo year's visits exist, none
+        # is dated a Thursday, and some of them are NOT on the 4th/18th.
+        page.goto(f"{BASE}/index.html#/pest/service/rodent/{date.today().year}")
+        page.wait_for_timeout(400)
+        svc_dates = [datetime.strptime(m, "%d-%b-%Y").date() for m in re.findall(r"\b\d{2}-[A-Z][a-z]{2}-\d{4}\b", page.locator(".doc-table tbody").inner_text())]
+        check(
+            "Demo service visits never sit on the Thursday weekly off — a visit scheduled on a Thursday is dated the next working day",
+            len(svc_dates) >= 4 and all(d.weekday() != 3 for d in svc_dates) and any(d.day not in (4, 18) for d in svc_dates),
+        )
 
         # switch back to live and confirm demo doesn't leak
         page.click("text=Live Mode")
@@ -401,10 +447,7 @@ def main():
         check("Pest Control overview shows the four groups", all(x in overview for x in ["Daily Report", "Service Reports", "Trend Analysis", "Training & Reference"]))
 
         # ---- 12b. A fixed-parameter inspection record (F/QC/37), prepared by the assistant ----
-        page.click("text=Record Calendar")
-        page.wait_for_timeout(200)
-        page.locator(".calendar-cell.today").first.click()
-        page.wait_for_timeout(300)
+        open_work_day(page)
         rows = page.locator(".doc-table tbody tr")
         opened_insp = False
         for i in range(rows.count()):
@@ -416,6 +459,7 @@ def main():
         page.wait_for_timeout(300)
         if opened_insp:
             check("Inspection shows the 11 printed test parameters", page.locator("table.log-sheet tbody tr").count() == 11)
+        if opened_insp and PREPARED_EXPECTED:
             check("Inspection observations were pre-filled from the specimen", "Standy + Zipper" in page.content())
             check("Lot status pre-set to Accepted and inspector signed", "Accepted" in page.content() and "Inspected By" in page.content())
             page.click("button:has-text('Submit')")
@@ -431,6 +475,79 @@ def main():
         page.fill("input[placeholder*='PC-04']", "Gaurav Singh")
         page.wait_for_timeout(300)
         check("Search finds the lamination operator on the prepared log sheets", page.locator(".doc-table tbody tr").count() >= 1)
+
+        # ---- 14. The working calendar: Thursday weekly off, leave calendar, adjustment days ----
+        # (engine/holidays.ts — the Gujarat Print Pack Leave Calendar 2026,
+        # Thursday copy.) September 2026 has four Thursdays (3, 10, 17, 24) and
+        # Janmashtami on Friday the 4th; October's 22nd is an adjustment day —
+        # a Thursday the plant works.
+        page.goto(f"{BASE}/index.html#/calendar/2026/8")
+        page.wait_for_timeout(400)
+        check("Calendar marks every Thursday of September 2026 as the weekly off", page.locator(".calendar-cell:has-text('Weekly off')").count() == 4)
+        check("Calendar shows Janmashtami (04-Sep-2026) from the leave calendar", page.locator(".calendar-cell:has-text('Janmashtami')").count() == 1)
+        page.goto(f"{BASE}/index.html#/calendar/2026/9")
+        page.wait_for_timeout(400)
+        check(
+            "Adjustment day 22-Oct-2026 is a working Thursday (October: 4 weekly offs + 1 working day)",
+            page.locator(".calendar-cell:has-text('Weekly off')").count() == 4 and page.locator(".calendar-cell:has-text('Working day')").count() == 1,
+        )
+        page.goto(f"{BASE}/index.html#/day/2026-09-10")
+        page.wait_for_timeout(400)
+        check("Day View explains a Thursday as the weekly off", "weekly off" in page.locator(".app-content").inner_text().lower())
+        # The next weekly-off Thursday on or after today (skipping adjustment
+        # days) — computed at run time, because a fresh browser's launch-date
+        # floor means only records from today onwards are generated.
+        next_off = date.today()
+        while next_off.weekday() != 3 or next_off.isoformat() in ADJUSTMENT_DAYS_2026:
+            next_off += timedelta(days=1)
+        page.goto(f"{BASE}/index.html#/pest/daily/{next_off.year}/{next_off.month - 1}")
+        page.wait_for_timeout(500)
+        check("Daily Report register pre-marks the next weekly-off Thursday as a HOLIDAY row", "HOLIDAY" in page.locator(".doc-table tbody tr").nth(next_off.day - 1).inner_text())
+        page.goto(f"{BASE}/index.html#/master-data")
+        page.wait_for_timeout(300)
+        page.click(".pill-tab:has-text('Holidays')")
+        page.wait_for_timeout(200)
+        check(
+            "Master Data shows the weekly off (Thursday) and the leave calendar's five adjustment days",
+            page.locator("select[aria-label='Weekly off day']").input_value() == "4" and page.locator("table.adjustment-days tbody tr").count() == 5,
+        )
+
+        # ---- 15. The Assistant page (ChatGPT-style, text only) ----
+        page.click("a[href='#/assistant']")
+        page.wait_for_timeout(300)
+        check(
+            "Assistant page opens from the sidebar with suggestions and a composer",
+            "#/assistant" in page.url and page.locator(".assistant-suggestion").count() >= 4 and page.locator("textarea.assistant-input").count() == 1,
+        )
+        check(
+            "Assistant page has no voice / microphone control",
+            page.locator(".assistant-page button[aria-label*='oice']").count() == 0 and page.locator(".assistant-page button[aria-label*='icrophone']").count() == 0,
+        )
+        # Fixed dates, so the expected wording never depends on the day the
+        # suite happens to run: 10-Sep-2026 is a Thursday (weekly off),
+        # 22-Oct-2026 a Thursday the plant works (adjustment day).
+        page.fill("textarea.assistant-input", "is 2026-09-10 a holiday?")
+        page.click("button[aria-label='Send message']")
+        page.wait_for_timeout(500)
+        reply = page.locator(".assistant-page .chat-msg.bot").last.inner_text().lower()
+        check("Assistant answers a weekly-off date from the working calendar (no network needed)", "weekly off" in reply and "thursday" in reply)
+        page.fill("textarea.assistant-input", "is 2026-10-22 a holiday?")
+        page.click("button[aria-label='Send message']")
+        page.wait_for_timeout(500)
+        reply_adj = page.locator(".assistant-page .chat-msg.bot").last.inner_text().lower()
+        check("Assistant explains an adjustment day as a working Thursday", "adjustment day" in reply_adj and "working day" in reply_adj)
+        page.fill("textarea.assistant-input", "when is the next company holiday?")
+        page.click("button[aria-label='Send message']")
+        page.wait_for_timeout(500)
+        reply2 = page.locator(".assistant-page .chat-msg.bot").last.inner_text().lower()
+        check("Assistant lists what's next on the leave calendar (or says the year's list is done) and names the weekly off", "weekly off" in reply2 and ("coming up" in reply2 or "no festival holidays" in reply2))
+        page.reload()
+        page.wait_for_timeout(700)
+        got_it = page.locator("button:has-text('Got it')")
+        if got_it.count():
+            got_it.first.click()
+            page.wait_for_timeout(200)
+        check("Assistant conversation persists across a reload", page.locator(".assistant-page .chat-msg.user").count() >= 2)
 
         browser.close()
 

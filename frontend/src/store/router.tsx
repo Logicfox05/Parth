@@ -54,7 +54,7 @@ export function useRouter(): RouterValue {
 // their own case (root, optional id), not as a zero-segment-only route.
 const SIMPLE_ROUTES = new Set([
   "", "dashboard", "process-flow", "library", "calendar", "reports",
-  "chemical-master", "sop", "master-data", "demo", "search", "pest-control",
+  "chemical-master", "sop", "master-data", "demo", "search", "pest-control", "assistant",
 ]);
 const REPORT_TABS = new Set(["monthly", "daily", "rodent", "flycatcher", "chemical", "gap", "training", "lamination"]);
 // Pest Control module pages (src/pages/PestControlPages.tsx):

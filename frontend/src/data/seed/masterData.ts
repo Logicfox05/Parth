@@ -193,14 +193,15 @@ export const SEED_MASTER_DATA: MasterData = {
     "qc-inprocess-printing": "QA Person",
   },
 
-  // "Gujarat Print Pack Leave Calendar 2026" — taken from the two copies of
-  // the company's official leave-calendar notice (union of both; the second
-  // copy adds one extra Uttarayan day not on the first). The "Adjustment
-  // Date" a working makeup day is intentionally NOT included here — it's the
-  // opposite of a holiday.
+  // "Gujarat Print Pack Leave Calendar 2026" (WhatsApp Image 2026-08-11 at
+  // 12.29.42 PM.jpeg — two printed copies of the notice on the board). The
+  // TOP copy is the one for staff whose weekly off is THURSDAY: 13 festival
+  // holidays and five "Adjustment Date … Thursday" entries. (The bottom copy
+  // is the same calendar for a Sunday-off roster — it adds Thursday
+  // 15-01-2026 Uttarayan, which is simply the weekly off here, and puts the
+  // adjustment days on Sundays.) Transcribed verbatim; see REQUIREMENTS.md §16.
   holidays: [
     { id: "hol-2026-01-14", date: "2026-01-14", name: "Uttarayan" },
-    { id: "hol-2026-01-15", date: "2026-01-15", name: "Uttarayan" },
     { id: "hol-2026-01-26", date: "2026-01-26", name: "Republic Day" },
     { id: "hol-2026-03-04", date: "2026-03-04", name: "Dhuleti" },
     { id: "hol-2026-08-15", date: "2026-08-15", name: "Independence Day" },
@@ -213,6 +214,23 @@ export const SEED_MASTER_DATA: MasterData = {
     { id: "hol-2026-11-11", date: "2026-11-11", name: "Padtar Diwas" },
     { id: "hol-2026-11-12", date: "2026-11-12", name: "Padtar Diwas" },
     { id: "hol-2026-11-13", date: "2026-11-13", name: "Padtar Diwas" },
+  ],
+
+  // Thursday is the weekly off (0 = Sunday … 6 = Saturday).
+  weeklyOffDay: 4,
+
+  // "Everyone must report to the company on adjustment Day is written next to
+  // this holiday" — the Thursdays the plant WORKS, exactly as printed on the
+  // Thursday copy of the notice, each with the holiday it sits next to.
+  // 20-11-2026 is printed as "Thursday" but is actually a Friday (the
+  // Thursdays are the 19th / 26th) — kept as printed, TO BE CONFIRMED with HR;
+  // editable in Master Data → Holidays.
+  adjustmentDays: [
+    { id: "adj-2026-01-22", date: "2026-01-22", forHoliday: "Republic Day (26-01-2026)" },
+    { id: "adj-2026-08-06", date: "2026-08-06", forHoliday: "Independence Day (15-08-2026)" },
+    { id: "adj-2026-10-22", date: "2026-10-22", forHoliday: "Navratri Navam (20-10-2026)" },
+    { id: "adj-2026-11-05", date: "2026-11-05", forHoliday: "Padtar Diwas (11-11-2026)" },
+    { id: "adj-2026-11-20", date: "2026-11-20", forHoliday: "Padtar Diwas (13-11-2026)", note: "Printed as Thursday on the notice, but 20-11-2026 is a Friday — TO BE CONFIRMED (19th or 26th?)" },
   ],
 };
 

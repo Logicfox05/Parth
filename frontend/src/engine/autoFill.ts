@@ -18,6 +18,7 @@ import { resolveResponsibleEmployees } from "./documentInfo";
 import { fixedMaterialForServiceArea } from "./serviceMaterials";
 import { describeRodentEvent, rodentEventFor, totalRodents } from "./rodentPattern";
 import { flyCatchFor, flySeasonLabel } from "./flyPattern";
+import { dayInfo } from "./holidays";
 import { formatDisplayDate } from "../utils/date";
 import { generateId } from "../utils/id";
 import { makeRng, type Rng } from "../utils/random";
@@ -103,12 +104,16 @@ function fillDailyMonitoring(
   rng: Rng
 ): AutoFillResult {
   const base = createDefaultData(doc, dueDate, master) as DailyPestMonitoringData;
-  const holiday = (master.holidays ?? []).find((h) => h.date === dueDate);
-  if (base.isHoliday && holiday) {
+  const day = dayInfo(dueDate, master);
+  if (base.isHoliday && day.isHoliday) {
     return {
       data: base,
-      notes: [`Marked as a holiday (${holiday.name}) — no checkpoint entry is needed today.`],
-      basedOn: "the Gujarat Print Pack Leave Calendar 2026",
+      notes: [
+        day.kind === "weekly-off"
+          ? `Marked as a holiday — ${day.weekday} is the weekly off, so no checkpoint entry is needed today.`
+          : `Marked as a holiday (${day.name}) — no checkpoint entry is needed today.`,
+      ],
+      basedOn: "the Gujarat Print Pack Leave Calendar 2026 (Master Data → Holidays)",
     };
   }
   const prevData = previous?.data;

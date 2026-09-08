@@ -6,7 +6,8 @@ import { recordRepository } from "../data/repositories/recordRepository";
 import { documentRepository } from "../data/repositories/documentRepository";
 import { masterRepository } from "../data/repositories/masterRepository";
 import { ensureRecordsGeneratedForMonth } from "../engine/recordGenerator";
-import { dueDatesInMonth, scheduleLabel } from "../engine/frequencyEngine";
+import { scheduleLabel } from "../engine/frequencyEngine";
+import { effectiveDueDatesInMonth } from "../engine/holidays";
 import { getDocumentInfo } from "../engine/documentInfo";
 import { countFindings } from "../engine/checkpoints";
 import { totalRodents } from "../engine/rodentPattern";
@@ -49,13 +50,17 @@ function monthRange(year: number, month: number) {
   return { fromDate: `${year}-${pad2(month + 1)}-01`, toDate: `${year}-${pad2(month + 1)}-${pad2(daysInMonth(year, month))}` };
 }
 
-// First scheduled date on/after `fromISO` (looks up to 13 months ahead).
+// First due date on/after `fromISO` (looks up to 13 months ahead), holiday-
+// aware: a visit scheduled on the Thursday weekly off is due on the Friday.
 function nextDueDate(doc: DocumentDefinition, fromISO: string): string | null {
+  const master = masterRepository.get();
   const d = fromISODate(fromISO);
   let y = d.getFullYear();
   let m = d.getMonth();
   for (let i = 0; i < 13; i++) {
-    const hit = dueDatesInMonth(doc, y, m).find((iso) => compareISO(iso, fromISO) >= 0);
+    const hit = effectiveDueDatesInMonth(doc, y, m, master)
+      .map((x) => x.due)
+      .find((iso) => compareISO(iso, fromISO) >= 0);
     if (hit) return hit;
     m += 1;
     if (m > 11) {

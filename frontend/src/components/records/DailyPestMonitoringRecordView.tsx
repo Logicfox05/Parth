@@ -4,6 +4,7 @@ import type { DailyPestMonitoringData, DocumentDefinition, RecordInstance, Roden
 import { DocumentHeader } from "../documents/DocumentHeader";
 import { masterRepository } from "../../data/repositories/masterRepository";
 import { isCheckpointFinding } from "../../engine/checkpoints";
+import { dayInfo } from "../../engine/holidays";
 import { totalRodents } from "../../engine/rodentPattern";
 import { formatDisplayDate } from "../../utils/date";
 import { generateId } from "../../utils/id";
@@ -83,6 +84,16 @@ export function DailyPestMonitoringRecordView({
             />
             <span className="text-sm">Mark as Holiday / Non-working day (matches "H O L I D A Y" rows in the source register — no checkpoint entry required)</span>
           </label>
+          {(() => {
+            const day = dayInfo(record.dueDate, master);
+            return day.kind !== "working" ? (
+              <div className={`text-xs mt-1 ${day.isHoliday ? "text-warning" : "text-success"}`} style={{ paddingLeft: 22 }}>
+                {day.label} — per the working calendar (Master Data → Holidays)
+                {day.isHoliday && data.isHoliday ? "; untick only if the plant actually worked this day." : ""}
+                {day.isHoliday && !data.isHoliday ? "; unticked — this day is being recorded as worked, with checkpoints to fill." : ""}
+              </div>
+            ) : null;
+          })()}
         </div>
       </div>
 

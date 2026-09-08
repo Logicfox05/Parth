@@ -3,7 +3,9 @@ import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { useAppStore } from "../store/AppStore";
 import { useRouter } from "../store/router";
 import { recordRepository } from "../data/repositories/recordRepository";
+import { masterRepository } from "../data/repositories/masterRepository";
 import { ensureRecordsGeneratedForMonth } from "../engine/recordGenerator";
+import { dayInfo, weeklyOffDay, WEEKDAY_LONG } from "../engine/holidays";
 import { daysInMonth, MONTH_NAMES, pad2, todayISO, WEEKDAY_NAMES } from "../utils/date";
 
 export function CalendarPage({ year, month }: { year?: number; month?: number }) {
@@ -57,13 +59,18 @@ export function CalendarPage({ year, month }: { year?: number; month?: number })
   const cells: (number | null)[] = [];
   for (let i = 0; i < firstWeekday; i++) cells.push(null);
   for (let d = 1; d <= dim; d++) cells.push(d);
+  const master = masterRepository.get();
+  const offDay = WEEKDAY_LONG[weeklyOffDay(master)];
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl mb-1">Record Calendar</h1>
-          <p className="text-muted">Select a date to view records due, completed, pending or overdue.</p>
+          <p className="text-muted">
+            Select a date to view records due, completed, pending or overdue. {offDay}s are the weekly off; festival holidays and adjustment (working) days follow the
+            Gujarat Print Pack Leave Calendar 2026 — anything scheduled on a closed day is due the next working day.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <select className="input input-sm" style={{ width: 90 }} value={y} onChange={(e) => setY(Number(e.target.value))}>
@@ -105,14 +112,17 @@ export function CalendarPage({ year, month }: { year?: number; month?: number })
           const overdue = records.filter((r) => dateISO < today && ["Scheduled", "Due", "In Progress"].includes(r.status));
           const pending = records.filter((r) => dateISO >= today && ["Scheduled", "Due", "In Progress"].includes(r.status));
           const isToday = dateISO === today;
+          const day = dayInfo(dateISO, master);
           return (
             <div
               key={dateISO}
-              className={`calendar-cell${isToday ? " today" : ""}`}
+              className={`calendar-cell${isToday ? " today" : ""}${day.kind !== "working" ? ` ${day.kind}` : ""}`}
               onClick={() => navigate(`/day/${dateISO}`)}
+              title={day.kind !== "working" ? day.label : undefined}
             >
               <div className="cal-date">{d}</div>
               <div className="flex flex-col gap-1">
+                {day.kind !== "working" && <span className={`cal-chip cal-day cal-day-${day.kind}`}>{day.short}</span>}
                 {completed.length > 0 && (
                   <span className="cal-chip" style={{ background: "var(--color-success-bg)", color: "var(--color-success)" }}>
                     {completed.length} Completed

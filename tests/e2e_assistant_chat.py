@@ -13,10 +13,29 @@ manually against a server you start yourself:
 """
 import sys
 import time
+from datetime import date, timedelta
 from playwright.sync_api import sync_playwright
 
 BASE = "http://localhost:8844"
 FAILURES = []
+
+# The company's working calendar (Thursday weekly off, festival holidays,
+# adjustment days — Master Data → Holidays, REQUIREMENTS.md §16): the fill
+# test needs a day with a real, non-holiday Daily Monitoring record.
+ADJUSTMENT_DAYS_2026 = {"2026-01-22", "2026-08-06", "2026-10-22", "2026-11-05", "2026-11-20"}
+FESTIVAL_HOLIDAYS_2026 = {
+    "2026-01-14", "2026-01-26", "2026-03-04", "2026-08-15", "2026-08-28", "2026-09-04", "2026-10-19", "2026-10-20",
+    "2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13",
+}
+
+
+def next_working_day(d):
+    while d.isoformat() in FESTIVAL_HOLIDAYS_2026 or (d.weekday() == 3 and d.isoformat() not in ADJUSTMENT_DAYS_2026):
+        d += timedelta(days=1)
+    return d
+
+
+WORK_DAY = next_working_day(date.today()).isoformat()
 TEST_EMAIL = f"e2e-buddy-{int(time.time() * 1000)}@example.com"
 TEST_PASSWORD = "PlaywrightQA123"
 
@@ -83,9 +102,12 @@ def main():
         check("Navigated to CAPA via free text", "#/gap" in page.url)
 
         # ---- 3. Plain conversational reply (no navigation, no fill) ----
+        # A phrase the client-side answer layer (engine/assistantLocal.ts)
+        # does NOT catch — "what can you do" is answered locally now — so this
+        # still round-trips through Groq.
         url_before = page.url
         before = bot_messages(page).count()
-        ask(page, "hi, what can you do")
+        ask(page, "hi there, how is your day going?")
         check("A conversational message did not navigate anywhere", page.url == url_before)
         check("Assistant gave a reply message", bot_messages(page).count() > before)
 
@@ -94,9 +116,7 @@ def main():
         # "Open" buttons, same as a real user would tuck it away to click.
         page.click("button[aria-label='Close assistant']")
         page.wait_for_timeout(150)
-        page.click("text=Record Calendar")
-        page.wait_for_timeout(200)
-        page.locator(".calendar-cell.today").first.click()
+        page.goto(f"{BASE}/index.html#/day/{WORK_DAY}")
         page.wait_for_timeout(300)
         rows = page.locator(".doc-table tbody tr")
         opened = False
@@ -111,6 +131,23 @@ def main():
             check("Fill instruction applied a field", bot_messages(page).filter(has_text="I've filled in").count() > 0)
             checker_input = page.locator("input[placeholder='Name of checker']")
             check("Checker field actually updated", checker_input.count() > 0 and checker_input.input_value() == "Buddy QA Tester")
+
+        # ---- 5. Full-page Assistant: the model answers from the live app context ----
+        # No date/weekday in the question, so it is NOT answered locally
+        # (engine/assistantLocal.ts) — it goes to Groq with the context digest
+        # attached, which states the weekly off is Thursday.
+        # The four model calls above fit in one minute of this account's
+        # tokens-per-minute allowance only just (each carries the route guide
+        # + context); pause so this one isn't the request that trips it.
+        page.wait_for_timeout(15000)
+        page.goto(f"{BASE}/index.html#/assistant")
+        page.wait_for_timeout(400)
+        page.fill("textarea.assistant-input", "which day of the week is our weekly off? answer in one line")
+        page.click("button[aria-label='Send message']")
+        page.wait_for_timeout(3500)
+        page_reply = page.locator(".assistant-page .chat-msg.bot").last.inner_text()
+        print(f"    (assistant page replied: {page_reply[:160]!r}; url now {page.url})")
+        check("Assistant page answers from the live app context (weekly off = Thursday)", "thursday" in page_reply.lower())
 
         browser.close()
         print("\nJS errors:", errors[:10])

@@ -13,7 +13,7 @@ import type {
 import { documentRepository } from "./repositories/documentRepository";
 import { masterRepository } from "./repositories/masterRepository";
 import { recordRepository } from "./repositories/recordRepository";
-import { dueDatesInMonth } from "../engine/frequencyEngine";
+import { effectiveDueDatesInMonth } from "../engine/holidays";
 import { periodKeyFor } from "../engine/recordGenerator";
 import { fixedMaterialForServiceArea } from "../engine/serviceMaterials";
 import { autoFillRecord } from "../engine/autoFill";
@@ -162,11 +162,9 @@ export function generateDemoRecordsForMonth(year: number, month: number): number
   const now = new Date().toISOString();
 
   const master = masterRepository.get();
-  const holidayDates = new Set((master.holidays ?? []).map((h) => h.date));
   const existing = recordRepository.periodKeys(true);
 
   for (const doc of docs) {
-    const dueDates = dueDatesInMonth(doc, year, month);
     // The most recent demo record before this month, so the assistant's
     // carry-forward logic has something to chain from for log sheets.
     let previous: RecordInstance | undefined = recordRepository
@@ -174,13 +172,18 @@ export function generateDemoRecordsForMonth(year: number, month: number): number
       .filter((r) => compareISO(r.dueDate, `${year}-${String(month + 1).padStart(2, "0")}-01`) < 0)
       .sort((a, b) => compareISO(b.dueDate, a.dueDate))[0];
 
-    for (const dueDate of dueDates) {
-      const periodKey = periodKeyFor(doc, dueDate);
+    // Same holiday-aware dates as the Live generator (engine/holidays.ts):
+    // Thursday weekly off, festival holidays, adjustment days; fortnightly
+    // visits that land on a closed day move to the next working day.
+    for (const { scheduled, due: dueDate, holiday } of effectiveDueDatesInMonth(doc, year, month, master)) {
+      const periodKey = periodKeyFor(doc, scheduled);
       if (existing.has(`${doc.id}|${periodKey}`)) continue;
-      if (doc.kind !== "daily-pest-monitoring" && holidayDates.has(dueDate)) continue;
+      if (holiday && doc.kind !== "daily-pest-monitoring") continue;
 
       const status = statusForDate(dueDate, today);
-      const isHoliday = doc.kind === "daily-pest-monitoring" && new Date(dueDate).getDay() === 0 && chance(0.15);
+      // The Daily Monitoring register's "H O L I D A Y" rows are the real
+      // closed days — the weekly off and the leave calendar — not random.
+      const isHoliday = doc.kind === "daily-pest-monitoring" && holiday;
       let data: unknown;
       if (doc.kind === "daily-pest-monitoring") data = buildDailyData(dueDate, isHoliday);
       else if (doc.kind === "fly-catcher") data = buildFlyCatcherData(dueDate);

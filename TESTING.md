@@ -43,7 +43,7 @@ python tests/e2e_assistant_chat.py # needs backend/.env's GROQ_API_KEY to actual
 Both scripts now sign up a fresh, randomly-emailed account at the start of the run (the app gates
 every page behind login — see `frontend/src/main.tsx`/`AuthProvider`) before exercising the rest of the app.
 
-## Results (last full run — 08-Sep-2026, on the TypeScript-only backend/scripts, after the Pest Control module restructure batch)
+## Results (last full run — 08-Sep-2026 17:30, on the TypeScript-only backend/scripts, after the working-calendar + Assistant-page batch)
 
 The run below is the production shape end to end: `frontend/scripts/build.ts` builds the bundle,
 `backend/index.ts` (run directly by Node 23.6, no compile step) serves it plus the API, and every
@@ -101,8 +101,60 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   per-unit register, the Demo-year fly total) and one new visual-QA check with two new screenshots.
   Two test selectors changed from `text=Reports` to `a[href='#/reports']` because the new
   "Service Reports" sub-heading also contains the word — a text selector now matches it first.
+- **Working calendar (Thursday weekly off + leave calendar + adjustment days).** `engine/holidays.ts`
+  is now the one rule for "is the plant open today?": the Thursday weekly off, the 13 festival
+  holidays and the five adjustment (working) Thursdays transcribed from the Gujarat Print Pack Leave
+  Calendar 2026 (REQUIREMENTS §16; the 20-11-2026 entry is printed as a Thursday but is a Friday —
+  flagged TO BE CONFIRMED). The record generator and Demo Mode build records from
+  `effectiveDueDatesInMonth`: Daily Monitoring is pre-marked on closed days, other daily registers
+  are skipped, and fortnightly/monthly/… obligations move to the next working day instead of
+  vanishing (June 2026's 4th and 18th are Thursdays — the demo Rat / Mice visits now fall on the 5th
+  and 19th). The Calendar shows Weekly off / holiday / Working day chips, the Day View a banner, the
+  Dashboard the day kind and the next entries on the calendar, and Master Data → Holidays gained the
+  weekly-off selector and an Adjustment Days table. Checked by seven new smoke assertions (calendar
+  chips for September and October 2026, the Day View banner, the pre-marked HOLIDAY row on the daily
+  register, the Master Data editor, the shifted demo visits).
+- **The Assistant page** (`/assistant`, ChatGPT-style, text only — no voice control) with
+  conversations persisted in the browser, plus a client-side answer layer
+  (`engine/assistantLocal.ts`) for calendar / workload / briefing / help questions and a live-facts
+  `context` digest sent to Groq with every chat. Checked by six new smoke assertions (page opens from
+  the sidebar with suggestions and a composer; no microphone control; "is 2026-09-10 a holiday?" →
+  weekly off, "is 2026-10-22 a holiday?" → adjustment (working) day and "when is the next company
+  holiday?" answered from the calendar without the network; the conversation survives a reload), one
+  new visual-QA check with two screenshots, and one new live-Groq check in `e2e_assistant_chat.py`
+  (a weekly-off question with no date reference is left to the model, which answers "Thursday" from
+  the attached context; that suite's "plain reply" section now sends "hi there, how is your day
+  going?" because "what can you do" is answered locally).
+- **Adversarial review of this batch** (three review lenses, each finding re-checked by two
+  skeptics; run as a workflow while the suites ran). Everything confirmed was fixed before the final
+  run: bare "closed" / "adjustment" in the calendar regex hijacked complaint questions; "what's due
+  tomorrow / this week" was answered with today's numbers; the widget answered "mark today as
+  holiday" locally instead of filling the open record; "last Thursday" resolved forward; message
+  timestamps mixed the UTC date with local hours; the typing bubble wasn't tied to its conversation;
+  locally answered messages weren't length-capped; records an *earlier* build had created on a
+  Thursday stayed stranded on a closed day (now `engine/calendarMigration.ts`, which also leaves a
+  person's own draft alone); the launch-date floor compared the scheduled rather than the due date;
+  a deleted seeded adjustment day came back at the next boot (`removedSeedIds`); two texts
+  hard-coded "Thursday"; the holiday hint under the Daily Monitoring checkbox had its condition
+  inverted; and several new checks were pinned to dates that would expire within days (now derived
+  from the calendar at run time, so the suite also passes on a Thursday).
+- **Groq rate limit.** The live chat suite's last check failed once with a 429 from Groq (this
+  account's tokens-per-minute allowance, five calls in ~20 s each carrying the route guide + context).
+  `backend/groq.ts` now retries a 429 once after the delay Groq asks for (bounded), and the suite
+  pauses before its final model call.
+- **Bug found by running the suite at 17:10 — a double briefing.** A first-ever open inside a slot
+  window (09:00–10:00 or 17:00–18:00) showed the "first" briefing and then, the instant it was
+  dismissed, the slot's own briefing straight over the page — a modal overlay that swallowed every
+  click (the suite timed out on `text=Record Calendar`, with Playwright reporting the widget's
+  `<div class="no-print">` intercepting pointer events). `recordBriefingShown("first")` now also
+  marks the current slot as shown (`engine/briefingSchedule.ts`), so the assistant interrupts once
+  per slot as designed. Every earlier run had happened outside those windows, which is why it had
+  never shown up.
+- One label in the new checks used a "→" arrow, which the Windows cp1252 console cannot print —
+  Python's `print` raised `UnicodeEncodeError` mid-run. Labels are ASCII-only now (em dashes are
+  fine in cp1252; arrows are not).
 
-### `e2e_smoke.py` — all 84 check sites passed (the "Section C / D / E is announced next" row runs three times, so 86 checks at run time), 0 unexpected console errors
+### `e2e_smoke.py` — all 97 check sites passed (the "Section C / D / E is announced next" row runs three times, so 99 checks at run time), 0 unexpected console errors
 
 | # | Check | Result |
 |---|---|---|
@@ -139,57 +191,70 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
 | 31 | Rodent report breaks catches down by location | PASS |
 | 32 | Fly Catcher Infestation trend has a non-zero yearly total in Demo Mode (seasonal fly pattern applied) | PASS |
 | 33 | Fly Catcher Infestation trend lists all 13 units in the company's year layout | PASS |
-| 34 | Live mode banner visible after switch | PASS |
-| 35 | CAPA home offers exactly the two options, Internal and External | PASS |
-| 36 | CAPA Internal list shows seeded Dec-2023 inspection | PASS |
-| 37 | CAPA External list shows the F/MKT/05 checklist | PASS |
-| 38 | New complaint auto-starts the assistant walk-through | PASS |
-| 39 | Assistant asks for the customer first | PASS |
-| 40 | Header details captured on the form | PASS |
-| 41 | Assistant announces Section A | PASS |
-| 42 | Section B is announced after A's five activities | PASS |
-| 43 | Section C / D / E is announced next | PASS |
-| 44 | After E the assistant asks for approval | PASS |
-| 45 | Form shows all 31 activities done | PASS |
-| 46 | Assistant confirms submission | PASS |
-| 47 | Checklist status is Pending Verification (awaiting approval) | PASS |
-| 48 | Prepared By was stamped with the logged-in user | PASS |
-| 49 | Assistant offers to approve | PASS |
-| 50 | Assistant confirms approval | PASS |
-| 51 | Checklist status is Verified (approved) | PASS |
-| 52 | Training list shows seeded record | PASS |
-| 53 | Training list shows the Dec-2025 awareness programme | PASS |
-| 54 | SOC list shows both statements | PASS |
-| 55 | SOC detail renders the declaration | PASS |
-| 56 | Chemical master shows pesticide chart | PASS |
-| 57 | SOP reference shows Lizard quarterly frequency | PASS |
-| 58 | Reports page renders tabs | PASS |
-| 59 | Lamination QC report renders | PASS |
-| 60 | Document Library lists all 21 documents | PASS |
-| 61 | Document Library shows the lamination module | PASS |
-| 62 | Document Library shows the QC inspection module | PASS |
-| 63 | Document Library groups both CAPA documents under the CAPA module | PASS |
-| 64 | Sidebar has a collapsible Pest Control module header | PASS |
-| 65 | Sidebar has a CAPA module with Internal and External links | PASS |
-| 66 | Pest Control module starts expanded (Training link visible) | PASS |
-| 67 | Collapsing the module header hides its links | PASS |
-| 68 | A collapsed module stays collapsed after navigating elsewhere | PASS |
-| 69 | Expanding it again restores the links | PASS |
-| 70 | Module link deep-links Document Library filtered to that module | PASS |
-| 71 | Filtered library shows only that module's documents | PASS |
-| 72 | Pest Control module lists its report groups in the sidebar | PASS |
-| 73 | Rat / Mice service reports open on their own page | PASS |
-| 74 | Service report list shows this month's fortnightly visit(s) | PASS |
-| 75 | Daily Report page shows the month register with today's row | PASS |
-| 76 | Fly Catcher Infestation page renders the per-unit register (Live) | PASS |
-| 77 | Pest Control overview shows the four groups | PASS |
-| 78 | Opened the F/QC/37 pouching inspection from Day View | PASS |
-| 79 | Inspection shows the 11 printed test parameters | PASS |
-| 80 | Inspection observations were pre-filled from the specimen | PASS |
-| 81 | Lot status pre-set to Accepted and inspector signed | PASS |
-| 82 | Inspection record submitted | PASS |
-| 83 | Search returns results for PC-01 | PASS |
-| 84 | Search finds the lamination operator on the prepared log sheets | PASS |
+| 34 | Demo service visits never sit on the Thursday weekly off — a visit scheduled on a Thursday is dated the next working day | PASS |
+| 35 | Live mode banner visible after switch | PASS |
+| 36 | CAPA home offers exactly the two options, Internal and External | PASS |
+| 37 | CAPA Internal list shows seeded Dec-2023 inspection | PASS |
+| 38 | CAPA External list shows the F/MKT/05 checklist | PASS |
+| 39 | New complaint auto-starts the assistant walk-through | PASS |
+| 40 | Assistant asks for the customer first | PASS |
+| 41 | Header details captured on the form | PASS |
+| 42 | Assistant announces Section A | PASS |
+| 43 | Section B is announced after A's five activities | PASS |
+| 44 | Section C / D / E is announced next | PASS |
+| 45 | After E the assistant asks for approval | PASS |
+| 46 | Form shows all 31 activities done | PASS |
+| 47 | Assistant confirms submission | PASS |
+| 48 | Checklist status is Pending Verification (awaiting approval) | PASS |
+| 49 | Prepared By was stamped with the logged-in user | PASS |
+| 50 | Assistant offers to approve | PASS |
+| 51 | Assistant confirms approval | PASS |
+| 52 | Checklist status is Verified (approved) | PASS |
+| 53 | Training list shows seeded record | PASS |
+| 54 | Training list shows the Dec-2025 awareness programme | PASS |
+| 55 | SOC list shows both statements | PASS |
+| 56 | SOC detail renders the declaration | PASS |
+| 57 | Chemical master shows pesticide chart | PASS |
+| 58 | SOP reference shows Lizard quarterly frequency | PASS |
+| 59 | Reports page renders tabs | PASS |
+| 60 | Lamination QC report renders | PASS |
+| 61 | Document Library lists all 21 documents | PASS |
+| 62 | Document Library shows the lamination module | PASS |
+| 63 | Document Library shows the QC inspection module | PASS |
+| 64 | Document Library groups both CAPA documents under the CAPA module | PASS |
+| 65 | Sidebar has a collapsible Pest Control module header | PASS |
+| 66 | Sidebar has a CAPA module with Internal and External links | PASS |
+| 67 | Pest Control module starts expanded (Training link visible) | PASS |
+| 68 | Collapsing the module header hides its links | PASS |
+| 69 | A collapsed module stays collapsed after navigating elsewhere | PASS |
+| 70 | Expanding it again restores the links | PASS |
+| 71 | Module link deep-links Document Library filtered to that module | PASS |
+| 72 | Filtered library shows only that module's documents | PASS |
+| 73 | Pest Control module lists its report groups in the sidebar | PASS |
+| 74 | Rat / Mice service reports open on their own page | PASS |
+| 75 | Service report list shows this month's fortnightly visit(s) | PASS |
+| 76 | Daily Report page shows the month register with today's row | PASS |
+| 77 | Fly Catcher Infestation page renders the per-unit register (Live) | PASS |
+| 78 | Pest Control overview shows the four groups | PASS |
+| 79 | Opened the F/QC/37 pouching inspection from Day View | PASS |
+| 80 | Inspection shows the 11 printed test parameters | PASS |
+| 81 | Inspection observations were pre-filled from the specimen | PASS |
+| 82 | Lot status pre-set to Accepted and inspector signed | PASS |
+| 83 | Inspection record submitted | PASS |
+| 84 | Search returns results for PC-01 | PASS |
+| 85 | Search finds the lamination operator on the prepared log sheets | PASS |
+| 86 | Calendar marks every Thursday of September 2026 as the weekly off | PASS |
+| 87 | Calendar shows Janmashtami (04-Sep-2026) from the leave calendar | PASS |
+| 88 | Adjustment day 22-Oct-2026 is a working Thursday (October: 4 weekly offs + 1 working day) | PASS |
+| 89 | Day View explains a Thursday as the weekly off | PASS |
+| 90 | Daily Report register pre-marks the next weekly-off Thursday as a HOLIDAY row | PASS |
+| 91 | Master Data shows the weekly off (Thursday) and the leave calendar's five adjustment days | PASS |
+| 92 | Assistant page opens from the sidebar with suggestions and a composer | PASS |
+| 93 | Assistant page has no voice / microphone control | PASS |
+| 94 | Assistant answers a weekly-off date from the working calendar (no network needed) | PASS |
+| 95 | Assistant explains an adjustment day as a working Thursday | PASS |
+| 96 | Assistant lists what's next on the leave calendar (or says the year's list is done) and names the weekly off | PASS |
+| 97 | Assistant conversation persists across a reload | PASS |
 
 (One benign console entry — the pre-login `GET /api/auth/me` 401, expected on every fresh
 session — is filtered out of the "unexpected console errors" check rather than counted as a
@@ -203,7 +268,7 @@ it now deliberately fills the year so far on entering Demo Mode, so the check wa
 assert what the original bug was actually about: demo data exists and is real data, not blank
 shells.
 
-### `visual_qa.py` — 12/12 interaction checks passed (12 `check()` calls at run time), 0 JS errors
+### `visual_qa.py` — 13/13 interaction checks passed (13 `check()` calls at run time), 0 JS errors
 
 | # | Check | Result |
 |---|---|---|
@@ -215,23 +280,25 @@ shells.
 | 6 | Created a new CAPA record, added a finding | PASS |
 | 7 | Created a new Training record, added an attendee | PASS |
 | 8 | Pest Control overview renders its four groups — Daily Report / Service Reports / Trend Analysis / Training & Reference (captured as `15_pest_control_overview.png`; the Fly Catcher Infestation page as `16_pest_fly_catcher_infestation.png`) | PASS |
-| 9 | SOC detail page renders | PASS |
-| 10 | Print media emulation renders a clean original-style layout (no sidebar/topbar/buttons) | PASS |
-| 11 | 20 full-page screenshots captured for visual review (`tests/shots/`) | PASS |
-| 12 | No JS errors across the whole pass | PASS |
+| 9 | Assistant page renders its suggestions and composer (captured as `17_assistant_page.png`; the October-2026 Record Calendar with its Weekly off / Working day chips as `18_calendar_october_holidays.png`) | PASS |
+| 10 | SOC detail page renders | PASS |
+| 11 | Print media emulation renders a clean original-style layout (no sidebar/topbar/buttons) | PASS |
+| 12 | 22 full-page screenshots captured for visual review (`tests/shots/`) | PASS |
+| 13 | No JS errors across the whole pass | PASS |
 
-### `e2e_assistant_chat.py` — 8/8 checks passed, 0 JS errors (real Groq calls)
+### `e2e_assistant_chat.py` — 9/9 checks passed, 0 JS errors (real Groq calls)
 
 | # | Check | Result |
 |---|---|---|
 | 1 | Navigated to Reports for August via free text ("show me all reports of august" → `#/reports/2026/7`, correctly 0-indexed) | PASS |
 | 2 | Assistant showed a confirmation reply alongside the navigation | PASS |
 | 3 | Navigated to CAPA via free text ("open CAPA" → `#/gap`) | PASS |
-| 4 | A conversational message ("hi, what can you do") did not navigate anywhere | PASS |
+| 4 | A conversational message ("hi there, how is your day going?") did not navigate anywhere | PASS |
 | 5 | Assistant gave a reply message for it | PASS |
 | 6 | Opened a Daily Pest Monitoring record for the fill test | PASS |
 | 7 | Fill instruction ("checker is Buddy QA Tester") applied a field | PASS |
 | 8 | Checker field actually updated in the form | PASS |
+| 9 | Assistant page: "which day of the week is our weekly off?" (no date reference, so not answered locally) — the model replied "Thursday" from the live-facts `context` attached to the call | PASS |
 
 Also verified directly against the Groq API (`GET /openai/v1/models`) that this account's key has no
 access to the commonly-documented `llama-3.3-70b-versatile` default (404s) — the model this app

@@ -5,6 +5,7 @@ import { masterRepository } from "../data/repositories/masterRepository";
 import { settingsRepository } from "../data/repositories/settingsRepository";
 import { ensureRecordsGeneratedForMonth } from "./recordGenerator";
 import { resolveResponsibleEmployees } from "./documentInfo";
+import { isCompanyHoliday } from "./holidays";
 import { addDays, compareISO, fromISODate, todayISO } from "../utils/date";
 
 // How far ahead an "upcoming" reminder starts firing. Anything due today is
@@ -81,7 +82,6 @@ export function ensureNearTermRecordsGenerated(isDemo: boolean): void {
 export function computeReminders(isDemo: boolean): DocumentReminder[] {
   const today = todayISO();
   const master = masterRepository.get();
-  const holidayDates = new Set((master.holidays ?? []).map((h) => h.date));
   const docs = documentRepository.getRecordable();
   const reminders: DocumentReminder[] = [];
   // Live records dated before this browser's launch floor are generator
@@ -96,9 +96,10 @@ export function computeReminders(isDemo: boolean): DocumentReminder[] {
     for (const record of records) {
       if (!PENDING_STATUSES.includes(record.status as (typeof PENDING_STATUSES)[number])) continue;
       if (liveStartDate && compareISO(record.dueDate, liveStartDate) < 0) continue;
-      // Nobody's expected to file paperwork on a day the company's closed —
-      // applies to every document kind, not just Daily Monitoring.
-      if (holidayDates.has(record.dueDate)) continue;
+      // Nobody's expected to file paperwork on a day the company's closed
+      // (the Thursday weekly off, a festival holiday) — applies to every
+      // document kind, not just Daily Monitoring.
+      if (isCompanyHoliday(record.dueDate, master)) continue;
 
       const cmp = compareISO(record.dueDate, today);
       const daysUntilDue = daysBetween(today, record.dueDate);

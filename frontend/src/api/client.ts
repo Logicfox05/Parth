@@ -59,6 +59,10 @@ export interface AssistantChatRequest {
   currentRoute: string;
   documentKind?: string;
   currentData?: unknown;
+  // Short plain-text digest of live app facts (today's working-day status,
+  // the weekly off, upcoming holidays / adjustment days, what's due) so the
+  // model answers from the app's own data — see engine/assistantLocal.ts.
+  context?: string;
 }
 
 export interface ChecklistAnswerResult {

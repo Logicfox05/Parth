@@ -355,9 +355,9 @@ REPORT               Reports > Lamination QC (daily min–max)
 
 - Format block reads **F-QC-40.C (00/28.02.25)** → Format No. F-QC-40.C, Rev 00, Date 28.02.2025.
 - Band **43–47 °C** from the printed recommendation. Observed values 44–46 °C.
-- The specimen skips 28-08-26 (Rakshabandhan) and 3/4-09-26 (Janmashtami) — consistent with the
-  leave calendar, which is why the generator creates no shell for non-Daily-Monitoring documents on
-  a company holiday.
+- The specimen skips 28-08-26 (Rakshabandhan), Thursday 03-09-26 (the weekly off) and 04-09-26
+  (Janmashtami) — consistent with the working calendar in §16, which is why no lamination log sheet
+  is generated for a closed day.
 
 ## 12. Solvent Base Lamination — Process Parameter Record
 
@@ -512,15 +512,52 @@ REPORT               Reports > CAPA Status (complaints table)
 - The `.doc` file also carries a stale trailing footer from another template ("SPECIFICATION: PAPER
   CORE — QA/ICM/SPEC/14, Rev 04") — not part of this checklist, ignored.
 
-## 16. Leave Calendar 2026
+## 16. Leave Calendar 2026 — the company's working calendar
 
 ```
-SOURCE DOCUMENT      WhatsApp Image 2026-08-11 at 12.29.42 PM.jpeg (two printed copies of the notice)
-DIGITAL TEMPLATE     Master Data > Holidays (already loaded; union of both copies)
+SOURCE DOCUMENT      WhatsApp Image 2026-08-11 at 12.29.42 PM.jpeg — TWO printed copies of the
+                      "Gujarat Print Pack Leave Calendar 2026" notice, pinned one above the other
+DIGITAL TEMPLATE     Master Data > Holidays: weekly off day + festival holidays + adjustment days;
+                      src/engine/holidays.ts is the single rule every screen and engine uses
+DATABASE FIELDS      MasterData.weeklyOffDay (0-6), holidays[] {id, date, name},
+                      adjustmentDays[] {id, date, forHoliday, note}
+WORKFLOW             Closed day (weekly off / festival): Daily Pest Control Monitoring Record
+                      pre-marked "holiday"; no lamination log sheet; no reminder; any fortnightly /
+                      monthly / quarterly / yearly record that lands on it is due the NEXT WORKING DAY.
+                      Adjustment day: a normal working day.
+REPORT               Record Calendar (weekly off / holiday / working-day chips), Day View banner,
+                      Dashboard header ("next on the leave calendar"), the assistant ("is Thursday a
+                      holiday?", "next holiday?", "adjustment days?")
 ```
 
-- **Resolves TBC #3** (holiday calendar). Adjustment (make-up) days are working days and are not
-  treated as holidays.
+- **Resolves TBC #3** (holiday calendar) fully. **The weekly off is Thursday** (confirmed by the user
+  on 08-Sep-2026, and by the notice itself — its adjustment days are all Thursdays; the F-QC-40.C
+  temperature register in §11 likewise has no row for Thursday 03-09-26).
+- **Two copies of the notice, transcribed.** The **top copy** is for the Thursday-off roster and is
+  the one loaded — 13 festival holidays: 14-01 Wed Uttarayan; 26-01 Mon Republic Day; 04-03 Wed
+  Dhuleti; 15-08 Sat Independence Day; 28-08 Fri Rakshabandhan; 04-09 Fri Janmashtami; 19-10 Mon
+  Navratri Atham; 20-10 Tue Navratri Navam; 09-11 Mon New Year; 10-11 Tue Bhai Dooj; 11-11 Wed,
+  12-11 Thu, 13-11 Fri Padtar Diwas. Its "Adjustment Date / Adjustment Day" column lists five
+  Thursdays the plant works: **22-01-2026** (next to Republic Day), **06-08-2026** (Independence Day),
+  **22-10-2026** (Navratri Navam), **05-11-2026** (Padtar Diwas 11-11) and **20-11-2026** (Padtar Diwas
+  13-11). Footer, verbatim: *"Everyone must report to the company on adjustment Day is written next
+  to this holiday, which everyone is requested to take note of."* The **bottom copy** is the same
+  calendar for a Sunday-off roster: 14 rows (it adds Thursday 15-01-2026 Uttarayan, which for the
+  Thursday roster is simply the weekly off) with adjustment days on Sundays (11-01, 25-01, 09-08,
+  11-10, 01-11, 15-11). Not loaded; recorded here so nothing on the board is lost.
+- **TO BE CONFIRMED (HR):** the notice prints "20-11-2026 — Thursday", but 20-Nov-2026 is a Friday
+  (the Thursdays are the 19th and 26th). Loaded exactly as printed, flagged in Master Data → Holidays,
+  editable there. Also: whether any staff actually follow the Sunday-off copy.
+- **Scheduling rule (engine/holidays.ts, used by the record generator, Demo Mode and the Pest Control
+  pages' "next due"):** a date is closed if it is a festival holiday, or the weekly-off weekday and
+  not an adjustment day. The Daily Pest Control Monitoring Record still gets a record on a closed day,
+  pre-marked as a holiday (the paper register's "H O L I D A Y" rows); the other daily registers have
+  no sheet; every other cadence moves to the next working day — a Gurudev visit scheduled for
+  Thursday the 4th happens on Friday the 5th (June 2026: both the 4th and 18th are Thursdays; the
+  fly-catcher inspections of 03/17-Sep and 03/17-Dec likewise). The record's `periodKey` is derived
+  from the *scheduled* date, so generation stays idempotent whether or not the due date moved.
+- Everything the earlier version stated still holds: adjustment (make-up) days are working days and
+  are never treated as holidays.
 
 ---
 

@@ -21,6 +21,7 @@ import {
   FiTrendingUp,
   FiActivity,
   FiHome,
+  FiMessageSquare,
 } from "react-icons/fi";
 import type { IconType } from "react-icons";
 import { Link, useRouter } from "../../store/router";
@@ -41,6 +42,9 @@ const isHeading = (e: NavEntry): e is { heading: string } => "heading" in e;
 
 const NAV_MAIN: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: FiGrid },
+  // The assistant as a screen of its own (ChatGPT-style, text only) — the
+  // same assistant as the floating widget, see pages/AssistantPage.tsx.
+  { to: "/assistant", label: "Assistant", icon: FiMessageSquare },
   { to: "/process-flow", label: "Process Flow", icon: FiGitBranch },
   { to: "/library", label: "Document Library", icon: FiBookOpen },
   { to: "/calendar", label: "Record Calendar", icon: FiCalendar },

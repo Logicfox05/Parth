@@ -175,6 +175,15 @@ def main():
         page.wait_for_timeout(300)
         page.screenshot(path="tests/shots/16_pest_fly_catcher_infestation.png", full_page=True)
 
+        # --- The Assistant page (ChatGPT-style) and the working calendar ---
+        page.click("a[href='#/assistant']")
+        page.wait_for_timeout(300)
+        check("Assistant page renders its suggestions and composer", page.locator(".assistant-suggestion").count() >= 4 and page.locator("textarea.assistant-input").count() == 1)
+        page.screenshot(path="tests/shots/17_assistant_page.png", full_page=True)
+        page.goto(f"{BASE}/index.html#/calendar/2026/9")
+        page.wait_for_timeout(400)
+        page.screenshot(path="tests/shots/18_calendar_october_holidays.png", full_page=True)
+
         # --- Master data ---
         page.click("text=Master Data")
         page.wait_for_timeout(300)

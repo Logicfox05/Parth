@@ -8,7 +8,8 @@ import { generateId } from "../utils/id";
 import { todayISO } from "../utils/date";
 import { scheduleLabel } from "../engine/frequencyEngine";
 import { resolveResponsibleEmployees } from "../engine/documentInfo";
-import type { CompanyHoliday, Employee } from "../types";
+import { weeklyOffDay, WEEKDAY_LONG } from "../engine/holidays";
+import type { AdjustmentDay, CompanyHoliday, Employee } from "../types";
 
 type Tab = "employees" | "chemicals" | "pcLocations" | "rodentStations" | "areas" | "checkpoints" | "documents" | "holidays" | "settings";
 
@@ -296,9 +297,39 @@ export function MasterDataPage() {
       {tab === "holidays" && (
         <>
           <p className="text-muted text-sm mb-3">
-            Company-wide holidays. A Daily Monitoring record due on one of these dates is automatically marked as a
-            holiday, and no reminder fires for any document due that day.
+            The company's working calendar (Gujarat Print Pack Leave Calendar 2026). On a closed day — the weekly off or a
+            festival holiday — the Daily Pest Control Monitoring Record is pre-marked as a holiday, no other daily register is
+            expected, no reminder fires, and a fortnightly / monthly / quarterly / yearly record that lands on it is due the next
+            working day instead. An adjustment day is the opposite: a weekly-off day on which everyone reports to the company.
           </p>
+
+          <div className="card mb-4">
+            <div className="card-pad flex items-center gap-3 wrap">
+              <label className="text-sm font-semibold" htmlFor="weekly-off-day">
+                Weekly off day
+              </label>
+              <select
+                id="weekly-off-day"
+                aria-label="Weekly off day"
+                className="input input-sm"
+                style={{ width: 160 }}
+                value={weeklyOffDay(master)}
+                onChange={(e) => {
+                  masterRepository.update({ weeklyOffDay: Number(e.target.value) });
+                  bump();
+                }}
+              >
+                {WEEKDAY_LONG.map((name, i) => (
+                  <option key={name} value={i}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-muted">Every {WEEKDAY_LONG[weeklyOffDay(master)]} is a holiday unless it is listed as an adjustment day below.</span>
+            </div>
+          </div>
+
+          <h3 className="text-sm uppercase text-muted mb-2">Festival holidays</h3>
           <HolidaysTable
             holidays={master.holidays ?? []}
             onAdd={() => {
@@ -308,7 +339,12 @@ export function MasterDataPage() {
               bump();
             }}
             onRemove={(i) => {
-              masterRepository.update({ holidays: (master.holidays ?? []).filter((_, idx) => idx !== i) });
+              const removedId = (master.holidays ?? [])[i]?.id;
+              masterRepository.update({
+                holidays: (master.holidays ?? []).filter((_, idx) => idx !== i),
+                // Remembered so the seed merge doesn't bring it back next boot.
+                removedSeedIds: removedId ? [...(master.removedSeedIds ?? []), removedId] : master.removedSeedIds,
+              });
               bump();
             }}
             onUpdate={(i, patch) => {
@@ -318,8 +354,105 @@ export function MasterDataPage() {
               bump();
             }}
           />
+
+          <h3 className="text-sm uppercase text-muted mb-2 mt-5">Adjustment (working) days</h3>
+          <p className="text-muted text-xs mb-2">
+            "Everyone must report to the company on adjustment Day is written next to this holiday" — the {WEEKDAY_LONG[weeklyOffDay(master)]}s the plant works, as printed on
+            the notice. 20-11-2026 is printed as a Thursday but is a Friday — TO BE CONFIRMED with HR.
+          </p>
+          <AdjustmentDaysTable
+            days={master.adjustmentDays ?? []}
+            onAdd={() => {
+              masterRepository.update({
+                adjustmentDays: [...(master.adjustmentDays ?? []), { id: generateId("adj"), date: todayISO(), forHoliday: "", note: "" }],
+              });
+              bump();
+            }}
+            onRemove={(i) => {
+              const removedId = (master.adjustmentDays ?? [])[i]?.id;
+              masterRepository.update({
+                adjustmentDays: (master.adjustmentDays ?? []).filter((_, idx) => idx !== i),
+                removedSeedIds: removedId ? [...(master.removedSeedIds ?? []), removedId] : master.removedSeedIds,
+              });
+              bump();
+            }}
+            onUpdate={(i, patch) => {
+              masterRepository.update({
+                adjustmentDays: (master.adjustmentDays ?? []).map((a, idx) => (idx === i ? { ...a, ...patch } : a)),
+              });
+              bump();
+            }}
+          />
         </>
       )}
+    </div>
+  );
+}
+
+function AdjustmentDaysTable({
+  days,
+  onAdd,
+  onRemove,
+  onUpdate,
+}: {
+  days: AdjustmentDay[];
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+  onUpdate: (index: number, patch: Partial<AdjustmentDay>) => void;
+}) {
+  return (
+    <div>
+      <div className="doc-table">
+        <table className="adjustment-days">
+          <thead>
+            <tr>
+              <th style={{ width: 160 }}>Date</th>
+              <th style={{ width: 110 }}>Day</th>
+              <th>For holiday</th>
+              <th>Note</th>
+              <th style={{ width: 40 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {days
+              .slice()
+              .sort((a, b) => (a.date < b.date ? -1 : 1))
+              .map((a) => {
+                const index = days.indexOf(a);
+                const dow = a.date ? WEEKDAY_LONG[new Date(`${a.date}T00:00:00`).getDay()] : "";
+                return (
+                  <tr key={a.id}>
+                    <td>
+                      <input type="date" className="input input-sm" value={a.date} onChange={(e) => onUpdate(index, { date: e.target.value })} />
+                    </td>
+                    <td className="text-sm">{dow}</td>
+                    <td>
+                      <input className="input input-sm" placeholder="e.g. Republic Day (26-01-2026)" value={a.forHoliday ?? ""} onChange={(e) => onUpdate(index, { forHoliday: e.target.value })} />
+                    </td>
+                    <td>
+                      <input className="input input-sm" value={a.note ?? ""} onChange={(e) => onUpdate(index, { note: e.target.value })} />
+                    </td>
+                    <td>
+                      <button className="btn btn-ghost btn-sm btn-icon" onClick={() => onRemove(index)}>
+                        <FiTrash2 size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            {days.length === 0 && (
+              <tr>
+                <td colSpan={5} className="text-muted text-center" style={{ padding: 16 }}>
+                  No adjustment days — every weekly-off day is a holiday.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <button className="btn btn-secondary btn-sm mt-2" onClick={onAdd}>
+        <FiPlus size={13} /> Add Adjustment Day
+      </button>
     </div>
   );
 }

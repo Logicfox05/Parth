@@ -22,6 +22,7 @@ import { ReportsPage } from "./pages/ReportsPage";
 import { MasterDataPage } from "./pages/MasterDataPage";
 import { DemoModePage } from "./pages/DemoModePage";
 import { SearchPage } from "./pages/SearchPage";
+import { AssistantPage } from "./pages/AssistantPage";
 import {
   DailyMonitoringListPage,
   FlyCatcherTrendPage,
@@ -112,6 +113,8 @@ function RouteSwitch() {
       return <DemoModePage />;
     case "search":
       return <SearchPage />;
+    case "assistant":
+      return <AssistantPage />;
     default:
       return <NotFoundPage />;
   }

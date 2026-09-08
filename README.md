@@ -68,6 +68,24 @@ The app behaves like a personal assistant rather than a blank form:
   Source / Unit / Target Pest / Year / Jan–Dec / Total layout; **Training & Reference** — Training
   Records, Chemical Master, SOP. The assistant navigates there from plain speech ("show me the rat
   reports", "fly catcher infestation for this year").
+- **The assistant also has a screen of its own** — **Assistant** in the sidebar (`/assistant`,
+  `src/pages/AssistantPage.tsx`): a ChatGPT-style page with your conversations on the left, the thread
+  in the middle, suggested questions when a chat is empty and a composer at the bottom. Text only —
+  there is deliberately no voice / microphone input. Conversations are kept in the browser, so a chat
+  survives the assistant taking you to another screen. Calendar and workload questions ("is Thursday a
+  holiday?", "next company holiday?", "adjustment days?", "what's due today?", "my briefing") are
+  answered instantly on the client from the app's own data (`src/engine/assistantLocal.ts`); everything
+  else goes to Groq with a short digest of live facts attached (today's working-day status, the weekly
+  off, upcoming holidays, what's due), so the model answers from real data.
+- **The company's working calendar is built in** (`src/engine/holidays.ts`, Master Data → Holidays):
+  **Thursday is the weekly off**, the 13 festival holidays and the five adjustment (working)
+  Thursdays come straight from the Gujarat Print Pack Leave Calendar 2026 in the zip. On a closed day
+  the Daily Pest Control Monitoring Record is pre-marked as a holiday, no lamination log sheet is
+  expected, no reminder fires, and a fortnightly / monthly / quarterly / yearly record that lands on it
+  is due the next working day instead of disappearing. The Record Calendar, Day View and Dashboard
+  all say which kind of day it is. Records an earlier build left on a closed day are brought into line
+  at start-up (moved to the next working day, re-marked as a holiday, or dropped — only ones nobody
+  has worked on), and a seeded holiday or adjustment day you delete in Master Data stays deleted.
 
 ## What's implemented
 

@@ -4,6 +4,7 @@ import { ensureSeeded as ensureRecordsSeeded, recordRepository } from "./reposit
 import { RETIRED_DOCUMENT_IDS } from "./seed/documentDefinitions";
 import { ensureRecordsGeneratedForMonth } from "../engine/recordGenerator";
 import { prepareDueRecords } from "../engine/assistantPrepare";
+import { alignRecordsToWorkingCalendar } from "../engine/calendarMigration";
 import { todayISO } from "../utils/date";
 
 // Called once on app start. Seeds / re-syncs master, document and historical
@@ -21,6 +22,11 @@ export function bootstrap(): void {
   // them and no definition is left to render them — so drop them, Live and
   // Demo alike. Idempotent: nothing to remove on every later boot.
   for (const id of RETIRED_DOCUMENT_IDS) recordRepository.removeWhere({ documentId: id });
+  // Records an earlier build (or an earlier version of the calendar) left on
+  // a closed day are moved / re-marked / dropped exactly as the generator
+  // would place them today — before this month's generation and the
+  // assistant's preparation run, so both see the corrected set.
+  alignRecordsToWorkingCalendar();
 
   const today = new Date(todayISO());
   ensureRecordsGeneratedForMonth(today.getFullYear(), today.getMonth(), { isDemo: false });

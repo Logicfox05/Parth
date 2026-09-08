@@ -5,6 +5,7 @@ import { recordRepository } from "../data/repositories/recordRepository";
 import { settingsRepository } from "../data/repositories/settingsRepository";
 import { COMPLIANCE_STATEMENTS, complianceValidUntil } from "../data/seed/complianceStatements";
 import { findPreLaunchNoise } from "./backlogCleanup";
+import { isCompanyHoliday } from "./holidays";
 import { computeReminders, routeForRecord } from "./reminders";
 import { submitRecord } from "./recordLifecycle";
 import { validateForSubmit } from "./validation";
@@ -72,7 +73,7 @@ export function greetingFor(name: string | undefined, now = new Date()): string 
 export function computeBriefing(userName: string | undefined): Briefing {
   const today = todayISO();
   const docs = documentRepository.getRecordable();
-  const holidays = new Set((masterRepository.get().holidays ?? []).map((h) => h.date));
+  const master = masterRepository.get();
   const { liveStartDate } = settingsRepository.get();
   const ready: BriefingItem[] = [];
   const needsInput: BriefingItem[] = [];
@@ -95,7 +96,8 @@ export function computeBriefing(userName: string | undefined): Briefing {
         (v.valid ? ready : needsInput).push(toItem(doc, r, v.errors));
         continue;
       }
-      if (["Scheduled", "Due", "In Progress", "Rejected"].includes(r.status) && !holidays.has(r.dueDate)) {
+      // A closed day (weekly off / festival holiday) is never "overdue work".
+      if (["Scheduled", "Due", "In Progress", "Rejected"].includes(r.status) && !isCompanyHoliday(r.dueDate, master)) {
         overdue.push(toItem(doc, r, r.status === "Rejected" && r.rejectionReason ? [`Rejected: ${r.rejectionReason}`] : []));
       }
     }

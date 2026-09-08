@@ -10,6 +10,7 @@ import type {
 } from "../types";
 import { formatMonthYearShort, fromISODate } from "../utils/date";
 import { fixedMaterialForServiceArea } from "./serviceMaterials";
+import { isCompanyHoliday } from "./holidays";
 import { getLogSheetLayout } from "../data/seed/logSheetLayouts";
 import { generateId } from "../utils/id";
 
@@ -27,7 +28,10 @@ export function createDefaultData(
   switch (doc.kind) {
     case "daily-pest-monitoring": {
       const data: DailyPestMonitoringData = {
-        isHoliday: (master.holidays ?? []).some((h) => h.date === dueDateISO),
+        // Closed days — the Thursday weekly off and the leave calendar's
+        // festival holidays, minus adjustment (working) days — arrive
+        // pre-marked, like the "H O L I D A Y" rows on the paper register.
+        isHoliday: isCompanyHoliday(dueDateISO, master),
         checkpoints: {},
         timeOfChecking: "",
         checker: "",

@@ -27,10 +27,13 @@ export function ensureSeeded(): void {
     return;
   }
   let changed = false;
+  // Seed rows an admin deliberately deleted (Master Data → Holidays) stay
+  // deleted — otherwise the additive merge would resurrect them every boot.
+  const removed = new Set(raw.removedSeedIds ?? []);
   const mergeById = <T extends { id: string }>(current: T[] | undefined, seed: T[]): T[] => {
     const list = current ?? [];
     const ids = new Set(list.map((x) => x.id));
-    const additions = seed.filter((x) => !ids.has(x.id));
+    const additions = seed.filter((x) => !ids.has(x.id) && !removed.has(x.id));
     if (additions.length > 0) changed = true;
     return additions.length ? [...list, ...additions] : list;
   };
@@ -45,7 +48,13 @@ export function ensureSeeded(): void {
     rodentStations: raw.rodentStations ?? [],
     checkpoints: raw.checkpoints?.length ? raw.checkpoints : SEED_MASTER_DATA.checkpoints,
     documentRoleKeywords: { ...raw.documentRoleKeywords },
+    // Working-calendar fields added later: the weekly off defaults from the
+    // seed (Thursday) only when the stored copy has never set one; adjustment
+    // days merge additively like every other list.
+    weeklyOffDay: raw.weeklyOffDay ?? SEED_MASTER_DATA.weeklyOffDay,
+    adjustmentDays: mergeById(raw.adjustmentDays, SEED_MASTER_DATA.adjustmentDays ?? []),
   };
+  if (raw.weeklyOffDay === undefined && SEED_MASTER_DATA.weeklyOffDay !== undefined) changed = true;
   for (const [docId, keyword] of Object.entries(SEED_MASTER_DATA.documentRoleKeywords)) {
     if (next.documentRoleKeywords[docId] === undefined) {
       next.documentRoleKeywords[docId] = keyword;
