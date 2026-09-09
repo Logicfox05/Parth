@@ -25,7 +25,7 @@ import { buildAssistantContext, localAnswer, offTopicReply } from "../../engine/
 import { useLanguage, useT } from "../../i18n";
 import { SPEECH_LOCALES } from "../../i18n/strings";
 import { settingsRepository } from "../../data/repositories/settingsRepository";
-import { isVoiceInputSupported, listenOnce, speak, stopSpeaking, type VoiceSession } from "../../utils/speech";
+import { isVoiceInputSupported, listenForUtterance, speak, stopSpeaking, type VoiceSession } from "../../utils/speech";
 import { formatDisplayDate, todayISO } from "../../utils/date";
 import { generateId } from "../../utils/id";
 import { openBriefing } from "./AssistantBriefingPopup";
@@ -304,7 +304,7 @@ export function DocumentAssistant() {
   // unmounts (navigating to the full-page Assistant does exactly that).
   useEffect(() => {
     return () => {
-      sessionRef.current?.stop();
+      sessionRef.current?.cancel();
       stopSpeaking();
     };
   }, []);
@@ -410,8 +410,9 @@ export function DocumentAssistant() {
   };
 
   const toggleListening = () => {
+    // Pressing it while listening means "I've finished" — send what was said.
     if (listening) {
-      sessionRef.current?.stop();
+      sessionRef.current?.finish();
       sessionRef.current = null;
       setListening(false);
       return;
@@ -422,9 +423,15 @@ export function DocumentAssistant() {
     }
     stopSpeaking();
     setListening(true);
-    sessionRef.current = listenOnce({
+    sessionRef.current = listenForUtterance({
       lang: speechLocale,
-      onResult: (transcript) => void send(transcript, true),
+      // Show the sentence building in the box, so a pause mid-thought
+      // clearly hasn't cut them off.
+      onInterim: (partial) => setInput(partial),
+      onFinal: (transcript) => {
+        setInput("");
+        void send(transcript, true);
+      },
       onError: (kind) => bot(kind === "denied" ? t("ai.voiceDenied") : t("ai.voiceError")),
       onEnd: () => {
         sessionRef.current = null;

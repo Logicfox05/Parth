@@ -11,7 +11,7 @@ import type { Chip } from "../engine/guidedChecklist";
 import { openBriefing } from "../components/common/AssistantBriefingPopup";
 import { useLanguage, useT } from "../i18n";
 import { SPEECH_LOCALES } from "../i18n/strings";
-import { isSpeechOutputSupported, isVoiceInputSupported, listenOnce, speak, stopSpeaking, type VoiceSession } from "../utils/speech";
+import { isSpeechOutputSupported, isVoiceInputSupported, listenForUtterance, speak, stopSpeaking, type VoiceSession } from "../utils/speech";
 import { generateId } from "../utils/id";
 import { formatDisplayDate, toISODate, todayISO } from "../utils/date";
 
@@ -129,7 +129,7 @@ export function AssistantPage() {
   // being read out.
   useEffect(() => {
     return () => {
-      sessionRef.current?.stop();
+      sessionRef.current?.cancel();
       stopSpeaking();
     };
   }, []);
@@ -239,8 +239,10 @@ export function AssistantPage() {
   };
 
   const toggleListening = () => {
+    // Pressing it while listening means "I've finished" — send what was said
+    // rather than throwing it away.
     if (listening) {
-      sessionRef.current?.stop();
+      sessionRef.current?.finish();
       sessionRef.current = null;
       setListening(false);
       return;
@@ -252,9 +254,13 @@ export function AssistantPage() {
     stopSpeaking();
     setVoiceNote(null);
     setListening(true);
-    sessionRef.current = listenOnce({
+    sessionRef.current = listenForUtterance({
       lang: speechLocale,
-      onResult: (transcript) => {
+      // The sentence appears in the composer as it is spoken, so the speaker
+      // can see it building and knows they haven't been cut off.
+      onInterim: (partial) => setInput(partial),
+      onFinal: (transcript) => {
+        setInput("");
         // Straight into the same send() as a typed message — voice is an
         // input method, not a separate assistant.
         void send(transcript, true);
@@ -424,7 +430,7 @@ export function AssistantPage() {
             title={voiceSupported ? (listening ? t("ai.stopVoice") : t("ai.startVoice")) : t("ai.voiceUnsupported")}
             aria-pressed={listening}
           >
-            {listening ? <FiMicOff size={14} /> : <FiMic size={14} />} {t("ai.speak")}
+            {listening ? <FiMicOff size={14} /> : <FiMic size={14} />} {listening ? t("ai.done") : t("ai.speak")}
           </button>
           <button className="btn btn-primary" data-action="send" onClick={() => send()} disabled={loading || !input.trim()} aria-label={t("ai.send")}>
             <FiSend size={14} /> {t("ai.send")}

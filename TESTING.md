@@ -2,7 +2,7 @@
 
 Per section 42 of the build brief, the application was actually built, run, and tested in a
 real Chromium browser (Playwright) against the production build — not just reviewed as source.
-Four scripts live in `tests/`:
+Five scripts live in `tests/`:
 
 - `tests/e2e_smoke.py` — the core acceptance walkthrough (calendar → day → record →
   save/submit/verify → dashboard update → persistence → demo isolation → every module page
@@ -11,6 +11,11 @@ Four scripts live in `tests/`:
   `localStorage` before the first post-fix boot and proves the launch-date-floor fix actually holds
   (not silently promoted to "ready", cleanup banner accurate, a human-verified record with the same
   old due date survives untouched). Network-independent.
+- `tests/e2e_voice.py` — proves the voice assistant waits for the *whole* spoken sentence. Headless
+  Chromium has no speech engine, so a fake `SpeechRecognition` is installed before the app boots and
+  driven by hand: speak a fragment, pause 1.2 s mid-sentence (nothing may be sent), speak the rest, go
+  quiet — exactly one message must be sent, containing both halves — plus pressing "Done" mid-utterance
+  sends what was said rather than discarding it. Network-independent and deterministic.
 - `tests/visual_qa.py` — deeper per-module interaction checks (Fly Catcher, Service Report, CAPA
   creation, Training creation) plus full-page screenshots of every major screen for visual
   review, saved to `tests/shots/`, network-independent.
@@ -24,7 +29,8 @@ Four scripts live in `tests/`:
 
 ```bash
 npm run test:e2e     # builds, boots backend/index.ts on :8842, runs e2e_smoke.py THEN
-                      # e2e_backlog_regression.py against it, tears down (see scripts/run-e2e.ts)
+                      # e2e_backlog_regression.py THEN e2e_voice.py against it, tears down
+                      # (see scripts/run-e2e.ts)
 ```
 
 `visual_qa.py` and `e2e_assistant_chat.py` aren't wired into an npm script (slower / make real Groq
@@ -35,15 +41,16 @@ npm run build
 API_PORT=8842 npm run server &     # Windows PowerShell: $env:API_PORT=8842; npm run server
 python tests/e2e_smoke.py          # or python3, depending on platform
 python tests/e2e_backlog_regression.py
+python tests/e2e_voice.py
 python tests/visual_qa.py
 python tests/e2e_assistant_chat.py # needs backend/.env's GROQ_API_KEY to actually resolve; edit
                                     # the BASE constant at the top if your server isn't on :8844
 ```
 
-Both scripts now sign up a fresh, randomly-emailed account at the start of the run (the app gates
+Every suite signs up a fresh, randomly-emailed account at the start of the run (the app gates
 every page behind login — see `frontend/src/main.tsx`/`AuthProvider`) before exercising the rest of the app.
 
-## Results (last full run — 09-Sep-2026, on the TypeScript-only backend/scripts, after the Gujarati + voice-assistant batch)
+## Results (last full run — 09-Sep-2026, on the TypeScript-only backend/scripts, after the Gujarati + voice-assistant batch and the wait-for-the-whole-sentence fix)
 
 The run below is the production shape end to end: `frontend/scripts/build.ts` builds the bundle,
 `backend/index.ts` (run directly by Node 23.6, no compile step) serves it plus the API, and every
@@ -200,6 +207,19 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   pressing the microphone produces a listening/explanation state without breaking the page) and one
   visual-QA check with a screenshot; real speech can't be driven from headless Chromium, so that
   part was verified by hand.
+- **The microphone now waits for the whole sentence** (09-Sep-2026, on the department's follow-up:
+  *"once user start speaking then user will complete it then only it should run"*). The first cut used
+  the browser default — `continuous = false`, which ends the utterance at the first pause — so thinking
+  mid-sentence sent half a question. `listenOnce` was replaced by `listenForUtterance`: continuous
+  recognition with interim results, the transcript rebuilt from the whole results list on every event
+  and shown live in the composer, a 2.5 s silence timer re-armed on every speech event, and the message
+  sent only when that timer elapses (restarting up to 3 times if Chrome ends the session with nothing
+  said; `"aborted"` / `"no-speech"` ignored). Pressing the button again now reads **Done** and sends
+  what was said rather than discarding it. **This one is no longer hand-verified**: `tests/e2e_voice.py`
+  injects a fake `SpeechRecognition` before the app boots and drives the exact failure case — fragment,
+  1.2 s pause, rest, silence — asserting nothing is sent at the pause and exactly one message carrying
+  both halves is sent afterwards. It is deterministic and network-independent, so it runs in
+  `npm run test:e2e` alongside the smoke and backlog suites.
 - **Test selectors moved off translated text.** The Send / microphone / speaker buttons now carry
   `data-action` hooks, because their `aria-label`s are (correctly) translated and a suite that
   selects on user-visible English would break the moment someone switches language — which is
@@ -399,6 +419,29 @@ generation created new records" check assumed the Dashboard did *not* pre-genera
 it now deliberately fills the year so far on entering Demo Mode, so the check was rewritten to
 assert what the original bug was actually about: demo data exists and is real data, not blank
 shells.
+
+### `e2e_voice.py` — 13/13 voice-timing checks passed
+
+Headless Chromium has no speech engine, so the suite installs a fake `SpeechRecognition` before the
+app boots (`page.add_init_script`) and drives it: emit a fragment, wait 1.2 s (a real mid-thought
+pause, inside the 2.5 s silence window), emit the rest, then go quiet. This is what proves the
+"finish your sentence first" behaviour rather than a screenshot of a microphone button.
+
+| # | Check | Result |
+|---|---|---|
+| 1 | No messages before speaking | PASS |
+| 2 | Recognition started in continuous mode with interim results | PASS |
+| 3 | Listening state is shown | PASS |
+| 4 | Nothing is sent during a mid-sentence pause | PASS |
+| 5 | The sentence so far is shown in the composer | PASS |
+| 6 | Still listening after the pause | PASS |
+| 7 | Still nothing sent immediately after the last word | PASS |
+| 8 | Sent exactly once after the speaker finished (sent: `is 2026-09-10 a holiday?`) | PASS |
+| 9 | Sent the COMPLETE sentence, both halves | PASS |
+| 10 | Listening stopped once it was sent | PASS |
+| 11 | Composer was cleared | PASS |
+| 12 | The assistant answered the spoken question | PASS |
+| 13 | Pressing "Done" sends what was said instead of discarding it | PASS |
 
 ### `visual_qa.py` — 16/16 interaction checks passed (16 `check()` calls at run time), 0 JS errors
 

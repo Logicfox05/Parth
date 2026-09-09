@@ -753,6 +753,14 @@ application in either language, chosen on the Dashboard, plus an assistant that 
   `gu-IN`). Chrome and Edge support recognition; Firefox does not, and the button explains that
   rather than failing. The microphone is never left listening — one utterance per press, and it is
   released when the page is left.
+- **It waits for the speaker to finish** (requested 09-Sep-2026: *"once user start speaking then user
+  will complete it then only it should run"*). The browser's default is to end the utterance at the
+  first pause, which cuts an operator off mid-thought. Instead the recogniser runs continuously, the
+  words appear in the composer as they are spoken, and the question is only sent after 2.5 s of actual
+  silence — a pause to think sends nothing. Pressing the button again ("Done") sends what has been said
+  so far rather than discarding it; leaving the page discards it. `tests/e2e_voice.py` proves this by
+  driving a fake recogniser: speak a fragment, pause 1.2 s (nothing sent), speak the rest, go quiet —
+  exactly one message, containing both halves.
 - **TO BE CONFIRMED:** whether the plant wants the ten F/HR/17 check points shown with a Gujarati
   reading aid *beside* the controlled English wording (not replacing it) for operators who fill the
   register — deliberately not added unilaterally, since it puts new text next to controlled content.

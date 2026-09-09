@@ -193,11 +193,21 @@ REQUIREMENTS §24. Identifiers never translate: module names in `MODULE_ORDER`, 
 are looked up.
 
 **Voice.** `src/utils/speech.ts` wraps the browser's Web Speech API: `isVoiceInputSupported()`,
-`listenOnce({lang, onResult, onError, onEnd})` (press-to-talk, one utterance, `abort()` to stop) and
-`speak(text, lang)` / `stopSpeaking()`. Both the Assistant page and the floating widget use it, in
-`SPEECH_LOCALES[lang]` (`en-IN` / `gu-IN`); a transcript is handed straight to the same `send()` a
-typed message uses, with a `spoken` flag so the reply is read back even when the read-aloud toggle
-(`AppSettings.speakReplies`) is off. Both components stop listening and speaking on unmount.
+`listenForUtterance({lang, onInterim, onFinal, onError, onEnd})` and `speak(text, lang)` /
+`stopSpeaking()`. Both the Assistant page and the floating widget use it, in `SPEECH_LOCALES[lang]`
+(`en-IN` / `gu-IN`); a transcript is handed straight to the same `send()` a typed message uses, with a
+`spoken` flag so the reply is read back even when the read-aloud toggle (`AppSettings.speakReplies`)
+is off. Both components stop listening and speaking on unmount.
+
+`listenForUtterance` waits for the *complete* sentence rather than firing at the first pause, because
+people think mid-sentence and Chrome's default behaviour would cut them off. It runs the recogniser
+with `continuous = true` and `interimResults = true`, rebuilds the transcript from the whole
+`event.results` list on every event (so nothing spoken is lost), pushes it to `onInterim` — which the
+components render live in the composer — and re-arms a `SILENCE_MS` (2500 ms) timer on every speech
+event. `onFinal` fires only when that timer elapses with non-empty text. If Chrome ends the session
+early with nothing said it restarts, up to `MAX_RESTARTS` (3); `"aborted"` and `"no-speech"` errors
+are ignored for the same reason. The returned `VoiceSession` exposes `finish()` (the **Done** button —
+deliver what has been said so far) and `cancel()` (unmount / stop — discard it).
 
 **Scope (this software only).** The assistant declines anything that isn't about this system, in two
 layers. The authoritative one is the `SCOPE` block at the top of the system prompt in

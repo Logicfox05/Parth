@@ -78,11 +78,15 @@ The app behaves like a personal assistant rather than a blank form:
   the assistant something in Gujarati and it answers in Gujarati.
 - **The assistant listens and talks.** Press the microphone on the Assistant page (or in the floating
   widget) and speak — the browser's own speech recognition turns it into text, which then follows
-  exactly the same path as anything typed, so nothing is sent anywhere extra. A question asked out
-  loud is answered out loud; the speaker button turns that on for typed questions too. Both follow the
-  chosen language (Indian English or Gujarati). Chrome and Edge support it; where a browser doesn't
-  (Firefox), the button says so instead of failing silently. Listening is always press-to-talk — the
-  microphone is never left open.
+  exactly the same path as anything typed, so nothing is sent anywhere extra. **It waits until you
+  have finished the whole sentence**: your words appear in the composer as you speak, a pause to think
+  mid-sentence does not send anything, and the question goes only after you have actually stopped
+  talking (2.5 s of silence) — or the moment you press **Done**, which sends what you have said rather
+  than throwing it away. A question asked out loud is answered out loud; the speaker button turns that
+  on for typed questions too. Both follow the chosen language (Indian English or Gujarati). Chrome and
+  Edge support it; where a browser doesn't (Firefox), the button says so instead of failing silently.
+  Listening is always press-to-talk — the microphone is never left open, and it is released when you
+  leave the page.
 - **The assistant only answers about this software.** It is a tool for operating this record system,
   not a general chatbot: ask it something outside the system — general knowledge, news, weather, a
   joke, a poem, coding or medical/legal advice — and it politely declines and offers what it can do
@@ -103,8 +107,8 @@ The app behaves like a personal assistant rather than a blank form:
   to the model.
 - **The assistant also has a screen of its own** — **Assistant** in the sidebar (`/assistant`,
   `src/pages/AssistantPage.tsx`): a ChatGPT-style page with your conversations on the left, the thread
-  in the middle, suggested questions when a chat is empty and a composer at the bottom. Text only —
-  there is deliberately no voice / microphone input. Conversations are kept in the browser, so a chat
+  in the middle, suggested questions when a chat is empty and a composer at the bottom (typed or
+  spoken — see the voice bullet above). Conversations are kept in the browser, so a chat
   survives the assistant taking you to another screen. Calendar and workload questions ("is Thursday a
   holiday?", "next company holiday?", "adjustment days?", "what's due today?", "my briefing") are
   answered instantly on the client from the app's own data (`src/engine/assistantLocal.ts`); everything
