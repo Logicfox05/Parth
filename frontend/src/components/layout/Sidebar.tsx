@@ -86,6 +86,7 @@ const MODULE_LINKS: Record<(typeof MODULE_ORDER)[number], NavEntry[]> = {
     { to: "/training", label: "Training Records", icon: FiAward },
     { to: "/chemical-master", label: "Chemical Master", icon: FiDroplet },
     { to: "/sop", label: "SOP Reference", icon: FiFileText },
+    { to: "/licence", label: "Service Provider Licence", icon: FiShield },
   ],
   "CAPA (Corrective & Preventive Action)": [
     { to: "/gap/internal", label: "Internal — Inspection Findings", icon: FiAlertCircle },

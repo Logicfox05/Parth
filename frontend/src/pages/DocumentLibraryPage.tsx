@@ -10,6 +10,7 @@ import { moduleSlug } from "../utils/moduleSlug";
 function openTarget(docId: string, kind: string): string {
   if (kind === "chemical-master") return "/chemical-master";
   if (kind === "sop-reference") return "/sop";
+  if (kind === "licence") return "/licence";
   if (kind === "compliance-statement") return `/soc/${docId}`;
   if (kind === "gap-inspection") return "/gap";
   if (kind === "complaint-checklist") return "/gap/external";

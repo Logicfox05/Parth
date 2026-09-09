@@ -41,6 +41,10 @@ export type DocumentKind =
   // Statement of Compliance / Declaration documents (F/QC-09, F/QC-38):
   // reference-only, with a validity period the app tracks for renewal.
   | "compliance-statement"
+  // A licence / certificate held on file exactly as supplied (scanned pages
+  // shown unaltered, plus a transcription) — the pest control service
+  // provider's Government of Gujarat insecticide licence (Form III).
+  | "licence"
   // Customer Complaint Handling Checklist (F/MKT/05) — the CAPA module's
   // "External" side. Sections A–E of fixed activities, each with a done
   // flag / date / comment, plus a Prepared-by / Approved-by sign-off. The

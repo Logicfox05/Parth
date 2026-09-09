@@ -17,6 +17,7 @@ import { fliesInMonth, flyStatsForYear, rodentStatsForYear, rodentsInMonth } fro
 import { FlyCatcherTrendReport, RodentTrendReport } from "./ReportsPage";
 import { StatusBadge } from "../components/common/StatusBadge";
 import { DemoTag } from "../components/common/DemoTag";
+import { DailyRegisterSheet, FHR17_ORIGINAL_PAGES } from "../components/records/DailyRegisterSheet";
 import { MONTH_NAMES, WEEKDAY_NAMES, compareISO, daysInMonth, formatDisplayDate, fromISODate, pad2, todayISO } from "../utils/date";
 import type { DailyPestMonitoringData, DocumentDefinition, FlyCatcherData, RecordInstance, ServiceReportData, TrainingRecordData } from "../types";
 
@@ -316,7 +317,8 @@ export function PestControlOverviewPage() {
           <div className="card-pad">
             <div className="text-sm text-muted mb-3">
               Last training: {lastTraining ? `${formatDisplayDate(lastTraining.data.trainingDate || lastTraining.dueDate)} — ${lastTraining.data.trainingType || "pest control training"}` : "—"}. The
-              chemical chart and the SOP are the reference material behind the service reports.
+              chemical chart and the SOP are the reference material behind the service reports; Gurudev Pesticides' Government of Gujarat insecticide licence
+              (Form III, MEH/FP1230000675/2023-2024) is on file, exactly as supplied.
             </div>
             <div className="flex gap-2 wrap">
               <button className="btn btn-secondary btn-sm" onClick={() => navigate("/training")}>
@@ -327,6 +329,9 @@ export function PestControlOverviewPage() {
               </button>
               <button className="btn btn-secondary btn-sm" onClick={() => navigate("/sop")}>
                 <FiFileText size={12} /> SOP Reference
+              </button>
+              <button className="btn btn-secondary btn-sm" onClick={() => navigate("/licence")}>
+                <FiFileText size={12} /> Service Provider Licence
               </button>
             </div>
           </div>
@@ -346,6 +351,10 @@ export function DailyMonitoringListPage({ year: initialYear, month: initialMonth
   const now = new Date();
   const [year, setYear] = useState(initialYear ?? now.getFullYear());
   const [month, setMonth] = useState(initialMonth ?? now.getMonth());
+  // The register (the company's own F/HR/17 layout) is the default; the
+  // status list is the app-side view of the same records.
+  const [view, setView] = useState<"register" | "list">("register");
+  const [showOriginal, setShowOriginal] = useState(false);
   const today = todayISO();
   useEnsureMonth(year, month, version);
 
@@ -381,7 +390,8 @@ export function DailyMonitoringListPage({ year: initialYear, month: initialMonth
         </div>
       </div>
       <p className="text-muted mb-4">
-        One record per day — the assistant prepares each one before you arrive; you review, correct anything only a person could know, and Submit. {doc?.description}
+        One record per day — the assistant prepares each one before you arrive; you review, correct anything only a person could know, and Submit. Shown below in
+        the company's own F/HR/17 layout: the three-page monthly register (instructions and check points; dates 1–19; dates 20–31 and the Summary of Actions).
       </p>
 
       <div className="flex gap-3 wrap mb-4">
@@ -419,8 +429,41 @@ export function DailyMonitoringListPage({ year: initialYear, month: initialMonth
         <button className="btn btn-secondary btn-sm" onClick={() => navigate("/pest/trend/rodent")}>
           <FiTrendingUp size={12} /> Rodent Catch Trend
         </button>
+        <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+          Print register
+        </button>
       </div>
 
+      <div className="flex items-center justify-between wrap gap-2 mb-2 no-print">
+        <div className="pill-tabs">
+          <div className={`pill-tab ${view === "register" ? "active" : ""}`} onClick={() => setView("register")}>
+            Register (F/HR/17 format)
+          </div>
+          <div className={`pill-tab ${view === "list" ? "active" : ""}`} onClick={() => setView("list")}>
+            Status list
+          </div>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={() => setShowOriginal((s) => !s)}>
+          {showOriginal ? "Hide" : "Show"} the original blank format (as supplied)
+        </button>
+      </div>
+
+      {showOriginal && (
+        <div className="card mb-3 no-print">
+          <div className="card-pad">
+            <div className="text-xs text-muted mb-2">"Daily pest control monitoring record .pdf" — the three printed pages this register reproduces, shown unaltered.</div>
+            <div className="register-original">
+              {FHR17_ORIGINAL_PAGES.map((src, i) => (
+                <img key={src} src={src} alt={`F/HR/17 blank format, page ${i + 1} of 3`} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {view === "register" && <DailyRegisterSheet year={year} month={month} isDemo={isDemo} onOpenDay={(r) => navigate(`/record/${r.id}`)} />}
+
+      {view === "list" && (
       <div className="doc-table">
         <table>
           <thead>
@@ -463,6 +506,7 @@ export function DailyMonitoringListPage({ year: initialYear, month: initialMonth
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }

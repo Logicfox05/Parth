@@ -6,7 +6,9 @@ import { masterRepository } from "../../data/repositories/masterRepository";
 import { isCheckpointFinding } from "../../engine/checkpoints";
 import { dayInfo } from "../../engine/holidays";
 import { totalRodents } from "../../engine/rodentPattern";
-import { formatDisplayDate } from "../../utils/date";
+import { Link } from "../../store/router";
+import { FHR17_INSTRUCTION_1, FHR17_INSTRUCTION_2 } from "./DailyRegisterSheet";
+import { MONTH_NAMES, formatDisplayDate, fromISODate } from "../../utils/date";
 import { generateId } from "../../utils/id";
 
 const RODENT_AREA_CONTEXT = "service-report:Rodent Control Service";
@@ -63,17 +65,20 @@ export function DailyPestMonitoringRecordView({
   };
   const removeAction = (id: string) => setField("summaryActions", data.summaryActions.filter((a) => a.id !== id));
 
+  const due = fromISODate(record.dueDate);
+
   return (
     <div>
-      <DocumentHeader doc={doc} extraTitle={formatDisplayDate(record.dueDate)} pageLabel="1 of 1 (digital)" />
+      <DocumentHeader doc={doc} extraTitle={formatDisplayDate(record.dueDate)} pageLabel={`row ${due.getDate()} of the ${MONTH_NAMES[due.getMonth()]} register`} />
+      <div className="text-xs text-muted mt-2 no-print">
+        This is one date row of the F/HR/17 monthly register (3 pages).{" "}
+        <Link to={`/pest/daily/${due.getFullYear()}/${due.getMonth()}`}>View {MONTH_NAMES[due.getMonth()]} {due.getFullYear()} in the register format</Link>
+      </div>
 
       <div className="card mt-4">
         <div className="card-pad">
-          <p className="text-sm mb-2">
-            Please check the following points on a Daily basis for monitoring of Rodent / Pest infestation &amp; report
-            to Production supervisor / Pest control agency for further investigation &amp; necessary actions.
-          </p>
-          <p className="text-sm font-semibold">Please mention the status as OK / Not OK against each check point except point no. 7.</p>
+          <p className="text-sm mb-2">{FHR17_INSTRUCTION_1}</p>
+          <p className="text-sm font-semibold">{FHR17_INSTRUCTION_2}</p>
 
           <label className="flex items-center gap-2 mt-4" style={{ cursor: editable ? "pointer" : "default" }}>
             <input

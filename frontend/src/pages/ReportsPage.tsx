@@ -16,6 +16,7 @@ import { MONTH_NAMES, daysInMonth, pad2, formatDisplayDate } from "../utils/date
 import { toCSV, downloadCSV } from "../utils/csv";
 import { MiniBarChart } from "../components/reports/MiniBarChart";
 import { DemoTag } from "../components/common/DemoTag";
+import { DailyRegisterSheet } from "../components/records/DailyRegisterSheet";
 import type {
   ComplaintChecklistData,
   DailyPestMonitoringData,
@@ -312,9 +313,13 @@ function DailyMonitoringReport({ isDemo, year, month }: { isDemo: boolean; year:
   };
 
   return (
-    <div className="card">
+    <>
+    {/* The register itself, in the company's F/HR/17 three-page layout — the
+        status / findings summary below is the app-side view of the same month. */}
+    <DailyRegisterSheet year={year} month={month} isDemo={isDemo} />
+    <div className="card mt-4">
       <div className="card-header">
-        <h3 className="text-lg">Daily Monitoring Summary — reproduces the original monthly register</h3>
+        <h3 className="text-lg">Daily Monitoring Summary — status and findings for the month</h3>
         <div className="flex items-center gap-3">
           <span className={`text-sm ${monthRodents ? "text-danger font-semibold" : "text-muted"}`}>
             {monthRodents} rodent{monthRodents === 1 ? "" : "s"} this month
@@ -366,6 +371,7 @@ function DailyMonitoringReport({ isDemo, year, month }: { isDemo: boolean; year:
         </table>
       </div>
     </div>
+    </>
   );
 }
 

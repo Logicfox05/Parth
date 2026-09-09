@@ -119,6 +119,46 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .text-warning { color: var(--color-warning); }
 .text-success { color: var(--color-success); }
 
+/* ---- F/HR/17 monthly register, printed layout (components/records/DailyRegisterSheet.tsx) ---- */
+.register-page { background: #fff; border: 1.5px solid #2c3e50; border-radius: 2px; padding: 14px 16px 18px; margin-top: 16px; }
+.register-page .doc-header { border-width: 1.5px; }
+.register-instructions p { font-size: 13px; margin: 12px 0 6px; line-height: 1.5; }
+.register-checkpoints { margin: 8px 0 0 22px; padding: 0; font-size: 13px; line-height: 1.7; }
+.register-grid-wrap { margin-top: 12px; border: none; border-radius: 0; }
+.register-grid { border-collapse: collapse; width: 100%; font-size: 12px; }
+.register-grid th, .register-grid td { border: 1px solid #2c3e50; padding: 4px 5px; text-align: center; vertical-align: middle; }
+.register-grid th { background: #d9d9d9; color: #1f2933; font-weight: 700; font-size: 11px; text-transform: none; letter-spacing: 0; white-space: normal; line-height: 1.2; }
+.register-grid td.date-cell { font-weight: 700; text-align: right; width: 44px; white-space: nowrap; }
+.register-grid td.holiday-cell { letter-spacing: 0.4em; font-weight: 700; color: var(--color-text-muted); }
+.register-grid td.time-cell, .register-grid td.checker-cell { min-width: 70px; }
+.register-grid td.flagged { background: var(--color-danger-bg); color: var(--color-danger); font-weight: 700; }
+.register-grid td.date-cell.st-verified { background: var(--color-success-bg); }
+.register-grid td.date-cell.st-submitted, .register-grid td.date-cell.st-pending-verification { background: var(--color-info-bg); }
+.register-grid td.date-cell.st-rejected { background: var(--color-danger-bg); }
+.register-grid tr.beyond-month td { background: #f3f4f6; }
+.register-grid tr.register-row.clickable { cursor: pointer; }
+.doc-table .register-grid tr.register-row.clickable:hover td { background: var(--color-primary-light); }
+.doc-table .register-grid tr.is-today td.date-cell { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.register-notes { margin-top: 8px; color: var(--color-text-muted); }
+.register-summary-title { background: #d9d9d9; border: 1px solid #2c3e50; border-bottom: none; font-weight: 700; font-size: 12px; padding: 6px 8px; margin-top: 16px; }
+.register-summary th { text-align: left; }
+.register-summary td { text-align: left; height: 30px; }
+.register-original { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.register-original img { width: 100%; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: #fff; }
+/* The licence page (pages/LicencePage.tsx) — scanned pages shown as supplied */
+.licence-scans { display: flex; flex-direction: column; gap: 18px; align-items: center; }
+.licence-scan { margin: 0; width: 100%; }
+.licence-scan img { width: 100%; display: block; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: #fff; }
+.licence-scan figcaption { text-align: center; margin-top: 4px; }
+.licence-terms td { vertical-align: top; }
+@media print {
+  .register-page { border: none; padding: 0; margin-top: 0; break-after: page; }
+  .register-page:last-of-type { break-after: auto; }
+  .register-grid td.date-cell, .register-grid td.flagged { background: #fff !important; color: #000 !important; }
+  .doc-table .register-grid tr.is-today td.date-cell { outline: none; }
+  .licence-scan { break-inside: avoid; }
+}
+
 /* The full-page Assistant (pages/AssistantPage.tsx) — chat-app layout */
 .assistant-page { display: flex; gap: 16px; height: calc(100vh - 58px - 44px - 60px); min-height: 520px; }
 .assistant-side { width: 250px; flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden; }

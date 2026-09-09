@@ -23,6 +23,7 @@ import { MasterDataPage } from "./pages/MasterDataPage";
 import { DemoModePage } from "./pages/DemoModePage";
 import { SearchPage } from "./pages/SearchPage";
 import { AssistantPage } from "./pages/AssistantPage";
+import { LicencePage } from "./pages/LicencePage";
 import {
   DailyMonitoringListPage,
   FlyCatcherTrendPage,
@@ -92,6 +93,8 @@ function RouteSwitch() {
       return <ChemicalMasterPage />;
     case "sop":
       return <SopReferencePage />;
+    case "licence":
+      return <LicencePage />;
     case "soc":
       return rest[0] ? <ComplianceDetailPage documentId={rest[0]} /> : <ComplianceListPage />;
     case "reports":

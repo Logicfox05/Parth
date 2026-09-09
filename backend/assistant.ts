@@ -155,6 +155,9 @@ Valid navigation targets (use EXACTLY this shape, "path/param" meaning substitut
 - /training — Training Records list
 - /chemical-master — the Chemical / Pesticide Application Chart
 - /sop — the Standard Operating Procedure reference
+- /licence — the pest control service provider's (Gurudev Pesticides) Government of Gujarat insecticide licence,
+  Form III, kept on file as scanned pages. Use for "licence", "license", "form III", "insecticide licence",
+  "Gurudev's licence"
 - /soc — Statements of Compliance list
 - /assistant — the full-page Assistant chat (the user may already be there; rarely a navigation target)
 - /search — the global search screen

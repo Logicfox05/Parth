@@ -184,6 +184,15 @@ def main():
         page.wait_for_timeout(400)
         page.screenshot(path="tests/shots/18_calendar_october_holidays.png", full_page=True)
 
+        # --- The Daily Report in its F/HR/17 register layout, and the licence on file ---
+        page.goto(f"{BASE}/index.html#/pest/daily")
+        page.wait_for_timeout(500)
+        page.screenshot(path="tests/shots/19_daily_register_fhr17.png", full_page=True)
+        page.goto(f"{BASE}/index.html#/licence")
+        page.wait_for_timeout(800)
+        check("Licence page shows both scanned pages of the Form III licence", page.locator(".licence-scan img").count() == 2)
+        page.screenshot(path="tests/shots/20_service_provider_licence.png", full_page=True)
+
         # --- Master data ---
         page.click("text=Master Data")
         page.wait_for_timeout(300)

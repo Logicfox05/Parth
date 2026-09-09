@@ -12,11 +12,19 @@ Gujarat, India – 384002. Pest control service provider: **Gurudev Pest Control
 ## 1. Daily Pest Control Monitoring Record
 
 ```
-SOURCE DOCUMENT      Kapila mam department reports.pdf, pages 2-4 (photographed paper form)
-DOCUMENT STRUCTURE   Header (company/title/Format No./Rev No./Date/Page No.) + instructions +
-                      10 numbered checkpoints + a 31-row daily grid (checkpoints 1-10, Time of
-                      checking, Checker) + a "Summary of Actions Taken if Pest Observed" table
-DIGITAL TEMPLATE     kind: "daily-pest-monitoring" — src/components/records/DailyPestMonitoringRecordView.tsx
+SOURCE DOCUMENT      "Daily pest control monitoring record .pdf" — the blank F/HR/17 format itself,
+                      3 pages (received 09-Sep-2026); Kapila mam department reports.pdf, pages 2-4
+                      (a filled month, photographed)
+DOCUMENT STRUCTURE   Page 1 of 3: header (company/title/Format No./Rev No./Date/Page No.) + two
+                      instruction lines + the 10 numbered check points. Page 2 of 3: grid, dates
+                      1-19 — "Check points numbers as per above guidelines" 1..10 | Time of checking
+                      | Checker. Page 3 of 3: dates 20-31 + "SUMMARY OF ACTIONS TAKEN IF PEST
+                      OBSERVED" (Date of observation | Description of Observation | Action Taken |
+                      Remarks)
+DIGITAL TEMPLATE     kind: "daily-pest-monitoring" — one record per date, edited in
+                      src/components/records/DailyPestMonitoringRecordView.tsx; the month shown in
+                      the format's own 3-page layout by src/components/records/DailyRegisterSheet.tsx
+                      (Pest Control > Daily Report, Reports > Daily Monitoring Summary, print)
 DATABASE FIELDS      DailyPestMonitoringData (src/types/record.ts): isHoliday, checkpoints
                       (Record<1-10, {value, note?}>), timeOfChecking, checker, summaryActions[]
 WORKFLOW             Frequency: Daily. One record instance per calendar date.
@@ -40,6 +48,20 @@ REPORT               Reports > Daily Monitoring Summary (reproduces the monthly 
   8. Any dead rodent observed? If yes, mention the location
   9. Any sign of Rodent cake biting in Rodent box? If yes, mention the Rodent box number
   10. Are Fly catcher tube lights having validity of usage?
+- **The blank format (09-Sep-2026).** The company supplied the F/HR/17 format itself as a clean
+  3-page PDF. Its header reads Format No. F/HR/17 · Rev No. 00 · Date 01.12.2021 · Page No. 1/2/3
+  Of 3; its second instruction line reads, verbatim, **"Please mention the status as Yes / No
+  against each check point except point no. 7"** — so the Yes/No vocabulary below is what the
+  format prints, not only what the filled specimen shows (the earlier photographed copy's "OK / Not
+  OK" reading is superseded). The ten check points are word-for-word identical to the seed
+  (`src/data/seed/masterData.ts`). The app now reproduces the format as printed
+  (`DailyRegisterSheet.tsx`): page 1 with the instructions and check points, page 2 with dates 1–19,
+  page 3 with dates 20–31 and the summary table; each date row is that day's record — Yes / No per
+  check point, the trap count in column 4, the number of pests trapped in column 7 (the "except
+  point no. 7" exception; the box and location sit in the catch details / summary), "HOLIDAY"
+  written across a closed day like the "H O L I D A Y" rows on the specimen, time of checking,
+  checker. The three blank pages are kept in `frontend/public/source/` and can be shown next to the
+  register for comparison.
 - **Response vocabulary — RESOLVED.** The printed instruction says every checkpoint except #7 is
   answered OK/Not OK, but the filled specimen actually uses **Yes/No** answers throughout
   (checkpoints 1, 2, 3, 5, 6, 7, 10), checkpoint 4 is a number (observed value: 100), and
@@ -623,6 +645,39 @@ a whole month unless a whole month is what was asked for. Answered entirely on t
   nobody has browsed to yet (Live) or that predates the current year's demo generation (Demo) still
   resolves correctly; the Live launch-date floor still applies (a pre-launch span correctly comes back
   "No … records").
+
+## 22. Insecticide Licence — Gurudev Pesticides (Form III, Government of Gujarat)
+
+```
+SOURCE DOCUMENT      Service licence GP3 kapila mam.pdf (2 pages, scanned; received 09-Sep-2026)
+DOCUMENT STRUCTURE   Page 1: Government of Gujarat FORM III "LICENSE TO SELL, STOCK OR EXHIBIT FOR
+                      SALE OR DISTRIBUTE INSECTICIDES [See sub-rules (4) of rule 10]" — registration /
+                      licence numbers, date of issue, validity, the grant, the expert staff, seal and
+                      signatory. Page 2: "TERMS AND CONDITIONS OF THIS LICENSE" — numbered conditions.
+DIGITAL TEMPLATE     kind: "licence" (reference-only) — src/pages/LicencePage.tsx (/licence), data in
+                      src/data/seed/serviceLicence.ts; scanned pages served from
+                      frontend/public/source/gurudev-licence-page-{1,2}.jpg
+WORKFLOW             On file. No records, no due dates. Renewal status TO BE CONFIRMED (below).
+```
+
+- Kept **exactly as supplied**: the two scanned pages are rendered from the PDF and shown unaltered
+  (no cropping, no overlays) as the document itself; the transcription is secondary and labelled so.
+- Transcribed, verbatim: Registration No **FP1230000675**; License No **MEH/FP1230000675/2023-2024**;
+  Date of issue **12/04/2023**; Valid upto **As per prevailing norms**. Granted to **GURUDEV
+  PESTICIDES** for the premises at SHOP NO- F-54, GOLDEN SQUARE, RADHANPUR ROAD, PANCHOT, MEHSANA,
+  under the direction and supervision of **PATEL KAUSHAL JAYANTIBHAI**, TECHNICAL PERSON, BSc in
+  Chemistry. Seal: Licensing Authority & Dy Director (Extn.) MAHESANA; signed (S. S. PATEL), Deputy
+  Director of Agriculture (Extension) Mehsana; footer "Agriculture, Farmers Welfare & Cooperation
+  Department, Govt of Gujarat — Print : 12-Apr-2023 12:51:18 PM". Page 2 lists the conditions with
+  Sr. Nos. **1, 2, 3, 4, 5, 6, 7, 9, 10, 13, 14, 15** — 8, 11 and 12 are not printed on the page;
+  the transcription keeps the numbering exactly as printed rather than renumbering.
+- Gurudev Pesticides is the service provider (Gurudev Pest Control) whose technicians file the Rat /
+  Mice, Ants & Cockroaches and Fly Control service reports (§5); the licence sits with the SOP and the
+  chemical chart under Pest Control > Training & Reference.
+- **TO BE CONFIRMED:** the current renewal — the licence number carries 2023-2024, validity is "as
+  per prevailing norms", and condition 6 makes renewal an application under rule 10(3A) of the
+  Insecticides Rules, 1971. When the renewed licence arrives, replace the scan in `source-documents/`
+  and the numbers in `serviceLicence.ts`.
 
 ## Master data provenance summary
 

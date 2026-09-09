@@ -96,19 +96,33 @@ The app behaves like a personal assistant rather than a blank form:
   all say which kind of day it is. Records an earlier build left on a closed day are brought into line
   at start-up (moved to the next working day, re-marked as a holiday, or dropped — only ones nobody
   has worked on), and a seeded holiday or adjustment day you delete in Master Data stays deleted.
+- **The Daily Pest Control Monitoring Record is shown in its own F/HR/17 layout** — the company's
+  three-page monthly register exactly as the blank format in the zip prints it
+  (`src/components/records/DailyRegisterSheet.tsx`): page 1 the header, the two instruction lines and
+  the ten check points; page 2 dates 1–19; page 3 dates 20–31 and the Summary of Actions Taken if
+  Pest Observed. Each row is that day's record (Yes / No per check point, the trap count in column 4,
+  the number of pests trapped in column 7, HOLIDAY written across a closed day, time of checking,
+  checker); click a row to open the day. It is the default view of Pest Control > Daily Report, the
+  Reports > Daily Monitoring Summary tab, and prints as three pages; the original blank pages can be
+  shown alongside for comparison.
+- **The service provider's insecticide licence is on file** — Gurudev Pesticides' Government of
+  Gujarat Form III licence (`/licence`, Pest Control > Training & Reference): the two scanned pages
+  shown exactly as supplied, with a verbatim transcription (registration and licence numbers, expert
+  staff, the terms and conditions as printed) for reading and search.
 
 ## What's implemented
 
-**Documents (21 configured):**
+**Documents (22 configured):**
 
-- Pest Control (8), in the module's four groups — *Daily Report*: Daily Pest Control Monitoring
+- Pest Control (9), in the module's four groups — *Daily Report*: Daily Pest Control Monitoring
   Record (F/HR/17). *Service Reports*: Rat / Mice (Rodent Control Service), Ants & Cockroaches
   (General Pest Control Services), Fly Control Services — the three reports in the April-2026
   service-report workbook. *Trend Analysis*: Fortnightly Fly Catcher Inspection & Cleaning Record
   (F/HR/18), which feeds the Fly Catcher Infestation trend (the Rodent Catch trend is computed from
   the daily record). *Training & Reference*: Training Record (**Yearly**, with both the Dec-2025
   technician certificate and the 24-Dec-2025 awareness programme loaded as history), Chemical
-  Master, SOP. (A Lizard Control service-report variant that existed earlier was retired — no
+  Master, SOP, and Gurudev Pesticides' Government of Gujarat insecticide licence (Form III, kept as
+  the scanned pages, unaltered, plus a transcription). (A Lizard Control service-report variant that existed earlier was retired — no
   specimen for it exists in the uploaded files; the SOP's lizard section is still in SOP Reference.)
 - CAPA (Corrective & Preventive Action) (2): **Internal** — Pest Control Inspection Findings Report
   (the Dec-2023 GAP report as history); **External** — Customer Complaint Handling Checklist

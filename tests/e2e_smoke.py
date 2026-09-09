@@ -397,11 +397,14 @@ def main():
         page.click(".pill-tab:has-text('Lamination QC')")
         page.wait_for_timeout(300)
         check("Lamination QC report renders", "Avg viscosity" in page.content())
+        page.click(".pill-tab:has-text('Daily Monitoring Summary')")
+        page.wait_for_timeout(300)
+        check("Reports > Daily Monitoring Summary reproduces the F/HR/17 three-page register", page.locator(".register-page").count() == 3)
 
         # ---- 12. Document Library ----
         page.click("text=Document Library")
         page.wait_for_timeout(300)
-        check("Document Library lists all 21 documents", page.locator(".doc-table tbody tr").count() == 21)
+        check("Document Library lists all 22 documents", page.locator(".doc-table tbody tr").count() == 22)
         check("Document Library shows the lamination module", "Lamination — Quality Control" in page.content())
         check("Document Library shows the QC inspection module", "Quality Control — Inspection Records" in page.content())
         check("Document Library groups both CAPA documents under the CAPA module", page.locator(".app-content h3:has-text('CAPA (Corrective')").count() == 1)
@@ -443,6 +446,15 @@ def main():
         page.click("a:has-text('Daily Pest Control Monitoring')")
         page.wait_for_timeout(300)
         check("Daily Report page shows the month register with today's row", "#/pest/daily" in page.url and page.locator(".doc-table tbody tr.is-today").count() == 1)
+        # The register is the company's own F/HR/17 layout ("Daily pest control
+        # monitoring record .pdf"): page 1 instructions + the ten check points,
+        # page 2 dates 1-19, page 3 dates 20-31 + the Summary of Actions.
+        check(
+            "Daily Report is laid out as the F/HR/17 three-page register (10 check points, 31 date rows)",
+            page.locator(".register-page").count() == 3 and page.locator(".register-checkpoints li").count() == 10 and page.locator(".register-grid tr[data-day]").count() == 31,
+        )
+        check("Register carries the format's own instruction wording (Yes / No, except point no. 7)", "except point no. 7" in page.locator(".register-instructions").inner_text())
+        check("Register page 3 carries the Summary of Actions Taken if Pest Observed", page.locator(".register-summary-title").count() == 1)
         page.click("a:has-text('Fly Catcher Infestation')")
         page.wait_for_timeout(300)
         check("Fly Catcher Infestation page renders the per-unit register (Live)", "#/pest/trend/fly-catcher" in page.url and page.locator("table.fly-units tbody tr").count() == 13)
@@ -450,6 +462,15 @@ def main():
         page.wait_for_timeout(300)
         overview = page.locator(".app-content").inner_text()
         check("Pest Control overview shows the four groups", all(x in overview for x in ["Daily Report", "Service Reports", "Trend Analysis", "Training & Reference"]))
+
+        # ---- 12d. The service provider's insecticide licence, on file exactly as supplied ----
+        page.click("a[href='#/licence']")
+        page.wait_for_timeout(800)
+        lic = page.locator(".app-content").inner_text()
+        check("Service Provider Licence page shows both scanned licence pages", page.locator(".licence-scan img").count() == 2)
+        check("Scanned licence pages are actually served by the app (first image loaded)", page.locator(".licence-scan img").first.evaluate("img => img.complete && img.naturalWidth > 0"))
+        check("Licence transcription carries Form III, the licensee and the licence number", "FORM III" in lic and "GURUDEV PESTICIDES" in lic and "MEH/FP1230000675/2023-2024" in lic)
+        check("Licence terms are listed exactly as printed (12 numbered conditions)", page.locator("table.licence-terms tbody tr").count() == 12)
 
         # ---- 12b. A fixed-parameter inspection record (F/QC/37), prepared by the assistant ----
         open_work_day(page)
@@ -507,7 +528,7 @@ def main():
             next_off += timedelta(days=1)
         page.goto(f"{BASE}/index.html#/pest/daily/{next_off.year}/{next_off.month - 1}")
         page.wait_for_timeout(500)
-        check("Daily Report register pre-marks the next weekly-off Thursday as a HOLIDAY row", "HOLIDAY" in page.locator(".doc-table tbody tr").nth(next_off.day - 1).inner_text())
+        check("Daily Report register pre-marks the next weekly-off Thursday as a HOLIDAY row", "HOLIDAY" in page.locator(f".register-grid tr[data-day='{next_off.day}']").inner_text())
         page.goto(f"{BASE}/index.html#/master-data")
         page.wait_for_timeout(300)
         page.click(".pill-tab:has-text('Holidays')")

@@ -199,6 +199,24 @@ a safety bound, not a normal truncation, since the span is one the user themselv
 "Holiday" status override for a pre-marked Daily Monitoring row; chips open each record directly when
 six or fewer are shown, else a single "Open Calendar" chip.
 
+**The F/HR/17 register view.** `components/records/DailyRegisterSheet.tsx` renders a month of
+`daily-pest-monitoring` records in the company's own three-page layout (page 1 instructions + the ten
+check points; page 2 dates 1–19; page 3 dates 20–31 + Summary of Actions) — a pure view over
+`recordRepository` (nothing stored twice): each `<tr data-day>` is that day's record, cells derive
+from `checkpoints[n].value` (column 7 shows the rodent count from `rodentCatches`, `isHoliday` rows
+render one HOLIDAY cell across the ten columns), `summaryActions` of every day are pooled into the
+page-3 table, and `yesno-note` notes are footnoted. The per-day `DailyPestMonitoringRecordView` stays
+the editing surface (lifecycle, validation, assistant fill) and links to the register; the register
+links back per row. `FHR17_INSTRUCTION_1/2` are the format's verbatim instruction lines, shared by
+both views. The blank pages of the format are served from `frontend/public/source/` (copied to
+`dist/` by the build).
+
+**Reference documents kept as scans.** `kind: "licence"` (`DocumentKind`) is a reference-only
+document whose scanned pages are the record of truth — `data/seed/serviceLicence.ts` holds the
+verbatim transcription (with the printed numbering gaps preserved) and the page image paths;
+`pages/LicencePage.tsx` (`/licence`) shows the scans first, then the transcription. A replacement
+licence means replacing the scan + the seed values, nothing else.
+
 ## Record lifecycle (state diagram)
 
 ```

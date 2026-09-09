@@ -149,11 +149,14 @@ export const SEED_MASTER_DATA: MasterData = {
   // confirmed. TO BE CONFIRMED.
   rodentStations: [],
 
-  // Daily Pest Control Monitoring Record (F/HR/17) — 10 checkpoints, verbatim.
-  // Response vocabulary: Yes/No throughout (matching the actual filled
-  // register, not the printed instruction's "OK/Not OK" wording — see
-  // REQUIREMENTS.md), except checkpoint 4 which is a count. `flagWhen` is
-  // the answer that represents a finding — polarity varies per question.
+  // Daily Pest Control Monitoring Record (F/HR/17) — 10 checkpoints, verbatim
+  // from the blank format ("Daily pest control monitoring record .pdf", page
+  // 1), whose instruction reads "Please mention the status as Yes / No
+  // against each check point except point no. 7". Yes/No throughout, except
+  // checkpoint 4 (a count) and checkpoint 7, whose register cell carries the
+  // number of pests trapped (see components/records/DailyRegisterSheet.tsx).
+  // `flagWhen` is the answer that represents a finding — polarity varies per
+  // question.
   checkpoints: [
     { no: 1, text: "Pest proofing of external door (self-closer / PVC Strip curtain) working properly", responseType: "yesno", flagWhen: "No" },
     { no: 2, text: "Any gaps in Doors, shutters, Cable entry or other areas, which pose threat for entry of pests inside the plant?", responseType: "yesno", flagWhen: "Yes" },
