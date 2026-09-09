@@ -53,11 +53,16 @@ The app behaves like a personal assistant rather than a blank form:
   logged-in user; the approver then sees it and can approve (Verify) from the same chat, which stamps
   Approved By. Quick-reply answers never need the network; typed answers go through Groq and fall
   back gracefully. See `src/engine/guidedChecklist.ts`.
-- **The sidebar is organized module-by-module and collapsible** — Pest Control, CAPA, Lamination —
-  Quality Control, Lamination — Production, Quality Control — Inspection Records, and Quality —
-  Compliance each expand/collapse independently; a module you close stays closed until you open it
-  again (remembered per browser). Modules without their own list page link into Document Library
-  pre-filtered to just that module (`/library/{module-slug}`).
+- **The sidebar is organized module-by-module, collapsible, and can be closed altogether** — Pest
+  Control, CAPA, Lamination — Quality Control, Lamination — Production, Quality Control — Inspection
+  Records, and Quality — Compliance each carry their own icon and expand/collapse independently; a
+  module you close stays closed until you open it again (remembered per browser), and one control
+  collapses or expands all six at once. The module holding the page you're on stays marked with a dot
+  even while shut. The whole panel closes from the **×** in its header or the button at the left of
+  the top bar — useful when a wide register wants the full window — and comes back from that same
+  button; that choice is remembered too. On a narrow window or tablet it becomes an overlay drawer
+  instead, dismissed by the backdrop, Escape, or picking a link. Modules without their own list page
+  link into Document Library pre-filtered to just that module (`/library/{module-slug}`).
 - **The Pest Control module is laid out the way the department reads its paperwork** (`/pest-control`
   overview, `src/pages/PestControlPages.tsx`): **Daily Report** — the Daily Pest Control Monitoring
   Record as a month register (`/pest/daily`); **Service Reports** — Gurudev Pest Control's three

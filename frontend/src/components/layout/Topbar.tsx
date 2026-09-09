@@ -1,8 +1,9 @@
 import React from "react";
-import { FiUser, FiPlayCircle, FiCheckCircle, FiLogOut, FiZap } from "react-icons/fi";
+import { FiUser, FiPlayCircle, FiCheckCircle, FiLogOut, FiZap, FiMenu, FiSidebar } from "react-icons/fi";
 import { useAppStore } from "../../store/AppStore";
 import { useAuth } from "../../store/AuthContext";
 import { useRouter } from "../../store/router";
+import { useSidebar } from "../../store/sidebar";
 import { useT } from "../../i18n";
 import { NotificationBell } from "./NotificationBell";
 import { LanguageSwitcher } from "../common/LanguageSwitcher";
@@ -12,12 +13,27 @@ export function Topbar() {
   const { mode, setMode } = useAppStore();
   const { user, logout } = useAuth();
   const { navigate } = useRouter();
+  const { visible: sidebarVisible, toggle: toggleSidebar } = useSidebar();
   const t = useT();
 
   return (
     <>
       <div className="app-topbar no-print">
         <div className="flex items-center gap-3">
+          {/* The only way back once the panel is closed, so it lives here
+              rather than inside the panel it hides. */}
+          <button
+            type="button"
+            className={`sidebar-toggle ${sidebarVisible ? "is-open" : ""}`}
+            data-action="toggle-sidebar"
+            onClick={toggleSidebar}
+            title={sidebarVisible ? t("nav.closeMenu") : t("nav.openMenu")}
+            aria-label={sidebarVisible ? t("nav.closeMenu") : t("nav.openMenu")}
+            aria-controls="app-sidebar"
+            aria-expanded={sidebarVisible}
+          >
+            {sidebarVisible ? <FiSidebar size={16} /> : <FiMenu size={16} />}
+          </button>
           <div className="pill-tabs">
             <div className={`pill-tab ${mode === "live" ? "active" : ""}`} onClick={() => setMode("live")} title={t("top.liveModeTitle")}>
               <FiCheckCircle size={13} style={{ marginRight: 5, verticalAlign: -2 }} />

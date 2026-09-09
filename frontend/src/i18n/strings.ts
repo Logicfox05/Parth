@@ -119,6 +119,14 @@ const en = {
   "nav.statementsOfCompliance": "Statements of Compliance",
   "nav.brandSubtitle": "Gujarat Printpack Publication Pvt. Ltd. · Pest Control · Lamination QC & Production · Compliance",
   "nav.foot": "Phase 1 Prototype · Local data only",
+  "nav.menu": "Menu",
+  "nav.workspace": "Workspace",
+  "nav.modules": "Modules",
+  "nav.closeMenu": "Close the menu",
+  "nav.openMenu": "Open the menu",
+  "nav.collapseAll": "Collapse all modules",
+  "nav.expandAll": "Expand all modules",
+  "nav.currentSection": "You are in this module",
 
   // ---- top bar -----------------------------------------------------------
   "top.liveMode": "Live Mode",
@@ -433,6 +441,14 @@ const gu: Record<StringKey, string> = {
   "nav.statementsOfCompliance": "અનુપાલન નિવેદનો",
   "nav.brandSubtitle": "ગુજરાત પ્રિન્ટપેક પબ્લિકેશન પ્રા. લિ. · જીવાત નિયંત્રણ · લેમિનેશન QC અને ઉત્પાદન · અનુપાલન",
   "nav.foot": "તબક્કો ૧ પ્રોટોટાઇપ · ડેટા ફક્ત આ ઉપકરણ પર",
+  "nav.menu": "મેનુ",
+  "nav.workspace": "કાર્યસ્થળ",
+  "nav.modules": "મોડ્યુલ",
+  "nav.closeMenu": "મેનુ બંધ કરો",
+  "nav.openMenu": "મેનુ ખોલો",
+  "nav.collapseAll": "બધા મોડ્યુલ બંધ કરો",
+  "nav.expandAll": "બધા મોડ્યુલ ખોલો",
+  "nav.currentSection": "તમે આ મોડ્યુલમાં છો",
 
   // ---- top bar -----------------------------------------------------------
   "top.liveMode": "લાઇવ મોડ",

@@ -41,6 +41,10 @@
   --shadow-md: 0 4px 14px rgba(15, 30, 45, 0.09);
   --shadow-lg: 0 10px 30px rgba(15, 30, 45, 0.14);
 
+  /* Navigation panel width — used by the panel, by the min-width that keeps
+     its contents intact while it animates closed, and by the drawer. */
+  --sidebar-w: 264px;
+
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
@@ -67,44 +71,133 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 
 /* ---- Layout shell ---- */
 .app-shell { display: flex; min-height: 100vh; }
+
 /* Side panel: light theme — white panel, teal brand band, teal accent rail
    on the active item, so it reads as part of the page rather than a dark
-   slab beside it. */
+   slab beside it. It can be closed entirely (× in the brand band, or the
+   button at the left of the top bar), which is the only way to give a wide
+   record table the full window; the choice is remembered per browser.
+   Below --sidebar-breakpoint it stops being a column and becomes an overlay
+   drawer instead — see the media query at the end of this block. Keep that
+   breakpoint in step with NARROW_QUERY in src/store/sidebar.tsx. */
 .app-sidebar {
-  width: 240px; flex-shrink: 0; background: var(--color-surface); color: var(--color-text);
+  width: var(--sidebar-w); flex-shrink: 0; background: var(--color-surface); color: var(--color-text);
   border-right: 1px solid var(--color-border);
-  display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh;
+  overflow-y: auto; overflow-x: hidden;
+  transition: width 0.22s ease, visibility 0.22s;
+  scrollbar-width: thin; scrollbar-color: #cbd5de transparent;
 }
+/* Holds the contents at full width while the panel itself animates to zero,
+   so closing slides the panel away instead of crushing every label first. */
+.app-sidebar > * { min-width: var(--sidebar-w); }
+/* visibility:hidden (not just zero width) so the links inside a closed panel
+   are also out of the tab order — a keyboard user must not fall into a panel
+   they can't see. */
+.app-sidebar.is-closed { width: 0; visibility: hidden; border-right-width: 0; }
+.app-sidebar::-webkit-scrollbar { width: 9px; }
+.app-sidebar::-webkit-scrollbar-track { background: transparent; }
+.app-sidebar::-webkit-scrollbar-thumb { background: #cbd5de; border-radius: 5px; border: 3px solid var(--color-surface); }
+.app-sidebar::-webkit-scrollbar-thumb:hover { background: var(--color-border-strong); }
+
+/* Brand band sticks to the top of the panel, so the close button stays
+   reachable however far down the module list you have scrolled. */
 .app-sidebar-brand {
-  padding: 20px 18px 16px; color: #fff;
+  padding: 16px 12px 15px 18px; color: #fff; display: flex; align-items: flex-start; gap: 8px;
   background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 60%, var(--color-accent) 100%);
+  position: sticky; top: 0; z-index: 2;
 }
+.app-sidebar-brand .brand-text { flex: 1; min-width: 0; }
 .app-sidebar-brand .title { font-size: 15px; font-weight: 700; line-height: 1.3; }
 .app-sidebar-brand .subtitle { font-size: 11.5px; opacity: 0.85; margin-top: 4px; }
-.app-nav { padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.sidebar-close {
+  flex-shrink: 0; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.28); background: rgba(255, 255, 255, 0.12);
+  color: #fff; cursor: pointer; transition: background 0.15s, transform 0.15s;
+}
+.sidebar-close:hover { background: rgba(255, 255, 255, 0.26); transform: scale(1.06); }
+
+.app-nav { padding: 8px 10px 14px; display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .app-nav a, .app-nav .nav-item {
-  display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--radius-sm);
-  color: var(--color-text-muted); font-size: 13.5px; cursor: pointer; font-weight: 500; border-left: 3px solid transparent;
+  position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 12px;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted); font-size: 13.5px; cursor: pointer; font-weight: 500;
+  transition: background 0.15s, color 0.15s;
 }
 .app-nav a:hover, .app-nav .nav-item:hover { background: var(--color-surface-alt); color: var(--color-text); text-decoration: none; }
-.app-nav a.active, .nav-item.active { background: var(--color-primary-light); color: var(--color-primary-dark); border-left-color: var(--color-primary); font-weight: 600; }
-.app-nav a svg { color: var(--color-text-faint); }
-.app-nav a.active svg, .app-nav a:hover svg { color: var(--color-primary); }
-.app-nav .nav-section-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-faint); padding: 14px 12px 4px; font-weight: 700; }
-.nav-module { margin-top: 6px; }
+.app-nav a.active, .nav-item.active { background: var(--color-primary-light); color: var(--color-primary-dark); font-weight: 600; }
+/* Accent rail inside the pill rather than a border on the row, so it lines up
+   with the rounded highlight instead of cutting the panel edge. */
+.app-nav a.active::before, .nav-item.active::before {
+  content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px; border-radius: 3px; background: var(--color-primary);
+}
+/* Fixed-width icon slot: labels line up even where the glyphs differ in width. */
+.nav-icon { flex-shrink: 0; width: 20px; display: inline-flex; align-items: center; justify-content: center; color: var(--color-text-faint); }
+.nav-label { flex: 1; min-width: 0; line-height: 1.3; }
+.app-nav a.active .nav-icon, .app-nav a:hover .nav-icon { color: var(--color-primary); }
+.app-nav a:focus-visible, .nav-module-header:focus-visible, .nav-section-action:focus-visible,
+.sidebar-close:focus-visible, .sidebar-toggle:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+.app-nav .nav-section-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-faint); padding: 14px 12px 5px; font-weight: 700; }
+.app-nav .nav-section-label.with-action { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.nav-section-action {
+  display: inline-flex; align-items: center; justify-content: center; padding: 3px; border-radius: var(--radius-sm);
+  border: none; background: transparent; color: var(--color-text-faint); cursor: pointer;
+}
+.nav-section-action:hover { background: var(--color-primary-light); color: var(--color-primary); }
+
+.nav-module { margin-top: 1px; }
 .nav-module-header {
-  width: 100%; display: flex; align-items: center; gap: 8px; background: transparent; border: none; cursor: pointer;
-  padding: 8px 12px; border-radius: var(--radius-sm); color: var(--color-text-faint); font-size: 11px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.06em; text-align: left;
+  width: 100%; display: flex; align-items: center; gap: 10px; background: transparent; border: none; cursor: pointer;
+  padding: 9px 10px 9px 12px; border-radius: var(--radius-md); color: var(--color-text); font-size: 12.5px; font-weight: 700;
+  text-align: left; transition: background 0.15s, color 0.15s;
 }
 .nav-module-header:hover { background: var(--color-surface-alt); color: var(--color-primary-dark); }
-.nav-module-header span { flex: 1; white-space: normal; line-height: 1.25; }
-.nav-module-header svg { color: var(--color-primary); }
-.nav-module-body { display: flex; flex-direction: column; gap: 2px; padding-left: 4px; }
+.nav-module-header .nav-icon { color: var(--color-primary); }
+.nav-module-name { flex: 1; min-width: 0; white-space: normal; line-height: 1.3; }
+.nav-module-chevron { flex-shrink: 0; color: var(--color-text-faint); transition: transform 0.18s ease; }
+.nav-module.closed .nav-module-chevron { transform: rotate(-90deg); }
+/* The module holding the page you're on stays marked even when shut, so a
+   tidied-away panel never leaves you wondering where you are. */
+.nav-module.current > .nav-module-header { color: var(--color-primary-dark); background: var(--color-primary-light); }
+.nav-module-dot { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--color-primary); }
+.nav-module-body {
+  display: flex; flex-direction: column; gap: 2px; margin: 2px 0 8px 21px; padding-left: 7px;
+  border-left: 1px solid var(--color-border); animation: nav-module-in 0.18s ease-out;
+}
+@keyframes nav-module-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 /* Sub-headings inside a module body (Pest Control: Daily Report / Service
    Reports / Trend Analysis / Training & Reference). */
-.nav-sub-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-faint); padding: 9px 12px 3px 14px; font-weight: 700; }
+.nav-sub-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-faint); padding: 9px 10px 3px 12px; font-weight: 700; }
 .nav-module-body a { font-size: 13px; }
+
+/* Top-bar control that brings the panel back — the panel's own close button
+   goes away with it, so this is the way in. */
+.sidebar-toggle {
+  display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; flex-shrink: 0;
+  border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-surface);
+  color: var(--color-text-muted); cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.sidebar-toggle:hover { background: var(--color-primary-light); color: var(--color-primary-dark); border-color: var(--color-primary); }
+.sidebar-toggle.is-open { color: var(--color-primary); }
+.sidebar-backdrop { position: fixed; inset: 0; background: rgba(15, 30, 45, 0.42); z-index: 55; animation: sidebar-fade-in 0.15s ease-out; }
+@keyframes sidebar-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* Narrow windows and tablets: the panel slides over the page instead of
+   taking a fifth of it away from a record table. */
+@media (max-width: 1024px) {
+  .app-sidebar {
+    position: fixed; top: 0; left: 0; z-index: 60; width: var(--sidebar-w); height: 100vh;
+    box-shadow: var(--shadow-lg); transform: translateX(-100%); visibility: hidden;
+    transition: transform 0.22s ease, visibility 0.22s;
+  }
+  .app-sidebar.is-closed { width: var(--sidebar-w); }
+  .app-sidebar.is-open { transform: none; visibility: visible; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar, .nav-module-chevron, .sidebar-close, .sidebar-toggle { transition: none; }
+  .nav-module-body, .sidebar-backdrop { animation: none; }
+}
 /* Pest Control module pages */
 .pest-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start; }
 .doc-table tr.is-today td { background: var(--color-primary-light); }

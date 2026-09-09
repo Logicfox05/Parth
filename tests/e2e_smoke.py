@@ -49,6 +49,21 @@ def display_date(iso):
     return date.fromisoformat(iso).strftime("%d-%b-%Y")
 
 
+def dismiss_briefing(page):
+    """Clear the assistant's briefing if it is on screen.
+
+    It is a blocking overlay, and it can appear on any load -- not just the
+    first one: a reload inside the morning (09:00-10:00) or evening
+    (17:00-18:00) slot gets that slot's briefing (engine/briefingSchedule.ts).
+    Leaving it up makes the next click time out with the overlay swallowing
+    pointer events, which is exactly how the double-briefing bug surfaced.
+    """
+    got_it = page.locator("button:has-text('Got it')")
+    if got_it.count():
+        got_it.first.click()
+        page.wait_for_timeout(200)
+
+
 WORK_DAY = next_working_day(date.today()).isoformat()
 # The assistant prepares records due today or earlier — so on a closed day
 # (when WORK_DAY is tomorrow or later) the opened records are blank shells and
@@ -102,10 +117,7 @@ def main():
         page.wait_for_timeout(300)
         check("Assistant briefing popup greets the user on login", "Good morning" in page.content() or "Good afternoon" in page.content() or "Good evening" in page.content())
         check("Briefing lists records the assistant filled in", "ready for your OK" in page.content())
-        got_it = page.locator("button:has-text('Got it')")
-        if got_it.count():
-            got_it.first.click()
-            page.wait_for_timeout(200)
+        dismiss_briefing(page)
 
         check("Dashboard heading renders after signup", "Digital Controlled Record System" in page.content())
         check("Top bar shows the signed-up user", "Playwright QA" in page.content())
@@ -213,6 +225,7 @@ def main():
         # ---- 4. Persistence across reload ----
         page.reload()
         page.wait_for_timeout(400)
+        dismiss_briefing(page)
         check("Status persists after reload", "Verified" in page.content() or "Pending Verification" in page.content())
 
         # ---- 5. Dashboard reflects update ----
@@ -424,6 +437,44 @@ def main():
         page.wait_for_timeout(150)
         check("Expanding it again restores the links", page.locator("a:has-text('Training Records')").count() == 1)
 
+        # ---- 12b. Closing and reopening the whole navigation panel ----
+        # The panel's own close button hides the only control that could bring
+        # it back, so the top bar carries the way in; the choice is remembered.
+        # Selectors are data-action hooks, not labels -- the labels translate.
+        def sidebar_width():
+            return page.evaluate("document.querySelector('.app-sidebar').getBoundingClientRect().width")
+
+        check("Navigation panel is a column beside the content by default", sidebar_width() > 200)
+        page.click("button[data-action='close-sidebar']")
+        page.wait_for_timeout(400)
+        check("Closing the panel gives the page the full window", sidebar_width() == 0)
+        check(
+            "A closed panel is hidden from keyboard and screen readers too, not just narrowed",
+            page.evaluate("getComputedStyle(document.querySelector('.app-sidebar')).visibility") == "hidden",
+        )
+        page.reload()
+        page.wait_for_timeout(800)
+        dismiss_briefing(page)
+        check("The panel stays closed after a reload (the choice is remembered)", sidebar_width() == 0)
+        page.click("button[data-action='toggle-sidebar']")
+        page.wait_for_timeout(400)
+        check("The top-bar button brings the panel back", sidebar_width() > 200)
+
+        # Collapse-all / expand-all: six modules in one click either way.
+        page.click("button[data-action='toggle-all-modules']")
+        page.wait_for_timeout(200)
+        check(
+            "Collapse-all closes every module at once",
+            page.locator(".nav-module.closed").count() == 6 and page.locator(".nav-module.open").count() == 0,
+        )
+        check(
+            "A collapsed module still marks the one holding the current page",
+            page.locator(".nav-module.current .nav-module-dot").count() == 1,
+        )
+        page.click("button[data-action='toggle-all-modules']")
+        page.wait_for_timeout(200)
+        check("Expand-all opens them again", page.locator(".nav-module.open").count() == 6)
+
         page.click("a:has-text('Lamination QC Documents')")
         page.wait_for_timeout(300)
         check("Module link deep-links Document Library filtered to that module", "#/library/lamination-quality-control" in page.url)
@@ -590,10 +641,7 @@ def main():
         check("Assistant lists what's next on the leave calendar (or says the year's list is done) and names the weekly off", "weekly off" in reply2 and ("coming up" in reply2 or "no festival holidays" in reply2))
         page.reload()
         page.wait_for_timeout(700)
-        got_it = page.locator("button:has-text('Got it')")
-        if got_it.count():
-            got_it.first.click()
-            page.wait_for_timeout(200)
+        dismiss_briefing(page)
         check("Assistant conversation persists across a reload", page.locator(".assistant-page .chat-msg.user").count() >= 2)
 
         # ---- 15b. Date-range document listing ("documents of X from date to

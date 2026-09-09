@@ -3,6 +3,7 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
 import { useRouter } from "./store/router";
 import { AssistantProvider } from "./store/AssistantContext";
+import { SidebarProvider } from "./store/sidebar";
 import { DocumentAssistant } from "./components/common/DocumentAssistant";
 import { AssistantBriefingPopup } from "./components/common/AssistantBriefingPopup";
 
@@ -126,15 +127,17 @@ function RouteSwitch() {
 export function App() {
   return (
     <AssistantProvider>
-      <div className="app-shell">
-        <Sidebar />
-        <div className="app-main">
-          <Topbar />
-          <div className="app-content">
-            <RouteSwitch />
+      <SidebarProvider>
+        <div className="app-shell">
+          <Sidebar />
+          <div className="app-main">
+            <Topbar />
+            <div className="app-content">
+              <RouteSwitch />
+            </div>
           </div>
         </div>
-      </div>
+      </SidebarProvider>
       <DocumentAssistant />
       <AssistantBriefingPopup />
     </AssistantProvider>

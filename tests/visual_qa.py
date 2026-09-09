@@ -214,6 +214,30 @@ def main():
         check("Assistant page shows voice input and a read-aloud toggle", page.locator("button[data-action='voice']").count() == 1 and page.locator("button[data-action='speak-replies']").count() == 1)
         page.screenshot(path="tests/shots/23_assistant_voice.png", full_page=True)
 
+        # --- The navigation panel: modules collapsed, and the panel closed ---
+        # Six modules shut fit on one screen with the current one still marked,
+        # and closing the panel hands the full window to a wide register.
+        page.goto(f"{BASE}/index.html#/pest/daily")
+        page.wait_for_timeout(500)
+        page.click("button[data-action='toggle-all-modules']")
+        page.wait_for_timeout(300)
+        check(
+            "Every module collapses to one row, with the current one still marked",
+            page.locator(".nav-module.closed").count() == 6 and page.locator(".nav-module.current .nav-module-dot").count() == 1,
+        )
+        page.screenshot(path="tests/shots/24_sidebar_modules_collapsed.png")
+        page.click("button[data-action='toggle-all-modules']")
+        page.wait_for_timeout(250)
+        page.click("button[data-action='close-sidebar']")
+        page.wait_for_timeout(450)
+        check(
+            "Closing the panel gives the register the full window",
+            page.evaluate("document.querySelector('.app-sidebar').getBoundingClientRect().width") == 0,
+        )
+        page.screenshot(path="tests/shots/25_sidebar_closed.png")
+        page.click("button[data-action='toggle-sidebar']")
+        page.wait_for_timeout(400)
+
         # --- Master data ---
         page.click("text=Master Data")
         page.wait_for_timeout(300)
