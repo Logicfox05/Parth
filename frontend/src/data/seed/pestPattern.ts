@@ -7,8 +7,8 @@
 // ===================== RODENT (F/HR/17, checkpoints 7/8/9) =====================
 
 // Probability that a given calendar day has a rodent catch, by month
-// (Jan..Dec). Seasonal — peaks in the monsoon, ~10 catch days a year.
-export const RODENT_MONTHLY_RATE: number[] = [0.006, 0.0027, 0.006, 0.0151, 0.0274, 0.0397, 0.0488, 0.0521, 0.0488, 0.0397, 0.0274, 0.0151];
+// (Jan..Dec). Seasonal — peaks in the monsoon, ~5 catch days a year.
+export const RODENT_MONTHLY_RATE: number[] = [0.003, 0.0014, 0.003, 0.0075, 0.0137, 0.0199, 0.0244, 0.026, 0.0244, 0.0199, 0.0137, 0.0075];
 
 // The 16 Rodent Control Service areas with catch weights and the numbered
 // trap boxes (RB-01..RB-100) each one owns.

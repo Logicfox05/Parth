@@ -2,7 +2,7 @@
 
 Per section 42 of the build brief, the application was actually built, run, and tested in a
 real Chromium browser (Playwright) against the production build — not just reviewed as source.
-Five scripts live in `tests/`:
+Six scripts live in `tests/`:
 
 - `tests/e2e_smoke.py` — the core acceptance walkthrough (calendar → day → record →
   save/submit/verify → dashboard update → persistence → demo isolation → every module page
@@ -16,6 +16,14 @@ Five scripts live in `tests/`:
   driven by hand: speak a fragment, pause 1.2 s mid-sentence (nothing may be sent), speak the rest, go
   quiet — exactly one message must be sent, containing both halves — plus pressing "Done" mid-utterance
   sends what was said rather than discarding it. Network-independent and deterministic.
+- `tests/e2e_realism.py` — reads a generated demo year the way an auditor would. Asserts that
+  exceptions exist and stay exceptional (some readings outside the printed band, but under 5% and
+  clustered on some days), that every exception carries its consequence (a remark beside an
+  out-of-band reading, an action against a flagged check point, a reason beside a lot that isn't
+  Accepted, a corrective action against every CAPA finding), that sign-off looks like sign-off
+  (varied clock times, some rejections naming a reason and a rejector, verification not always
+  same-day and never before submission), that nothing is filled in for a date that hasn't happened,
+  and that a second browser reproduces the same day exactly. Network-independent.
 - `tests/visual_qa.py` — deeper per-module interaction checks (Fly Catcher, Service Report, CAPA
   creation, Training creation) plus full-page screenshots of every major screen for visual
   review, saved to `tests/shots/`, network-independent.
@@ -29,8 +37,8 @@ Five scripts live in `tests/`:
 
 ```bash
 npm run test:e2e     # builds, boots backend/index.ts on :8842, runs e2e_smoke.py THEN
-                      # e2e_backlog_regression.py THEN e2e_voice.py against it, tears down
-                      # (see scripts/run-e2e.ts)
+                      # e2e_backlog_regression.py THEN e2e_voice.py THEN e2e_realism.py
+                      # against it, tears down (see scripts/run-e2e.ts)
 ```
 
 `visual_qa.py` and `e2e_assistant_chat.py` aren't wired into an npm script (slower / make real Groq
@@ -42,6 +50,7 @@ API_PORT=8842 npm run server &     # Windows PowerShell: $env:API_PORT=8842; npm
 python tests/e2e_smoke.py          # or python3, depending on platform
 python tests/e2e_backlog_regression.py
 python tests/e2e_voice.py
+python tests/e2e_realism.py
 python tests/visual_qa.py
 python tests/e2e_assistant_chat.py # needs backend/.env's GROQ_API_KEY to actually resolve; edit
                                     # the BASE constant at the top if your server isn't on :8844
@@ -50,7 +59,7 @@ python tests/e2e_assistant_chat.py # needs backend/.env's GROQ_API_KEY to actual
 Every suite signs up a fresh, randomly-emailed account at the start of the run (the app gates
 every page behind login — see `frontend/src/main.tsx`/`AuthProvider`) before exercising the rest of the app.
 
-## Results (last full run — 09-Sep-2026, on the TypeScript-only backend/scripts, after the Gujarati + voice-assistant batch and the wait-for-the-whole-sentence fix)
+## Results (last full run — 09-Sep-2026, on the TypeScript-only backend/scripts, after the navigation-panel and plant-behaviour-model batch)
 
 The run below is the production shape end to end: `frontend/scripts/build.ts` builds the bundle,
 `backend/index.ts` (run directly by Node 23.6, no compile step) serves it plus the API, and every
@@ -231,6 +240,31 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   assertions (#74–81) and two new visual-QA screenshots (`24_sidebar_modules_collapsed.png`,
   `25_sidebar_closed.png`) cover it; the suites select on `data-action` hooks, since every label here
   translates.
+- **The generated records now read like a real plant's** (09-Sep-2026, on the department's
+  instruction that the data should look real to an auditor — *"not like every data is very good,
+  only some are bad also which seem to be real if any auditor check it"*). Every record the system
+  produced was perfect by construction: `readingInBand()` clamped every reading inside the printed
+  band (so the Lamination QC report's out-of-band column was permanently zero), `lotStatus` was
+  always "Accepted", the F/QC/13 grades were frozen at the specimen's B/A/A/–/A/B so no C or F ever
+  appeared, all ten F/HR/17 check points were answered the clean way every day, every demo record
+  was submitted at 10:00 and verified at 15:00 with one rejection reason in the whole system,
+  training attendance was 100% every year, and a demo year contained no CAPA activity at all.
+  `tools/plant_pattern.py` → `src/data/seed/plantPattern.ts` → `src/engine/plantSimulation.ts` now
+  models how the plant actually behaves, calibrated against its own specimens and its Dec-2023 GAP
+  report — see REQUIREMENTS §25 for the calibration of every rate. Verified by
+  `tests/e2e_realism.py` (24 checks, below), by reading a generated year on screen (the August
+  register's varied round times and checkers, three flagged check points with their Summary of
+  Actions rows; the September Lamination QC report's per-day out-of-band column reading 0 on most
+  days and 1–5 on others; the CAPA report's 20 findings, 15 closed and 5 overdue), and by dumping a
+  year of the model in a scratch script before wiring it in.
+- **Two bugs the model surfaced, both fixed.** (1) Jittering a *set-point* around the previous
+  record's jittered value is a random walk: within weeks the adhesive/hardener/ethyl quantities had
+  wandered to the band edges and 246 of 274 mixing sheets carried a spurious excursion remark. Set
+  points and weighed quantities are now copied exactly, as the specimen shows them, and only
+  readings with a printed nominal follow the model. (2) Demo records for *future* dates were being
+  generated complete — 24 hourly readings already written down for next Tuesday — which would be a
+  serious finding in a real register; a future record is now an empty shell, and a blank inspection
+  form no longer arrives with its Lot Status box pre-set to "Accepted".
 - **Briefing dismissal is now a helper in the smoke suite** (`dismiss_briefing`). A reload inside the
   morning or evening briefing window pops that slot's briefing — a modal that swallows clicks — and
   the suite reloads in four places. This surfaced as a one-off timeout at 17:0x on `text=Record
@@ -468,6 +502,37 @@ pause, inside the 2.5 s silence window), emit the rest, then go quiet. This is w
 | 11 | Composer was cleared | PASS |
 | 12 | The assistant answered the spoken question | PASS |
 | 13 | Pressing "Done" sends what was said instead of discarding it | PASS |
+
+### `tests/e2e_realism.py` — 22/22 checks passed
+
+Run against a generated demo year (2687 demo records: {'Verified': 1806, 'Pending Verification': 272, 'In Progress': 72, 'Rejected': 86, 'Due': 451}).
+
+| # | Check | Result |
+|---|---|---|
+| 1 | A demo year of records was generated | PASS |
+| 2 | Some readings fall outside the printed band, as they do on the real specimen | PASS |
+| 3 | ...but they stay exceptional (under 5% of all readings) | PASS |
+| 4 | ...and they cluster on some days rather than every day | PASS |
+| 5 | Every out-of-band reading on a form WITH a remark column has the remark filled in | PASS |
+| 6 | Not every inspected lot is plain Accepted | PASS |
+| 7 | ...but most are (over 85%) | PASS |
+| 8 | Every lot that is not Accepted states its reason | PASS |
+| 9 | In-process printing grades are not all A and B | PASS |
+| 10 | ...and the F grade, which stops printing, stays rare | PASS |
+| 11 | The daily pest register records findings, not a clean sheet every day | PASS |
+| 12 | Every recorded finding says what was done about it | PASS |
+| 13 | Findings observed in the registers are carried into CAPA records | PASS |
+| 14 | Every CAPA finding carries a corrective action | PASS |
+| 15 | Some corrective actions are closed and some are still overdue | PASS |
+| 16 | Records are not all submitted at the same clock time | PASS |
+| 17 | Some records were sent back | PASS |
+| 18 | Every rejected record names the reason and who rejected it | PASS |
+| 19 | Verification is not always same-day | PASS |
+| 20 | ...and never before submission | PASS |
+| 21 | No record for a future date has been filled in already | PASS |
+| 22 | A second browser generates exactly the same readings, signatures and status for the same day | PASS |
+
+Measured on that year: 121/8904 readings outside the printed band = 1.4%; lot status: {'Accepted': 584, 'Accepted on Deviation': 35, 'Segregation': 14, 'Reject / Scrap': 3}; printing grades: {'A': 661, 'B': 325, '-': 212, 'C': 68, 'F': 6}; 21 check-point findings recorded; 8 CAPA records, 20 findings: 15 closed, 5 overdue; 578 distinct submission clock times; 86 rejected records; 451 records dated in the future; same day on a second browser: 2026-01-02.
 
 ### `visual_qa.py` — 18/18 interaction checks passed (18 `check()` calls at run time), 0 JS errors
 

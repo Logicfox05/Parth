@@ -93,7 +93,14 @@ export function createDefaultData(
       const header: Record<string, string> = {};
       let rows: LogSheetRow[] = [];
       if (layout) {
-        for (const f of [...layout.headerFields, ...(layout.footerFields ?? [])]) header[f.key] = f.autoFill?.default ?? "";
+        // A blank form may arrive with the routine parts already entered (the
+        // shift, the machine), but never with a DECISION already made: the
+        // Lot Status box of an inspection that has not happened yet must not
+        // read "Accepted". It is filled when the record is prepared, and the
+        // person who signs it is the one who decides.
+        for (const f of [...layout.headerFields, ...(layout.footerFields ?? [])]) {
+          header[f.key] = isDecisionField(f.key) ? "" : (f.autoFill?.default ?? "");
+        }
         rows = emptyLogRows(doc.id);
       }
       const data: LogSheetData = { header, rows };
@@ -103,6 +110,10 @@ export function createDefaultData(
       return {};
   }
 }
+
+// The fields that record a judgement rather than a setting, and so are never
+// pre-answered on a blank form (see createDefaultData above).
+const isDecisionField = (key: string): boolean => key === "lotStatus" || key === "deviationReason";
 
 // Blank grid rows for a log sheet: one per fixed time slot, exactly one for
 // single-row layouts, or the minimum number of free rows.

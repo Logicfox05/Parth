@@ -6,6 +6,8 @@ import type {
   DailyPestMonitoringData,
   DocumentDefinition,
   FlyCatcherData,
+  GapFinding,
+  GapInspectionData,
   RecordInstance,
   RecordStatus,
   ServiceReportData,
@@ -17,35 +19,31 @@ import { effectiveDueDatesInMonth } from "../engine/holidays";
 import { periodKeyFor } from "../engine/recordGenerator";
 import { fixedMaterialForServiceArea } from "../engine/serviceMaterials";
 import { autoFillRecord } from "../engine/autoFill";
+import { createDefaultData } from "../engine/recordDefaults";
 import { describeRodentEvent, rodentEventFor } from "../engine/rodentPattern";
 import { flyCatchFor } from "../engine/flyPattern";
+import {
+  checkpointFindingsFor,
+  findingScheduleFor,
+  lifecycleFor,
+  serviceRemarkFor,
+  type LifecycleOutcome,
+} from "../engine/plantSimulation";
 import { generateId } from "../utils/id";
-import { compareISO, todayISO } from "../utils/date";
+import { makeRng } from "../utils/random";
+import { addDays, compareISO, todayISO } from "../utils/date";
 
 const DEMO_CHECKERS = ["Roshni", "Vijay", "Yogesh Rathod", "Priya Solanki"];
-const DEMO_REMARKS = ["", "", "", "Monitored, no issues found.", "Reported to supervisor.", "Minor gap sealed same day."];
+const DEMO_VERIFIER = "Kapila Barad";
 
-function pick<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-function chance(p: number): boolean {
-  return Math.random() < p;
-}
-function randTime(): string {
-  const h = 8 + Math.floor(Math.random() * 2);
-  const m = Math.floor(Math.random() * 60);
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
-function statusForDate(dueDate: string, today: string): RecordStatus {
-  if (dueDate > today) return "Due";
-  if (dueDate === today) return pick<RecordStatus>(["Due", "In Progress", "Submitted"]);
-  // past dates: mostly verified, some pending/submitted, rare rejected
-  const r = Math.random();
-  if (r < 0.75) return "Verified";
-  if (r < 0.9) return "Pending Verification";
-  if (r < 0.97) return "Submitted";
-  return "Rejected";
+// Demo data is deterministic per (record, date), exactly like the Live
+// assistant's pre-fill. It used to be drawn from Math.random(), which meant
+// the same day showed different values on two machines and changed again
+// whenever the month was regenerated — an auditor who came back to a record
+// found a different record. Everything below draws from a seeded stream whose
+// seed names what it decides.
+function rngFor(...parts: string[]) {
+  return makeRng(`demo|${parts.join("|")}`);
 }
 
 function buildDailyData(dueDate: string, isHoliday: boolean): DailyPestMonitoringData {
@@ -59,21 +57,23 @@ function buildDailyData(dueDate: string, isHoliday: boolean): DailyPestMonitorin
     if (cp.responseType === "number") {
       checkpoints[cp.no] = { value: 100 };
     } else {
-      // Non-rodent checkpoints: a rare (~1.5%) housekeeping finding — a
-      // door closer, a gap, a tube light — with its own action row.
-      const flagged = cp.no < 7 || cp.no === 10 ? chance(0.015) : false;
-      const value = flagged ? cp.flagWhen! : cp.flagWhen === "Yes" ? "No" : "Yes";
-      checkpoints[cp.no] = { value };
-      if (flagged) {
-        summaryActions.push({
-          id: generateId("act"),
-          dateOfObservation: dueDate,
-          descriptionOfObservation: `Checkpoint ${cp.no}: ${cp.text}`,
-          actionTaken: "Reported to Production Supervisor; rectified the same day (demo data).",
-          remarks: pick(DEMO_REMARKS),
-        });
-      }
+      checkpoints[cp.no] = { value: cp.flagWhen === "Yes" ? "No" : "Yes" };
     }
+  }
+  // The housekeeping findings come from the same model the Live assistant
+  // uses (engine/plantSimulation.ts), worded from this plant's own Dec-2023
+  // GAP report, each with its Summary of Actions row.
+  for (const finding of checkpointFindingsFor(dueDate)) {
+    const cp = master.checkpoints.find((c) => c.no === finding.no);
+    if (!cp?.flagWhen) continue;
+    checkpoints[finding.no] = { value: cp.flagWhen };
+    summaryActions.push({
+      id: generateId("act"),
+      dateOfObservation: dueDate,
+      descriptionOfObservation: finding.description,
+      actionTaken: finding.action,
+      remarks: finding.remarks,
+    });
   }
   // Rodent checkpoints 7/8/9 follow the same seasonal catch pattern the
   // Live assistant uses (engine/rodentPattern.ts), so a demo year shows a
@@ -92,11 +92,12 @@ function buildDailyData(dueDate: string, isHoliday: boolean): DailyPestMonitorin
   if (ev.deadRodentLocation) checkpoints[8] = { value: "Yes", note: ev.deadRodentLocation };
   if (ev.cakeBitingBoxNo) checkpoints[9] = { value: "Yes", note: ev.cakeBitingBoxNo };
 
+  const rng = rngFor("daily", dueDate);
   return {
     isHoliday: false,
     checkpoints,
-    timeOfChecking: randTime(),
-    checker: pick(DEMO_CHECKERS),
+    timeOfChecking: `${String(rng.int(8, 9)).padStart(2, "0")}:${String(rng.int(0, 59)).padStart(2, "0")}`,
+    checker: rng.chance(0.8) ? DEMO_CHECKERS[0] : rng.pick(DEMO_CHECKERS),
     summaryActions,
     rodentCatches: ev.catches,
   };
@@ -111,16 +112,23 @@ function buildFlyCatcherData(dueDate: string): FlyCatcherData {
   return {
     // Same "August-26" style as the paper register's Month & Year box.
     monthYear: `${MONTH_LONG[month]}-${String(year).slice(2)}`,
-    entries: master.pcLocations.map((pc) => ({
-      pcId: pc.id,
-      // The same seasonal per-unit pattern the Live assistant uses, so the
-      // demo year's Fly Catcher Infestation trend has a believable shape.
-      catchCountApprox: flyCatchFor(pc.id, dueDate),
-      tubeLightInstallDate: "2025-12-24",
-      tubeLightDueDate: "2026-12-23",
-      cleaningDoneBy: pick(["Vijay", "Ramesh"]),
-      verifiedBy: pick(DEMO_CHECKERS),
-    })),
+    entries: master.pcLocations.map((pc, i) => {
+      const rng = rngFor("fly", pc.id, dueDate);
+      // Tubes are replaced as they fail, so their one-year validity dates
+      // fall across the year rather than all landing on the same day (which
+      // is what the register used to show for all 13 units).
+      const install = addDays("2025-10-01", (i * 29) % 330);
+      return {
+        pcId: pc.id,
+        // The same seasonal per-unit pattern the Live assistant uses, so the
+        // demo year's Fly Catcher Infestation trend has a believable shape.
+        catchCountApprox: flyCatchFor(pc.id, dueDate),
+        tubeLightInstallDate: install,
+        tubeLightDueDate: addDays(install, 364),
+        cleaningDoneBy: rng.pick(["Vijay", "Ramesh"]),
+        verifiedBy: rng.chance(0.8) ? DEMO_CHECKERS[0] : rng.pick(DEMO_CHECKERS),
+      };
+    }),
   };
 }
 
@@ -128,31 +136,147 @@ function buildFlyCatcherData(dueDate: string): FlyCatcherData {
 // actually observed in the source specimens (REQUIREMENTS.md §5) rather than
 // one generic "ml" range for every material (glue boards are counted in
 // pieces, not millilitres).
-function randomQtyFor(materialName: string): string {
-  if (materialName === "Glue Board") return `${2 + Math.floor(Math.random() * 4)}`;
-  if (materialName === "Bromadiolone Cake") return `${30 + Math.floor(Math.random() * 11)} grams`;
-  return `${100 + Math.floor(Math.random() * 51)} ml`;
+function randomQtyFor(materialName: string, rng: ReturnType<typeof makeRng>): string {
+  if (materialName === "Glue Board") return `${rng.int(2, 5)}`;
+  if (materialName === "Bromadiolone Cake") return `${rng.int(30, 40)} grams`;
+  return `${rng.int(100, 150)} ml`;
 }
 
-function buildServiceReportData(doc: DocumentDefinition): ServiceReportData {
+export interface ServiceObservation {
+  areaName: string;
+  finding: string;
+  correctiveAction: string;
+}
+
+function buildServiceReportData(doc: DocumentDefinition, dueDate: string, observed: ServiceObservation[]): ServiceReportData {
   const master = masterRepository.get();
   const areas = master.areas.filter((a) => a.context === `service-report:${doc.variantKey}`);
+  const rng = rngFor("service", doc.id, dueDate);
   return {
     serviceName: doc.variantKey ?? doc.name,
     lines: (areas.length ? areas : [{ id: "adhoc", name: "General area (demo)", context: "" }]).map((a, i) => {
       const fixed = fixedMaterialForServiceArea(doc.variantKey, a.name);
+      // What the technician actually noted at this area on this visit — and
+      // where that is something the plant has to act on, it is collected so
+      // a CAPA finding can be raised against it below.
+      const observation = serviceRemarkFor(doc.variantKey, a.name, dueDate);
+      if (observation.finding) observed.push({ areaName: a.name, ...observation.finding });
       return {
         slNo: i + 1,
         areaName: a.name,
         materialName: fixed.materialName,
-        qtyUsed: randomQtyFor(fixed.materialName),
+        qtyUsed: randomQtyFor(fixed.materialName, rng),
         methodOfApplication: fixed.methodOfApplication,
-        remarks: pick(["-", "-", "No Rodent Trapped", "Routine service"]),
+        remarks: observation.remark,
       };
     }),
     technicianSign: "Yogesh Rathod",
-    customerSign: chance(0.7) ? "Kapila Barad" : "",
+    // The customer's countersignature is genuinely missed now and then, and
+    // that is exactly what blocks verification (engine/validation.ts).
+    customerSign: rng.chance(0.85) ? DEMO_VERIFIER : "",
   };
+}
+
+// ---------------------------------------------------------------------------
+// From what was observed to what was done about it.
+
+const MONTH_END = (year: number, month: number) => new Date(Date.UTC(year, month + 1, 0)).toISOString().slice(0, 10);
+
+/**
+ * The month's internal CAPA record: every finding the registers raised that
+ * month, each with the target date it was given and the date it was actually
+ * closed on (engine/plantSimulation.ts). Some are closed on time, some late,
+ * some still open — which is what the Dashboard's "Open Corrective Actions"
+ * tile and the CAPA report are counting.
+ */
+function buildMonthlyCapaRecord(
+  year: number,
+  month: number,
+  monthRecords: RecordInstance[],
+  serviceObservations: ServiceObservation[],
+  existing: Set<string>,
+  today: string
+): RecordInstance[] {
+  const doc = documentRepository.getById("gap-inspection");
+  if (!doc) return [];
+  const inspectionDate = MONTH_END(year, month);
+  if (compareISO(inspectionDate, today) > 0) return [];
+  const periodKey = `${doc.id}:${inspectionDate}`;
+  if (existing.has(`${doc.id}|${periodKey}`)) return [];
+
+  const findings: GapFinding[] = [];
+  // The same issue seen twice in a month is one corrective action, not two —
+  // a CAPA log listing the identical finding on two lines is what a review
+  // meeting would have merged before it was written down.
+  const seen = new Set<string>();
+  const add = (observedOn: string, description: string, comment: string, action: string, source: GapFinding["source"]) => {
+    if (seen.has(description)) return;
+    seen.add(description);
+    const schedule = findingScheduleFor(`${periodKey}|${findings.length}`, observedOn, today);
+    findings.push({
+      id: generateId("finding"),
+      sNo: findings.length + 1,
+      findingOfInspection: description,
+      commentsOnFindings: comment,
+      correctiveActionContractor: source === "External" ? action : "NA",
+      correctiveActionClient: source === "External" ? "NA" : action,
+      targetDate: schedule.targetDate,
+      actualDateOfAction: schedule.actualDateOfAction,
+      verifiedByServiceProvider: schedule.status === "Closed" ? "Yogesh Rathod" : "",
+      status: schedule.status,
+      source,
+    });
+  };
+
+  // What the daily register itself flagged during the month.
+  for (const rec of monthRecords) {
+    if (rec.documentId !== "daily-pest-monitoring") continue;
+    const data = rec.data as DailyPestMonitoringData;
+    for (const act of data.summaryActions ?? []) {
+      // Rodent catches are routine pest activity handled on the day, not a
+      // system failure to raise a corrective action against.
+      if (/rodent (trapped|removed)/i.test(act.actionTaken)) continue;
+      add(act.dateOfObservation, act.descriptionOfObservation, "Raised from the Daily Pest Control Monitoring Record (F/HR/17).", act.actionTaken, "Internal");
+    }
+  }
+  // ...and what the pest control contractor noticed on their visits.
+  for (const obs of serviceObservations) {
+    add(inspectionDate, `${obs.finding} (${obs.areaName})`, "Raised by the service technician during the fortnightly visit.", obs.correctiveAction, "External");
+  }
+
+  if (findings.length === 0) return [];
+
+  const now = new Date().toISOString();
+  const rng = rngFor("capa", inspectionDate);
+  const allClosed = findings.every((f) => f.status === "Closed");
+  // Verification is blocked while a finding is still open (validation.ts), so
+  // a month with something outstanding sits at Pending Verification — which
+  // is exactly the state an auditor expects to find it in.
+  const status: RecordStatus = allClosed ? (rng.chance(0.8) ? "Verified" : "Pending Verification") : "Pending Verification";
+  return [
+    {
+      id: generateId("demo"),
+      documentId: doc.id,
+      periodKey,
+      dueDate: inspectionDate,
+      status,
+      isDemo: true,
+      data: {
+        inspectionDate,
+        premisesName: "Gujarat Print Pack Publications Pvt. Ltd.",
+        premisesAddress: "Dediyasan GIDC, Mehsana",
+        contactPerson: "Ms. Kapila Barad",
+        findings,
+        generalComments: [],
+      } satisfies GapInspectionData,
+      createdAt: now,
+      updatedAt: now,
+      submittedBy: DEMO_CHECKERS[0],
+      submittedAt: `${inspectionDate}T16:${String(rng.int(0, 59)).padStart(2, "0")}:00.000Z`,
+      verifiedBy: status === "Verified" ? DEMO_VERIFIER : undefined,
+      verifiedAt: status === "Verified" ? `${addDays(inspectionDate, 1)}T11:00:00.000Z` : undefined,
+    },
+  ];
 }
 
 export function generateDemoRecordsForMonth(year: number, month: number): number {
@@ -163,6 +287,9 @@ export function generateDemoRecordsForMonth(year: number, month: number): number
 
   const master = masterRepository.get();
   const existing = recordRepository.periodKeys(true);
+  // Findings the fortnightly service visits raised this month, collected as
+  // the reports are built so they can be carried into a CAPA record below.
+  const observedThisMonth: ServiceObservation[] = [];
 
   for (const doc of docs) {
     // The most recent demo record before this month, so the assistant's
@@ -180,14 +307,20 @@ export function generateDemoRecordsForMonth(year: number, month: number): number
       if (existing.has(`${doc.id}|${periodKey}`)) continue;
       if (holiday && doc.kind !== "daily-pest-monitoring") continue;
 
-      const status = statusForDate(dueDate, today);
       // The Daily Monitoring register's "H O L I D A Y" rows are the real
       // closed days — the weekly off and the leave calendar — not random.
       const isHoliday = doc.kind === "daily-pest-monitoring" && holiday;
+      const inFuture = compareISO(dueDate, today) > 0;
       let data: unknown;
-      if (doc.kind === "daily-pest-monitoring") data = buildDailyData(dueDate, isHoliday);
+      // A record for a day that hasn't happened yet is an empty shell. It
+      // used to be generated complete — 24 hourly readings already written
+      // down for next Tuesday — which is the single most obvious tell that a
+      // dataset was manufactured, and would be a serious finding in a real
+      // register.
+      if (inFuture) data = createDefaultData(doc, dueDate, master);
+      else if (doc.kind === "daily-pest-monitoring") data = buildDailyData(dueDate, isHoliday);
       else if (doc.kind === "fly-catcher") data = buildFlyCatcherData(dueDate);
-      else if (doc.kind === "service-report") data = buildServiceReportData(doc);
+      else if (doc.kind === "service-report") data = buildServiceReportData(doc, dueDate, observedThisMonth);
       else if (doc.kind === "log-sheet" || doc.kind === "training-record") {
         // Same engine the Live assistant uses, so demo log sheets look
         // exactly like the prepared real ones (still isDemo:true below).
@@ -196,26 +329,38 @@ export function generateDemoRecordsForMonth(year: number, month: number): number
         data = filled.data;
       } else continue;
 
+      // How this record was signed off: who submitted it and when, whether
+      // the verifier got to it the same day or a week later, whether it was
+      // sent back (engine/plantSimulation.ts). Every record submitted at
+      // 10:00 and verified at 15:00 was the clearest tell in the old data.
+      const submitter = rngFor("submitter", doc.id, dueDate).chance(0.75) ? DEMO_CHECKERS[0] : rngFor("submitter2", doc.id, dueDate).pick(DEMO_CHECKERS);
+      const life: LifecycleOutcome | { status: RecordStatus } = inFuture
+        ? { status: "Due" as RecordStatus }
+        : lifecycleFor(doc, dueDate, submitter, DEMO_VERIFIER, today);
+
       const rec: RecordInstance = {
         id: generateId("demo"),
         documentId: doc.id,
         periodKey,
         dueDate,
-        status,
         isDemo: true,
         data,
         createdAt: now,
         updatedAt: now,
-        submittedBy: status !== "Due" && status !== "In Progress" ? pick(DEMO_CHECKERS) : undefined,
-        submittedAt: status !== "Due" && status !== "In Progress" ? `${dueDate}T10:00:00.000Z` : undefined,
-        verifiedBy: status === "Verified" ? "Kapila Barad" : undefined,
-        verifiedAt: status === "Verified" ? `${dueDate}T15:00:00.000Z` : undefined,
-        rejectionReason: status === "Rejected" ? "Missing checker signature (demo data)." : undefined,
+        ...life,
       };
       created.push(rec);
       previous = rec;
     }
   }
+
+  // Everything the month's own records observed — the check points answered
+  // the finding way, the areas a technician flagged — becomes the month's
+  // internal CAPA record, with target dates and closures. This is the chain
+  // an auditor actually follows: an observation in a register, an action
+  // raised against it, and a date it was closed on. Before this, a demo year
+  // contained no CAPA activity at all.
+  created.push(...buildMonthlyCapaRecord(year, month, created, observedThisMonth, existing, today));
 
   recordRepository.upsertMany(created);
   return created.length;

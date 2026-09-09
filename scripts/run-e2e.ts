@@ -1,5 +1,5 @@
 // Orchestrates the network-independent Playwright suites (tests/e2e_smoke.py,
-// tests/e2e_backlog_regression.py, tests/e2e_voice.py): build the frontend, boot the
+// tests/e2e_backlog_regression.py, tests/e2e_voice.py, tests/e2e_realism.py): build,
 // single-process server (dist/ + auth API) on the port the tests expect,
 // wait for it to answer, run each suite in turn against the same server,
 // then always tear the server down again -- regardless of pass/fail -- so
@@ -61,7 +61,7 @@ async function main(): Promise<void> {
     if (!ready) throw new Error(`Server did not come up on :${TEST_PORT} in time.`);
 
     const python = findPython();
-    const suites = ["tests/e2e_smoke.py", "tests/e2e_backlog_regression.py", "tests/e2e_voice.py"];
+    const suites = ["tests/e2e_smoke.py", "tests/e2e_backlog_regression.py", "tests/e2e_voice.py", "tests/e2e_realism.py"];
     exitCode = 0;
     for (const suite of suites) {
       console.log(`Running ${suite}...`);

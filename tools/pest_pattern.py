@@ -56,7 +56,14 @@ months = np.arange(12)
 # catch. A smooth annual curve peaking in the monsoon (Jul-Sep), lowest in the
 # dry winter, scaled to ~10 catch days / year.
 seasonal = 1.0 + 0.9 * np.cos((months - 7) * 2 * np.pi / 12)  # peak at index 7 = August
-TARGET_CATCH_DAYS_PER_YEAR = 10.0
+# Reconciled downwards (09-Sep-2026) from 10 to 5. The company's own Rodent
+# Catch Report — which the app prints alongside the digital total, so the two
+# sit in the same table for an auditor to compare — reports 0 rodents in 2024,
+# 2 in 2025 and 0 through Jun-2026. A digital column showing eleven catch days
+# a year next to a reported column showing two contradicts the very document
+# it is printed beside. Five catch days keeps the seasonal shape visible
+# without arguing with the plant's own history.
+TARGET_CATCH_DAYS_PER_YEAR = 5.0
 daily_rate = seasonal / seasonal.sum() * TARGET_CATCH_DAYS_PER_YEAR / 30.4
 daily_rate = np.round(daily_rate, 4)
 

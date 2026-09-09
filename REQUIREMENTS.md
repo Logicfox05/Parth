@@ -765,6 +765,79 @@ application in either language, chosen on the Dashboard, plus an assistant that 
   reading aid *beside* the controlled English wording (not replacing it) for operators who fill the
   register — deliberately not added unilaterally, since it puts new text next to controlled content.
 
+## 25. Records that read like a real plant's (09-Sep-2026)
+
+```
+DIGITAL TEMPLATE     tools/plant_pattern.py (the model and its calibration) ->
+                      src/data/seed/plantPattern.ts (generated), applied by
+                      src/engine/plantSimulation.ts; consumed by src/engine/autoFill.ts
+                      (Live pre-fill) and src/data/demoGenerator.ts (Demo Mode)
+SOURCE               The company's own filled specimens (F-QC-30, F-QC-32, F-QC-40.C, the
+                      lamination sheets of 07-09-26) and its GAP Analysis Report of Dec-2023
+```
+
+**The problem.** Every generated record was, by construction, perfect. `readingInBand()` clamped
+every reading inside the printed band, so the Lamination QC report's "Out-of-band" column read zero
+for every day the system would ever hold. `lotStatus` defaulted to "Accepted" on all three
+inspection formats and was never anything else. The F/QC/13 grades were frozen at the specimen's
+B, A, A, –, A, B, so no C and no F ever appeared, though the form's own printed rule explains what
+to do when they do. All ten F/HR/17 check points were answered the clean way every day. Every demo
+record was submitted at 10:00 and verified at 15:00 the same afternoon, with one rejection reason
+in the whole system. Training attendance was 100%, every year. And a demo year contained no CAPA
+activity at all, because no generator could produce a finding.
+
+Individually each was defensible; together they produced a year of records that an auditor would
+disbelieve on sight — the exceptions, and what was done about each, are the first thing they look
+for, and a register with none is a register nobody is filling in.
+
+**The model.** `tools/plant_pattern.py` states how the plant actually behaves and writes it as one
+generated seed module. Every rate and every line of wording is measured or quoted, not invented:
+
+- **Readings drift in episodes, not spikes.** The F-QC-30 specimen's four highest readings
+  (20.96, 21.00, 20.89 and the out-of-band 21.08) are *consecutive*, 11:00 to 14:00 — a process
+  drifting for a few hours and then being brought back. So the model is quiet noise (sd 0.30
+  against the specimen's whole-day sd of 0.553) plus a drift episode on about one day in five,
+  2–5 readings long, which usually takes one or two of them out of band. The hot room and the
+  mixing station, whose specimens never breached, get episodes of 7% and 5% of days.
+- **An excursion always carries its explanation.** Where the printed form has a Remark column
+  (F-QC-32), the operator's wording goes in it — "Viscosity high — ethyl acetate added and
+  re-circulated; re-checked after 15 min." Where the form has none (F-QC-30 has no remark column
+  and it is a controlled format, so none was added), the flag goes in the assistant's notes.
+- **Check-point findings are the plant's own.** The wording for check points 1, 2, 3, 5, 6 and 10
+  is taken from the Dec-2023 GAP Analysis Report: the utility-area opening, the fly killer machine
+  found switched off, the missing RBS numbering, material stacked against the wall, the torn PVC
+  strip curtain. About 1.7 a month, each with its Summary of Actions row, as the form asks.
+- **Lots are dispositioned.** 93% Accepted, 4.5% Accepted on Deviation, 1.8% Segregation, 0.7%
+  Reject / Scrap, each with a reason written in that format's own vocabulary — and a pass/fail
+  observation flips to FAIL only when the lot was actually held for that reason, so the two can
+  never contradict.
+- **Jobs rotate.** The lamination sheets carry the jobs that ran that day, with PO numbers climbing
+  with the calendar, instead of the same four jobs and the same five PO numbers for ever.
+- **Work gets signed off like work.** Submission lags 0–2 days, verification 0–8, about 4% of
+  records sent back with a reason a verifier would actually give ("Out-of-band reading not
+  explained in the Remark column"), and ~3% started and never finished.
+- **A finding becomes a corrective action.** In Demo Mode the month's observations — from the daily
+  register and from the contractor's fortnightly visits — are carried into that month's internal
+  CAPA record with target dates, actual closure dates, and Closed / Overdue statuses. This is the
+  chain an auditor follows, and it did not exist before.
+
+**Determinism is what makes it auditable.** Every value comes from a seeded PRNG whose seed names
+what it decides (`reading|qc-viscosity|viscosity|2026-08-14|11`), on independent streams per
+concern. The same date reads the same way on every device and after every regeneration — an auditor
+who comes back to 14-Aug finds the same 21.4 Sec. reading and the same remark. The demo generator
+previously used `Math.random()`, so two browsers disagreed and regenerating rewrote history;
+`tests/e2e_realism.py` now proves a second browser reproduces a day exactly.
+
+**Reconciled while doing this:** the rodent catch pattern was generating ~11 catch days a year
+while the company's own Rodent Catch Report — printed in the same table for comparison — reports
+0 in 2024, 2 in 2025 and 0 through Jun-2026. Lowered to 5 catch days a year
+(`TARGET_CATCH_DAYS_PER_YEAR`, tools/pest_pattern.py), so the digital column no longer argues with
+the document beside it.
+
+**What the model does NOT do:** it never signs, submits or verifies; it never ticks an attendance;
+it never fabricates a CAPA finding in Live mode. Demo records remain `isDemo: true` and are
+watermarked "DEMO / SYNTHETIC DATA — NOT AUDIT EVIDENCE" on every screen.
+
 ## Master data provenance summary
 
 | Master list | Source | Notes |
@@ -822,11 +895,18 @@ login). The rules that keep this honest:
 - Values are **carried forward from the user's most recent submitted or verified record** of the
   same document (operator, machine, batch numbers, job list, trap counts, tube-light dates,
   checker names). With no history yet, the **filled specimen** from the source file is used.
-- Measured readings (viscosity, hot-room temperature, mix viscosity) are generated close to the
-  printed nominal and **always inside the acceptance band**; machine set-points and weighed set
-  quantities are copied exactly.
-- The assistant **never invents a finding, a deviation, a CAPA action or a training attendance** —
-  Daily Monitoring is prepared as "all normal", CAPA records are never auto-filled.
+- Measured readings (viscosity, hot-room temperature, mix viscosity) follow the plant behaviour
+  model in §25 — mostly in control, with the occasional drift episode that takes a reading outside
+  the printed band and is flagged for the person to confirm. Machine set-points and weighed set
+  quantities are **copied exactly**: the specimen shows the same 3.00 / 2.00 / 45 and the same
+  15 / 1.65 / 19.5 row after row, because they are settings, not measurements.
+- The assistant **never signs, submits, verifies, or ticks an attendance**. It proposes what the
+  plant's own pattern says the day looked like; a person confirms it. Anything the model says went
+  wrong is put in the first line of the record's notes ("Check this before you submit…") rather
+  than left to be discovered, and CAPA records are still never auto-filled in Live mode — a
+  corrective action is a decision, not a routine entry.
+- A **blank form never carries a decision**. The Lot Status box on an inspection that has not
+  happened yet is empty, not "Accepted" (`isDecisionField`, `src/engine/recordDefaults.ts`).
 - Prepared records stay **In Progress** with a visible "Your assistant has filled this in" banner
   listing exactly what was filled and what it was based on. Nothing is Submitted or Verified until
   a logged-in person does it; the login briefing offers one-click "Submit" only after the record

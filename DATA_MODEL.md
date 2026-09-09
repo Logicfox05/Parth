@@ -81,9 +81,11 @@ engine/assistantPrepare.ts  prepareDueRecords()
         │  that's a person's partial work) and not yet `prepared`:
         ▼
 engine/autoFill.ts          autoFillRecord(doc, dueDate, master, previousConfirmedRecord)
-        │  carry forward → else specimen; readings inside band via a seeded PRNG keyed on
-        │  (documentId, dueDate) so values are stable across reloads/devices; returns
-        │  { data, notes[], basedOn }
+        │  carry forward → else specimen; readings, check-point findings, lot decisions,
+        │  grades and the day's job list come from engine/plantSimulation.ts (the plant
+        │  behaviour model, DATA_MODEL "The plant behaviour model" below); every value from
+        │  a seeded PRNG so it is stable across reloads and devices; returns
+        │  { data, notes[], basedOn } with anything the model flagged first in notes
         ▼
 RecordInstance.prepared = { at, by: "assistant", notes, basedOn }, status "In Progress"
         │
@@ -100,6 +102,46 @@ dashboard card and assistant widget) · PreparedBanner on each record · "Prepar
 `prepared` is kept after submission so the audit trail reads "prepared by assistant, submitted by
 <user>". Demo Mode reuses `autoFillRecord` for log sheets and training, so demo data looks the same
 as prepared Live data (still `isDemo: true`).
+
+## The plant behaviour model
+
+`tools/plant_pattern.py` → `src/data/seed/plantPattern.ts` (generated) → `engine/plantSimulation.ts`
+(applied). It decides the things a record can only get from watching the plant: how far a reading
+moves and how often it leaves the printed band, which check points get flagged and in what words,
+how a lot is dispositioned, what grade a printed sheet gets, which jobs ran, who signed and when,
+and when a finding was closed. REQUIREMENTS §25 documents the calibration; the shape of the API:
+
+```ts
+readingFor(documentId, dateISO, col, rowIndex, rowCount) → { value, outOfBand }
+excursionRemarkFor(documentId, dateISO, columnKey)       → { remark, action } | null
+checkpointFindingsFor(dateISO)                           → { no, description, action, remarks }[]
+lotOutcomeFor(documentId, dateISO)                       → { status, reason }
+jobsFor(dateISO)                                         → JobRun[]   (PO, times, set-points)
+serviceRemarkFor(variantKey, areaName, dateISO)          → { remark, finding? }
+lifecycleFor(doc, dueDate, submitter, verifier, today)   → status + submitted/verified/rejected stamps
+findingScheduleFor(seed, observedOn, today)              → { targetDate, actualDateOfAction, status }
+```
+
+Two rules make it safe to build records on. **Deterministic**: every value comes from a seeded PRNG
+whose seed names exactly what it decides (`reading|qc-viscosity|viscosity|2026-08-14|11`), so the
+same date reads the same way on every device and after every regeneration. **Independent streams**:
+each concern draws from its own seed rather than one shared sequence per record, so adding a value
+in one place cannot silently re-roll every other value — which the single shared stream in
+`autoFill.ts` would otherwise do.
+
+Readings drift in *episodes* rather than isolated spikes, because that is what the specimen shows
+(F-QC-30's four highest readings are consecutive, 11:00–14:00). `episodeFor` decides once per
+(document, column, date) whether the day drifts and over which rows; the per-row value is then
+normal noise around nominal plus that day's shift. A reading that lands outside the band is
+recorded as-is, `outOfBand` is returned, and the caller must deal with it — `explainExcursions`
+writes the operator's remark where the printed form has a Remark column, and `describeExcursions`
+puts a "Check this before you submit…" line at the top of the record's notes.
+
+What is *not* modelled as a reading: machine set-points and weighed set quantities. The specimen
+repeats the same 3.00 / 2.00 / 45 and the same 15 / 1.65 / 19.5 row after row because they are
+settings, so they are copied exactly and what differs between records is the job that ran. Jittering
+them was also a random walk — each day centred on yesterday's jittered value — which wandered into
+the band edges within a few weeks and put a spurious excursion remark on most sheets.
 
 ## Seed synchronisation (existing installs pick up new documents)
 

@@ -17,8 +17,21 @@ The app behaves like a personal assistant rather than a blank form:
 
 - **Every record that falls due is pre-filled** (`src/engine/autoFill.ts`) from the user's last real
   record of that document, or from the filled specimen in the source file when there is no history —
-  operators, machines, batch numbers, job lists, hourly readings inside the printed band, checkers,
-  trap counts. It never invents findings, deviations or CAPA actions.
+  operators, machines, batch numbers, job lists, hourly readings, checkers, trap counts. It never
+  signs, submits or verifies anything: a person does that.
+- **The records read like a real plant's, not like a demo.** A year in which every reading sits on
+  nominal, every check point says Yes and every lot is Accepted is the first thing an auditor
+  disbelieves — what they look for is the exceptions and what was done about each. So the readings
+  follow a behaviour model measured from the company's own filled specimens
+  (`tools/plant_pattern.py` → `src/data/seed/plantPattern.ts`, applied by
+  `src/engine/plantSimulation.ts`): mostly in control, with the occasional drift episode that takes
+  a reading out of the printed band — and every one of those carries its consequence, whether that's
+  the operator's remark beside it, the Summary of Actions row against a flagged check point, the
+  reason beside a lot held on deviation, or a corrective action with a target date. The wording of
+  the pest-control findings is the company's own, from its Dec-2023 GAP report. Anything the model
+  flags is put in the first line of the record's notes — "Check this before you submit…" — so it is
+  confirmed by a person, never quietly signed off. Every value is deterministic per date, so an
+  auditor who comes back to 14-Aug finds exactly the record they saw. See REQUIREMENTS §25.
 - **On login the assistant greets the user with a briefing**: what it filled in and why, what still
   needs a detail only a person knows, what is waiting for a verifier, what is coming up, and any
   compliance statement due for re-issue. Each prepared record can be viewed or submitted in one
