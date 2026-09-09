@@ -43,7 +43,7 @@ python tests/e2e_assistant_chat.py # needs backend/.env's GROQ_API_KEY to actual
 Both scripts now sign up a fresh, randomly-emailed account at the start of the run (the app gates
 every page behind login — see `frontend/src/main.tsx`/`AuthProvider`) before exercising the rest of the app.
 
-## Results (last full run — 09-Sep-2026, on the TypeScript-only backend/scripts, after the assistant-scope batch)
+## Results (last full run — 09-Sep-2026, on the TypeScript-only backend/scripts, after the licence-held-as-supplied batch)
 
 The run below is the production shape end to end: `frontend/scripts/build.ts` builds the bundle,
 `backend/index.ts` (run directly by Node 23.6, no compile step) serves it plus the API, and every
@@ -173,6 +173,16 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   Monitoring Summary, and prints as three pages. Checked by four new smoke assertions (3 register
   pages / 10 check points / 31 date rows; the format's instruction wording; the summary table; the
   Reports tab) and a re-targeted one (the pre-marked HOLIDAY row is now found by `tr[data-day]`).
+- **The licence is held with no changes at all** (09-Sep-2026, on the department re-confirming it
+  must stay exactly as supplied). The app previously showed only page *renderings* of the PDF; the
+  supplied file itself is now served too, byte for byte — `frontend/public/source/gurudev-insecticide-licence.pdf`,
+  320,370 bytes, SHA-256 `0a63f34c…c96f`, verified identical to the file as received, to the copy in
+  `source-documents/`, and to the copy the build emits into `dist/`. The licence page opens it from an
+  "Open the original PDF" button (and a link beside the scans), and says plainly that the pages shown
+  are that same file page for page, with the transcription secondary. Checked by two new smoke
+  assertions: the PDF is served with `application/pdf` at exactly 320,370 bytes, and the page links to
+  it. Nothing about the document, its placement in Pest Control > Training & Reference, or the
+  transcription changed.
 - **Assistant scope — this software only** (09-Sep-2026). The assistant is a tool for operating this
   record system, not a general chatbot, so it now declines anything outside it (general knowledge,
   news, sport, weather, maths, jokes, poems and other creative writing, recipes, programming,
@@ -220,7 +230,7 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   Python's `print` raised `UnicodeEncodeError` mid-run. Labels are ASCII-only now (em dashes are
   fine in cp1252; arrows are not).
 
-### `e2e_smoke.py` — all 111 check sites passed (the "Section C / D / E is announced next" row runs three times, so 113 checks at run time), 0 unexpected console errors
+### `e2e_smoke.py` — all 113 check sites passed (the "Section C / D / E is announced next" row runs three times, so 115 checks at run time), 0 unexpected console errors
 
 | # | Check | Result |
 |---|---|---|
@@ -310,31 +320,33 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
 | 84 | Scanned licence pages are actually served by the app (first image loaded) | PASS |
 | 85 | Licence transcription carries Form III, the licensee and the licence number | PASS |
 | 86 | Licence terms are listed exactly as printed (12 numbered conditions) | PASS |
-| 87 | Opened the F/QC/37 pouching inspection from Day View | PASS |
-| 88 | Inspection shows the 11 printed test parameters | PASS |
-| 89 | Inspection observations were pre-filled from the specimen | PASS |
-| 90 | Lot status pre-set to Accepted and inspector signed | PASS |
-| 91 | Inspection record submitted | PASS |
-| 92 | Search returns results for PC-01 | PASS |
-| 93 | Search finds the lamination operator on the prepared log sheets | PASS |
-| 94 | Calendar marks every Thursday of September 2026 as the weekly off | PASS |
-| 95 | Calendar shows Janmashtami (04-Sep-2026) from the leave calendar | PASS |
-| 96 | Adjustment day 22-Oct-2026 is a working Thursday (October: 4 weekly offs + 1 working day) | PASS |
-| 97 | Day View explains a Thursday as the weekly off | PASS |
-| 98 | Daily Report register pre-marks the next weekly-off Thursday as a HOLIDAY row | PASS |
-| 99 | Master Data shows the weekly off (Thursday) and the leave calendar's five adjustment days | PASS |
-| 100 | Assistant page opens from the sidebar with suggestions and a composer | PASS |
-| 101 | Assistant page has no voice / microphone control | PASS |
-| 102 | Assistant answers a weekly-off date from the working calendar (no network needed) | PASS |
-| 103 | Assistant explains an adjustment day as a working Thursday | PASS |
-| 104 | Assistant lists what's next on the leave calendar (or says the year's list is done) and names the weekly off | PASS |
-| 105 | Assistant conversation persists across a reload | PASS |
-| 106 | Assistant lists a document's records for an explicit single-day range, not the whole month | PASS |
-| 107 | Assistant scopes a module's listing to the exact multi-day span asked for | PASS |
-| 108 | Assistant declines a general (non-software) question | PASS |
-| 109 | Declining a general question does not navigate away | PASS |
-| 110 | A general request that mentions a pest-control word is still declined | PASS |
-| 111 | An in-scope question straight after is still answered normally (scope guard does not over-block) | PASS |
+| 87 | The original licence PDF is served by the app exactly as supplied (byte-for-byte) | PASS |
+| 88 | Licence page links to that original PDF | PASS |
+| 89 | Opened the F/QC/37 pouching inspection from Day View | PASS |
+| 90 | Inspection shows the 11 printed test parameters | PASS |
+| 91 | Inspection observations were pre-filled from the specimen | PASS |
+| 92 | Lot status pre-set to Accepted and inspector signed | PASS |
+| 93 | Inspection record submitted | PASS |
+| 94 | Search returns results for PC-01 | PASS |
+| 95 | Search finds the lamination operator on the prepared log sheets | PASS |
+| 96 | Calendar marks every Thursday of September 2026 as the weekly off | PASS |
+| 97 | Calendar shows Janmashtami (04-Sep-2026) from the leave calendar | PASS |
+| 98 | Adjustment day 22-Oct-2026 is a working Thursday (October: 4 weekly offs + 1 working day) | PASS |
+| 99 | Day View explains a Thursday as the weekly off | PASS |
+| 100 | Daily Report register pre-marks the next weekly-off Thursday as a HOLIDAY row | PASS |
+| 101 | Master Data shows the weekly off (Thursday) and the leave calendar's five adjustment days | PASS |
+| 102 | Assistant page opens from the sidebar with suggestions and a composer | PASS |
+| 103 | Assistant page has no voice / microphone control | PASS |
+| 104 | Assistant answers a weekly-off date from the working calendar (no network needed) | PASS |
+| 105 | Assistant explains an adjustment day as a working Thursday | PASS |
+| 106 | Assistant lists what's next on the leave calendar (or says the year's list is done) and names the weekly off | PASS |
+| 107 | Assistant conversation persists across a reload | PASS |
+| 108 | Assistant lists a document's records for an explicit single-day range, not the whole month | PASS |
+| 109 | Assistant scopes a module's listing to the exact multi-day span asked for | PASS |
+| 110 | Assistant declines a general (non-software) question | PASS |
+| 111 | Declining a general question does not navigate away | PASS |
+| 112 | A general request that mentions a pest-control word is still declined | PASS |
+| 113 | An in-scope question straight after is still answered normally (scope guard does not over-block) | PASS |
 
 (One benign console entry — the pre-login `GET /api/auth/me` 401, expected on every fresh
 session — is filtered out of the "unexpected console errors" check rather than counted as a

@@ -23,6 +23,9 @@ export function LicencePage() {
         </button>
         <div className="flex items-center gap-2 wrap">
           <span className="badge badge-Verified">On file · issued {formatDisplayDate(L.dateOfIssue)}</span>
+          <a className="btn btn-secondary btn-sm" href={L.originalPdf} target="_blank" rel="noopener noreferrer">
+            <FiFileText size={13} /> Open the original PDF
+          </a>
           <button className="btn btn-secondary btn-sm" onClick={() => setZoom((z) => !z)}>
             {zoom ? "Fit to page" : "Larger scan"}
           </button>
@@ -35,8 +38,9 @@ export function LicencePage() {
       <h1 className="text-2xl mb-1">{doc?.name ?? "Insecticide Licence — Gurudev Pesticides (Form III)"}</h1>
       <p className="text-muted mb-4">
         The Government of Gujarat licence held by <strong>Gurudev Pesticides</strong> — the pest control service provider (Gurudev Pest Control) whose technicians
-        file the Rat / Mice, Ants & Cockroaches and Fly Control service reports. Kept here exactly as supplied: the scanned pages below are the document;
-        the transcription under them is for reading and search only.
+        file the Rat / Mice, Ants & Cockroaches and Fly Control service reports. Kept here <strong>exactly as supplied — nothing in it changed</strong>: the
+        original PDF is held as issued and opens from the button above; the pages below are that same file, page for page; the transcription under them is for
+        reading and search only.
       </p>
 
       <div className="card mb-4">
@@ -44,7 +48,12 @@ export function LicencePage() {
           <h3 className="text-base font-semibold">
             <FiFileText size={14} style={{ verticalAlign: -2 }} /> Scanned original — {L.sourceFile}
           </h3>
-          <span className="text-xs text-muted">2 pages · shown unaltered</span>
+          <span className="text-xs text-muted">
+            {L.pages.length} pages · shown unaltered ·{" "}
+            <a href={L.originalPdf} target="_blank" rel="noopener noreferrer">
+              open the PDF
+            </a>
+          </span>
         </div>
         <div className="card-pad licence-scans">
           {L.pages.map((src, i) => (

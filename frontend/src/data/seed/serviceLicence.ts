@@ -16,6 +16,12 @@ export interface LicenceTerm {
 export const SERVICE_LICENCE = {
   documentId: "gurudev-insecticide-licence",
   sourceFile: "Service licence GP3 kapila mam.pdf",
+  // The supplied file itself, served byte-for-byte (SHA-256
+  // 0a63f34c3d689bcbc75c5fde4391400ba70f0badbe4ec45798794aae08c6c96f, 320,370
+  // bytes) — the licence is held exactly as issued, and `pages` below are
+  // only page renderings of this same file for on-screen display and print.
+  originalPdf: "/source/gurudev-insecticide-licence.pdf",
+  originalBytes: 320370,
   pages: ["/source/gurudev-licence-page-1.jpg", "/source/gurudev-licence-page-2.jpg"],
 
   issuer: "GOVERNMENT OF GUJARAT",

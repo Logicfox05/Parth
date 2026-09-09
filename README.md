@@ -113,10 +113,12 @@ The app behaves like a personal assistant rather than a blank form:
   checker); click a row to open the day. It is the default view of Pest Control > Daily Report, the
   Reports > Daily Monitoring Summary tab, and prints as three pages; the original blank pages can be
   shown alongside for comparison.
-- **The service provider's insecticide licence is on file** — Gurudev Pesticides' Government of
-  Gujarat Form III licence (`/licence`, Pest Control > Training & Reference): the two scanned pages
-  shown exactly as supplied, with a verbatim transcription (registration and licence numbers, expert
-  staff, the terms and conditions as printed) for reading and search.
+- **The service provider's insecticide licence is on file, unchanged** — Gurudev Pesticides'
+  Government of Gujarat Form III licence (`/licence`, Pest Control > Training & Reference). The
+  supplied PDF is held byte for byte and opens from the page ("Open the original PDF"); the two pages
+  shown on screen are that same file page for page, with a verbatim transcription (registration and
+  licence numbers, expert staff, the terms and conditions as printed) beneath them for reading and
+  search only.
 
 ## What's implemented
 

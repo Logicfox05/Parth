@@ -471,6 +471,15 @@ def main():
         check("Scanned licence pages are actually served by the app (first image loaded)", page.locator(".licence-scan img").first.evaluate("img => img.complete && img.naturalWidth > 0"))
         check("Licence transcription carries Form III, the licensee and the licence number", "FORM III" in lic and "GURUDEV PESTICIDES" in lic and "MEH/FP1230000675/2023-2024" in lic)
         check("Licence terms are listed exactly as printed (12 numbered conditions)", page.locator("table.licence-terms tbody tr").count() == 12)
+        # The licence is held with no changes at all: the app serves the
+        # supplied PDF itself, byte for byte (320,370 bytes, SHA-256
+        # 0a63f34c…), not only the page renderings shown on screen.
+        pdf = page.request.get(f"{BASE}/source/gurudev-insecticide-licence.pdf")
+        check(
+            "The original licence PDF is served by the app exactly as supplied (byte-for-byte)",
+            pdf.status == 200 and pdf.headers.get("content-type", "").startswith("application/pdf") and len(pdf.body()) == 320370,
+        )
+        check("Licence page links to that original PDF", page.locator(f"a[href='/source/gurudev-insecticide-licence.pdf']").count() >= 1)
 
         # ---- 12b. A fixed-parameter inspection record (F/QC/37), prepared by the assistant ----
         open_work_day(page)

@@ -660,8 +660,14 @@ DIGITAL TEMPLATE     kind: "licence" (reference-only) — src/pages/LicencePage.
 WORKFLOW             On file. No records, no due dates. Renewal status TO BE CONFIRMED (below).
 ```
 
-- Kept **exactly as supplied**: the two scanned pages are rendered from the PDF and shown unaltered
-  (no cropping, no overlays) as the document itself; the transcription is secondary and labelled so.
+- Kept **exactly as supplied — nothing in the document changed** (re-confirmed by the department
+  09-Sep-2026). The supplied PDF itself is served byte for byte from
+  `frontend/public/source/gurudev-insecticide-licence.pdf` (320,370 bytes, SHA-256
+  `0a63f34c3d689bcbc75c5fde4391400ba70f0badbe4ec45798794aae08c6c96f` — identical to the file as
+  received, to `source-documents/Service licence GP3 kapila mam.pdf`, and to the copy the build emits
+  into `dist/`), and opens from the page's "Open the original PDF" button. The two page images shown
+  on screen are renderings of that same file (no cropping, no overlays), used so the licence displays
+  and prints reliably; the transcription is secondary and labelled so.
 - Transcribed, verbatim: Registration No **FP1230000675**; License No **MEH/FP1230000675/2023-2024**;
   Date of issue **12/04/2023**; Valid upto **As per prevailing norms**. Granted to **GURUDEV
   PESTICIDES** for the premises at SHOP NO- F-54, GOLDEN SQUARE, RADHANPUR ROAD, PANCHOT, MEHSANA,

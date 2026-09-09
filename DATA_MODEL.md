@@ -225,11 +225,14 @@ links back per row. `FHR17_INSTRUCTION_1/2` are the format's verbatim instructio
 both views. The blank pages of the format are served from `frontend/public/source/` (copied to
 `dist/` by the build).
 
-**Reference documents kept as scans.** `kind: "licence"` (`DocumentKind`) is a reference-only
-document whose scanned pages are the record of truth — `data/seed/serviceLicence.ts` holds the
-verbatim transcription (with the printed numbering gaps preserved) and the page image paths;
-`pages/LicencePage.tsx` (`/licence`) shows the scans first, then the transcription. A replacement
-licence means replacing the scan + the seed values, nothing else.
+**Reference documents kept as supplied.** `kind: "licence"` (`DocumentKind`) is a reference-only
+document whose supplied file is the record of truth. `data/seed/serviceLicence.ts` holds
+`originalPdf` (the file served byte for byte from `frontend/public/source/`, with its expected
+`originalBytes` recorded so a smoke check can prove it is untouched), the page-image paths rendered
+from that same file for display and print, and the verbatim transcription (printed numbering gaps
+preserved). `pages/LicencePage.tsx` (`/licence`) offers the original PDF, shows the pages, then the
+transcription. A renewed licence means dropping in the new PDF + page images and updating the seed
+values — nothing else.
 
 ## Record lifecycle (state diagram)
 
