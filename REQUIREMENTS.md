@@ -720,6 +720,43 @@ work.
   I can open the CAPA screen or navigate to the pest-control daily register"*, with none of the
   answer's giveaway words).
 
+## 24. Two languages (English / ગુજરાતી) and a voice assistant (09-Sep-2026)
+
+```
+DIGITAL TEMPLATE     src/i18n/strings.ts (the two string tables), src/i18n/index.ts (t / useT),
+                      src/components/common/LanguageSwitcher.tsx, src/utils/speech.ts
+DATABASE FIELDS      AppSettings.language ("en" | "gu"), AppSettings.speakReplies (boolean)
+```
+
+The plant is in Mehsana and the shop floor works in Gujarati, so the department asked for the whole
+application in either language, chosen on the Dashboard, plus an assistant that can be spoken to.
+
+- **Language.** Picked on the Dashboard (and from the top bar on any screen); the entire interface
+  changes at once — navigation, page titles, buttons, statuses, frequencies, module names, report
+  tabs, the calendar and Day View, the Pest Control pages, and the assistant's own wording, briefing
+  and canned replies. Remembered per browser. Asking the assistant something in Gujarati gets a
+  Gujarati answer (the backend is told the language; routes, field names and stored values stay as
+  the app defines them).
+- **What is NOT translated, deliberately.** The controlled documents' own text: format numbers
+  (F/HR/17, F/QC/13, F/MKT/05 …), the printed instruction lines and the ten check points transcribed
+  verbatim from the paper form, the licence and its terms and conditions, the Statements of
+  Compliance, and employee / area / holiday names held as master data. Translating a controlled
+  record's wording would break the source-to-digital traceability this whole document exists to
+  record — the digital record must read as the same document the auditor holds on paper. The Gujarati
+  F/QC/13 in-process sheet (§18) stays in Gujarati in both languages, for the same reason. The smoke
+  suite asserts this: with Gujarati selected, "F/HR/17" and "Total number of rodent traps provided"
+  are still on screen.
+- **Voice.** Press-to-talk on the Assistant page and in the floating widget: the browser's own Web
+  Speech API turns speech into text, which then takes exactly the same path as a typed message (no
+  extra service, nothing else sent). A question asked aloud is answered aloud; a speaker toggle
+  extends that to typed questions. Recognition and playback follow the chosen language (`en-IN` /
+  `gu-IN`). Chrome and Edge support recognition; Firefox does not, and the button explains that
+  rather than failing. The microphone is never left listening — one utterance per press, and it is
+  released when the page is left.
+- **TO BE CONFIRMED:** whether the plant wants the ten F/HR/17 check points shown with a Gujarati
+  reading aid *beside* the controlled English wording (not replacing it) for operators who fill the
+  register — deliberately not added unilaterally, since it puts new text next to controlled content.
+
 ## Master data provenance summary
 
 | Master list | Source | Notes |

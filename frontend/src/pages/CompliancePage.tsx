@@ -4,6 +4,7 @@ import { useRouter } from "../store/router";
 import { documentRepository } from "../data/repositories/documentRepository";
 import { COMPLIANCE_STATEMENTS, complianceValidUntil } from "../data/seed/complianceStatements";
 import { formatDisplayDate, todayISO } from "../utils/date";
+import { useT } from "../i18n";
 
 function validityBadge(validUntil: string) {
   const today = todayISO();
@@ -14,11 +15,12 @@ function validityBadge(validUntil: string) {
 }
 
 export function ComplianceListPage() {
+  const t = useT();
   const { navigate } = useRouter();
   const statements = Object.values(COMPLIANCE_STATEMENTS);
   return (
     <div>
-      <h1 className="text-2xl mb-1">Statements of Compliance (SOC)</h1>
+      <h1 className="text-2xl mb-1">{t("soc.title")}</h1>
       <p className="text-muted mb-4">
         Declarations of Compliance issued to customers. Each is valid for two years from the date of publication — the assistant reminds you 90 days
         before a re-issue is due.

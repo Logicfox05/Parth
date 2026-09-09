@@ -8,6 +8,7 @@ import { computeBriefing } from "./assistantBriefing";
 import { ensureRecordsGeneratedForMonth } from "./recordGenerator";
 import { routeForRecord } from "./reminders";
 import { dayInfo, describeDay, nextWeeklyOff, upcomingHolidays, weeklyOffDay, WEEKDAY_LONG, type DayInfo } from "./holidays";
+import { t } from "../i18n";
 import { addDays, compareISO, daysInMonth, formatDisplayDate, fromISODate, MONTH_NAMES, pad2, todayISO } from "../utils/date";
 
 // WHAT THE ASSISTANT KNOWS WITHOUT ASKING THE MODEL.
@@ -63,35 +64,28 @@ const OFF_TOPIC_PATTERNS: RegExp[] = [
   /^\s*(what\s+is|what'?s|calculate|solve)\s+[\d\s+\-*/x×÷().]+\??\s*$/i,
 ];
 
-const OFF_TOPIC_REPLY =
-  "I only cover this Digital Controlled Record System — its records, documents, calendar, reports and the work of filling and verifying them — so I can't help with that one.";
-
 // Exported so the floating widget can decline an off-topic message even when
 // a record is open (where it otherwise treats free text as data to fill in).
 export function offTopicReply(message: string): LocalAnswer | null {
   const text = message.trim();
   if (!OFF_TOPIC_PATTERNS.some((re) => re.test(text))) return null;
   return {
-    reply: `${OFF_TOPIC_REPLY} Ask me something like "what's due today", "daily pest control monitoring record from 1 to 19 January", or "open the rat / mice service reports".`,
+    reply: t("ai.offTopic"),
     chips: [
-      { label: "What's due today?", action: { type: "navigate", route: `/day/${todayISO()}` }, tone: "primary" },
-      { label: "Pest Control", action: { type: "navigate", route: "/pest-control" } },
-      { label: "This month's reports", action: { type: "navigate", route: "/reports" } },
+      { label: t("ai.chip.dueToday"), action: { type: "navigate", route: `/day/${todayISO()}` }, tone: "primary" },
+      { label: t("ai.chip.pestControl"), action: { type: "navigate", route: "/pest-control" } },
+      { label: t("ai.chip.monthReports"), action: { type: "navigate", route: "/reports" } },
     ],
   };
 }
 
-export const SUGGESTED_PROMPTS: { title: string; text: string }[] = [
-  { title: "What's due today?", text: "What's due today and what have you already prepared for me?" },
-  { title: "Is tomorrow a holiday?", text: "Is tomorrow a holiday?" },
-  { title: "Next company holiday", text: "When is the next company holiday?" },
-  { title: "Adjustment days", text: "Which adjustment days are coming up?" },
-  { title: "This month's reports", text: "Show me this month's reports" },
-  { title: "Rat / Mice service reports", text: "Open the rat and mice service reports" },
-  { title: "Daily pest control report", text: "Take me to the daily pest control report" },
-  { title: "Rodent trend", text: "Show me the rodent catch trend for this year" },
-  { title: "Documents for a date range", text: "Show me daily pest control monitoring record documents from 1 to 19 January" },
-];
+const SUGGESTION_IDS = ["due", "tomorrow", "nextHoliday", "adjustment", "reports", "rat", "daily", "rodent", "range"] as const;
+
+// Read at render time, not module load, so the questions are in whichever
+// language is selected now.
+export function suggestedPrompts(): { title: string; text: string }[] {
+  return SUGGESTION_IDS.map((id) => ({ title: t(`sugg.${id}.title`), text: t(`sugg.${id}.text`) }));
+}
 
 const WEEKDAY_RE = /\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)\b/i;
 // Deliberately narrow: bare words like "closed" or "adjustment" also occur in
@@ -151,8 +145,8 @@ function parseDateRef(text: string, today: string): { date: string; phrase: stri
 
 function holidayChips(): Chip[] {
   return [
-    { label: "Record Calendar", action: { type: "navigate", route: "/calendar" } },
-    { label: "Holiday calendar (Master Data)", action: { type: "navigate", route: "/master-data" } },
+    { label: t("ai.chip.calendar"), action: { type: "navigate", route: "/calendar" } },
+    { label: t("ai.chip.holidayMaster"), action: { type: "navigate", route: "/master-data" } },
   ];
 }
 
@@ -408,7 +402,10 @@ function listDocumentsAnswer(text: string, isDemo: boolean): LocalAnswer | null 
     .sort((a, b) => compareISO(a.dueDate, b.dueDate) || a.documentId.localeCompare(b.documentId));
 
   const scopeLabel = docs.length === 1 ? docs[0].name : docs.length > 0 ? `${docs.length} matching documents` : "matching documents";
-  const calendarChip: Chip = { label: "Open Calendar", action: { type: "navigate", route: `/calendar/${fromISODate(range.from).getFullYear()}/${fromISODate(range.from).getMonth()}` } };
+  const calendarChip: Chip = {
+    label: t("ai.chip.openCalendar"),
+    action: { type: "navigate", route: `/calendar/${fromISODate(range.from).getFullYear()}/${fromISODate(range.from).getMonth()}` },
+  };
 
   if (records.length === 0) {
     return {
@@ -430,7 +427,7 @@ function listDocumentsAnswer(text: string, isDemo: boolean): LocalAnswer | null 
 
   const chips: Chip[] = [];
   if (shown.length === 1) {
-    chips.push({ label: "Open it", action: { type: "navigate", route: routeForRecord(documentRepository.getById(shown[0].documentId), shown[0].id) }, tone: "primary" });
+    chips.push({ label: t("ai.chip.openIt"), action: { type: "navigate", route: routeForRecord(documentRepository.getById(shown[0].documentId), shown[0].id) }, tone: "primary" });
   } else if (shown.length <= 6) {
     for (const r of shown) chips.push({ label: formatDisplayDate(r.dueDate), action: { type: "navigate", route: routeForRecord(documentRepository.getById(r.documentId), r.id) } });
   } else {
@@ -501,8 +498,8 @@ export function localAnswer(message: string, isDemo: boolean, userName?: string)
     return {
       reply: `${formatDisplayDate(today)}${dayNote}: ${due.length} record${due.length === 1 ? "" : "s"} due — ${done} done, ${open} still open.${prepared}`,
       chips: [
-        { label: "Open today", action: { type: "navigate", route: `/day/${today}` }, tone: "primary" },
-        { label: "Today's briefing", action: { type: "briefing" } },
+        { label: t("ai.chip.openToday"), action: { type: "navigate", route: `/day/${today}` }, tone: "primary" },
+        { label: t("ai.chip.briefing"), action: { type: "briefing" } },
       ],
     };
   }
@@ -530,9 +527,9 @@ export function localAnswer(message: string, isDemo: boolean, userName?: string)
     return {
       reply: `I can take you anywhere in the app in plain words ("show me August's reports", "open the rat / mice service reports"), list a document's records for a date range ("daily pest control monitoring record from 1 to 19 January", "pest records for September"), fill in a record you have open ("checker is Ramesh, time 9:15"), tell you what's due and what I've already prepared, and answer calendar questions — holidays, the ${off} weekly off, adjustment days. I stick to this record system only — I'm not a general chatbot, so anything outside this software I'll politely decline. Text only, no voice.`,
       chips: [
-        { label: "What's due today?", action: { type: "navigate", route: `/day/${today}` } },
-        { label: "Pest Control", action: { type: "navigate", route: "/pest-control" } },
-        { label: "This month's reports", action: { type: "navigate", route: "/reports" } },
+        { label: t("ai.chip.dueToday"), action: { type: "navigate", route: `/day/${today}` } },
+        { label: t("ai.chip.pestControl"), action: { type: "navigate", route: "/pest-control" } },
+        { label: t("ai.chip.monthReports"), action: { type: "navigate", route: "/reports" } },
       ],
     };
   }

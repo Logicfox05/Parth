@@ -1,13 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
-import { FiMessageSquare, FiPlus, FiSend, FiTrash2, FiZap } from "react-icons/fi";
+import { FiMessageSquare, FiMic, FiMicOff, FiPlus, FiSend, FiTrash2, FiVolume2, FiVolumeX, FiZap } from "react-icons/fi";
 import { ApiError, assistantApi } from "../api/client";
 import { useAuth } from "../store/AuthContext";
 import { useAppStore } from "../store/AppStore";
 import { isValidAppRoute, useRouter } from "../store/router";
 import { readJSON, writeJSON } from "../data/storageAdapter";
-import { buildAssistantContext, localAnswer, SUGGESTED_PROMPTS } from "../engine/assistantLocal";
+import { settingsRepository } from "../data/repositories/settingsRepository";
+import { buildAssistantContext, localAnswer, suggestedPrompts } from "../engine/assistantLocal";
 import type { Chip } from "../engine/guidedChecklist";
 import { openBriefing } from "../components/common/AssistantBriefingPopup";
+import { useLanguage, useT } from "../i18n";
+import { SPEECH_LOCALES } from "../i18n/strings";
+import { isSpeechOutputSupported, isVoiceInputSupported, listenOnce, speak, stopSpeaking, type VoiceSession } from "../utils/speech";
 import { generateId } from "../utils/id";
 import { formatDisplayDate, toISODate, todayISO } from "../utils/date";
 
@@ -16,18 +20,25 @@ import { formatDisplayDate, toISODate, todayISO } from "../utils/date";
 const MAX_MESSAGE_CHARS = 2000;
 
 // THE ASSISTANT, FULL PAGE — the same assistant as the floating widget, laid
-// out like a chat app: conversations on the left, the thread in the middle,
-// a composer at the bottom, suggested questions when a chat is empty. Text
-// only — there is deliberately no voice / microphone control. Conversations
-// are kept in this browser (localStorage) so a chat survives navigating away
-// (the assistant will happily take you to another screen mid-conversation)
-// and coming back.
+// out like a chat app: conversations on the left, the thread in the middle, a
+// composer at the bottom, suggested questions when a chat is empty.
+// Conversations are kept in this browser (localStorage) so a chat survives
+// navigating away (the assistant will happily take you to another screen
+// mid-conversation) and coming back.
+//
+// Voice: press the microphone and speak — the browser's own speech
+// recognition turns it into text, which then follows exactly the same path as
+// anything typed (nothing is sent anywhere extra). Replies to a spoken
+// question are read back aloud, and the speaker button turns that on for
+// typed questions too. Both listen and speak follow the interface language
+// (English or Gujarati). Where the browser has no speech recognition (Firefox)
+// the microphone explains itself instead of failing silently.
 //
 // Answers come from two places: a few intents are answered on the client
 // instantly (holidays / weekly off / adjustment days, what's due, the
-// briefing, help — see engine/assistantLocal.ts); everything else goes to
-// /api/assistant/chat with a digest of live facts attached, so the model can
-// answer from the app's own data.
+// briefing, out-of-scope questions, help — see engine/assistantLocal.ts);
+// everything else goes to /api/assistant/chat with a digest of live facts
+// attached, so the model can answer from the app's own data.
 
 interface StoredMessage {
   id: string;
@@ -79,6 +90,8 @@ export function AssistantPage() {
   const { user } = useAuth();
   const { mode, currentUser } = useAppStore();
   const { navigate } = useRouter();
+  const { lang } = useLanguage();
+  const t = useT();
   const isDemo = mode === "demo";
   const [state, setState] = useState<StoredState>(loadState);
   const [input, setInput] = useState("");
@@ -87,10 +100,17 @@ export function AssistantPage() {
   // is only shown there, and that conversation can't be deleted from under
   // its own pending reply.
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
+  const [voiceNote, setVoiceNote] = useState<string | null>(null);
+  const [speakReplies, setSpeakReplies] = useState(() => settingsRepository.get().speakReplies);
   const logRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const sessionRef = useRef<VoiceSession | null>(null);
   const firstName = (user?.name ?? currentUser).trim().split(/\s+/)[0];
   const active = state.conversations.find((c) => c.id === state.activeId) ?? null;
+  const voiceSupported = isVoiceInputSupported();
+  const speechSupported = isSpeechOutputSupported();
+  const speechLocale = SPEECH_LOCALES[lang];
 
   useEffect(() => {
     writeJSON(STORE_KEY, state);
@@ -105,12 +125,21 @@ export function AssistantPage() {
     inputRef.current?.focus();
   }, [state.activeId]);
 
+  // Leaving the page must not leave the microphone open or a reply still
+  // being read out.
+  useEffect(() => {
+    return () => {
+      sessionRef.current?.stop();
+      stopSpeaking();
+    };
+  }, []);
+
   const createConversation = (): string => {
     const id = generateId("conv");
     const now = new Date().toISOString();
     setState((s) => ({
       activeId: id,
-      conversations: [{ id, title: "New chat", createdAt: now, updatedAt: now, messages: [] }, ...s.conversations].slice(0, MAX_CONVERSATIONS),
+      conversations: [{ id, title: t("ai.newChat"), createdAt: now, updatedAt: now, messages: [] }, ...s.conversations].slice(0, MAX_CONVERSATIONS),
     }));
     return id;
   };
@@ -131,7 +160,9 @@ export function AssistantPage() {
           : {
               ...c,
               updatedAt: msg.at,
-              title: c.title === "New chat" && msg.role === "user" ? msg.text.slice(0, 48) : c.title,
+              // A conversation is named after its first real message — in
+              // whichever language that chat was started in.
+              title: !c.messages.some((m) => m.role === "user") && msg.role === "user" ? msg.text.slice(0, 48) : c.title,
               // Older chips are retired once the conversation moves on — the
               // same rule as the widget, so a stale "Open" button can't act
               // on an outdated answer.
@@ -148,17 +179,25 @@ export function AssistantPage() {
     else if (a.type === "focusInput") inputRef.current?.focus();
   };
 
-  const send = async (raw?: string) => {
+  // `spoken` = the question arrived by voice, so the reply is read back even
+  // when "read replies aloud" is off — answering out loud is the whole point
+  // of having asked out loud.
+  const send = async (raw?: string, spoken = false) => {
     const text = (raw ?? input).trim().slice(0, MAX_MESSAGE_CHARS);
     if (!text || loading) return;
     setInput("");
+    setVoiceNote(null);
     const convId = active?.id ?? createConversation();
     const stamp = () => new Date().toISOString();
+    const readOut = (reply: string) => {
+      if (spoken || speakReplies) speak(reply, speechLocale);
+    };
     append(convId, { id: generateId("msg"), role: "user", text, at: stamp() });
 
     const local = localAnswer(text, isDemo, user?.name);
     if (local) {
       append(convId, { id: generateId("msg"), role: "bot", text: local.reply, at: stamp(), chips: local.chips });
+      readOut(local.reply);
       return;
     }
 
@@ -170,6 +209,7 @@ export function AssistantPage() {
         today: todayISO(),
         currentRoute: "/assistant",
         context: buildAssistantContext(isDemo, user?.name),
+        language: lang,
       });
       if (result.action === "navigate" && result.route && isValidAppRoute(result.route)) {
         append(convId, {
@@ -177,17 +217,19 @@ export function AssistantPage() {
           role: "bot",
           text: result.reply,
           at: stamp(),
-          chips: [{ label: "Open it again", action: { type: "navigate", route: result.route } }],
+          chips: [{ label: t("ai.openItAgain"), action: { type: "navigate", route: result.route } }],
         });
+        readOut(result.reply);
         navigate(result.route);
         return;
       }
       append(convId, { id: generateId("msg"), role: "bot", text: result.reply, at: stamp() });
+      readOut(result.reply);
     } catch (err) {
       append(convId, {
         id: generateId("msg"),
         role: "bot",
-        text: err instanceof ApiError ? err.message : "Sorry — something went wrong on my end. Try again in a moment.",
+        text: err instanceof ApiError ? err.message : t("ai.error"),
         at: stamp(),
       });
     } finally {
@@ -196,17 +238,57 @@ export function AssistantPage() {
     }
   };
 
+  const toggleListening = () => {
+    if (listening) {
+      sessionRef.current?.stop();
+      sessionRef.current = null;
+      setListening(false);
+      return;
+    }
+    if (!voiceSupported) {
+      setVoiceNote(t("ai.voiceUnsupported"));
+      return;
+    }
+    stopSpeaking();
+    setVoiceNote(null);
+    setListening(true);
+    sessionRef.current = listenOnce({
+      lang: speechLocale,
+      onResult: (transcript) => {
+        // Straight into the same send() as a typed message — voice is an
+        // input method, not a separate assistant.
+        void send(transcript, true);
+      },
+      onError: (kind) => setVoiceNote(kind === "denied" ? t("ai.voiceDenied") : t("ai.voiceError")),
+      onEnd: () => {
+        sessionRef.current = null;
+        setListening(false);
+      },
+    });
+  };
+
+  const toggleSpeakReplies = () => {
+    const next = !speakReplies;
+    setSpeakReplies(next);
+    settingsRepository.update({ speakReplies: next });
+    if (!next) stopSpeaking();
+  };
+
   return (
     <div className={`assistant-page ${isDemo ? "demo-watermark" : ""}`}>
       <aside className="assistant-side card">
         <div className="assistant-side-head">
-          <span className="text-sm font-semibold">Conversations</span>
-          <button className="btn btn-primary btn-sm" onClick={() => createConversation()} aria-label="New chat">
-            <FiPlus size={13} /> New chat
+          <span className="text-sm font-semibold">{t("ai.conversations")}</span>
+          <button className="btn btn-primary btn-sm" onClick={() => createConversation()} aria-label={t("ai.newChat")}>
+            <FiPlus size={13} /> {t("ai.newChat")}
           </button>
         </div>
         <div className="assistant-side-list">
-          {state.conversations.length === 0 && <div className="text-xs text-faint" style={{ padding: "10px 12px" }}>No conversations yet — ask anything below.</div>}
+          {state.conversations.length === 0 && (
+            <div className="text-xs text-faint" style={{ padding: "10px 12px" }}>
+              {t("ai.noConversations")}
+            </div>
+          )}
           {state.conversations.map((c) => (
             <div key={c.id} className={`assistant-conv ${c.id === state.activeId ? "active" : ""}`} onClick={() => setState((s) => ({ ...s, activeId: c.id }))}>
               <div style={{ minWidth: 0, flex: 1 }}>
@@ -215,8 +297,8 @@ export function AssistantPage() {
               </div>
               <button
                 className="btn btn-ghost btn-sm btn-icon"
-                aria-label="Delete conversation"
-                title={c.id === pendingId ? "Waiting for a reply — try again in a moment" : "Delete conversation"}
+                aria-label={t("ai.deleteConversation")}
+                title={t("ai.deleteConversation")}
                 disabled={c.id === pendingId}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -235,22 +317,33 @@ export function AssistantPage() {
           <span className="chat-avatar" style={{ width: 30, height: 30 }}>
             <FiZap size={14} />
           </span>
-          <div style={{ minWidth: 0 }}>
-            <div className="font-semibold">Assistant</div>
-            <div className="text-xs text-muted truncate">Ask, navigate, fill — in plain words. Knows today's work, the leave calendar and every register. This system only; text only.</div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="font-semibold">{t("ai.title")}</div>
+            <div className="text-xs text-muted truncate">{t("ai.headerSubtitle")}</div>
           </div>
+          {speechSupported && (
+            <button
+              className={`btn btn-ghost btn-sm btn-icon ${speakReplies ? "voice-on" : ""}`}
+              data-action="speak-replies"
+              onClick={toggleSpeakReplies}
+              aria-label={speakReplies ? t("ai.muteReplies") : t("ai.speakReplies")}
+              title={speakReplies ? t("ai.muteReplies") : t("ai.speakReplies")}
+              aria-pressed={speakReplies}
+            >
+              {speakReplies ? <FiVolume2 size={15} /> : <FiVolumeX size={15} />}
+            </button>
+          )}
         </header>
 
         <div ref={logRef} className="assistant-log chat-log">
           {(!active || active.messages.length === 0) && (
             <div className="assistant-welcome">
-              <h2 className="text-xl mb-1">Hi {firstName} 👋</h2>
+              <h2 className="text-xl mb-1">{t("ai.greeting", { name: firstName })}</h2>
               <p className="text-muted mb-4" style={{ maxWidth: 560 }}>
-                I'm your buddy for this system. Ask me what's due, where something is, whether a day is a holiday, or tell me what happened and I'll fill it in. I answer about this
-                software and its records only — anything outside it I'll politely decline. Pick a question to start, or type your own.
+                {t("ai.welcome")}
               </p>
               <div className="assistant-suggestions">
-                {SUGGESTED_PROMPTS.map((p) => (
+                {suggestedPrompts().map((p) => (
                   <button key={p.title} type="button" className="assistant-suggestion" onClick={() => send(p.text)}>
                     <FiMessageSquare size={13} className="text-faint" />
                     <span>
@@ -291,13 +384,25 @@ export function AssistantPage() {
           )}
         </div>
 
+        {(listening || voiceNote) && (
+          <div className={`assistant-voice-note ${listening ? "listening" : ""}`}>
+            {listening ? (
+              <>
+                <span className="voice-pulse" /> {t("ai.listening")}
+              </>
+            ) : (
+              voiceNote
+            )}
+          </div>
+        )}
+
         <div className="assistant-composer">
           <textarea
             ref={inputRef}
             className="input assistant-input"
             rows={2}
             maxLength={MAX_MESSAGE_CHARS}
-            placeholder="Message the assistant… (Enter to send, Shift+Enter for a new line)"
+            placeholder={t("ai.composerPlaceholder")}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -308,13 +413,25 @@ export function AssistantPage() {
             }}
             disabled={loading}
           />
-          <button className="btn btn-primary" onClick={() => send()} disabled={loading || !input.trim()} aria-label="Send message">
-            <FiSend size={14} /> Send
+          {/* data-action is a stable hook for tests and shortcuts: the
+              aria-label is translated, so it can't be selected on. */}
+          <button
+            className={`btn ${listening ? "btn-danger" : "btn-secondary"}`}
+            data-action="voice"
+            onClick={toggleListening}
+            disabled={loading}
+            aria-label={listening ? t("ai.stopVoice") : t("ai.startVoice")}
+            title={voiceSupported ? (listening ? t("ai.stopVoice") : t("ai.startVoice")) : t("ai.voiceUnsupported")}
+            aria-pressed={listening}
+          >
+            {listening ? <FiMicOff size={14} /> : <FiMic size={14} />} {t("ai.speak")}
+          </button>
+          <button className="btn btn-primary" data-action="send" onClick={() => send()} disabled={loading || !input.trim()} aria-label={t("ai.send")}>
+            <FiSend size={14} /> {t("ai.send")}
           </button>
         </div>
         <div className="text-xs text-faint" style={{ padding: "0 16px 12px" }}>
-          Answers cover this record system only — not general questions. Text only, no voice input. Conversations are saved in this browser. The assistant never submits or verifies
-          anything by itself.
+          {t("ai.footer")}
         </div>
       </section>
     </div>

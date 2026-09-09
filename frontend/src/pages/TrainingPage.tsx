@@ -16,10 +16,12 @@ import { formatDisplayDate, todayISO } from "../utils/date";
 import { DocumentHeader } from "../components/documents/DocumentHeader";
 import { PreparedBanner } from "../components/records/PreparedBanner";
 import { reprepareRecord } from "../engine/assistantPrepare";
+import { useT } from "../i18n";
 
 const TRAINING_DOC_ID = "training-record";
 
 export function TrainingListPage() {
+  const t = useT();
   const { mode, bump } = useAppStore();
   const { navigate } = useRouter();
   const isDemo = mode === "demo";
@@ -56,7 +58,7 @@ export function TrainingListPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl mb-1">Training Records</h1>
+          <h1 className="text-2xl mb-1">{t("training.title")}</h1>
           <p className="text-muted">{doc.description}</p>
         </div>
         <button className="btn btn-primary" onClick={createNew}>

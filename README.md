@@ -68,6 +68,21 @@ The app behaves like a personal assistant rather than a blank form:
   Source / Unit / Target Pest / Year / Jan–Dec / Total layout; **Training & Reference** — Training
   Records, Chemical Master, SOP. The assistant navigates there from plain speech ("show me the rat
   reports", "fly catcher infestation for this year").
+- **Two languages — English and ગુજરાતી — chosen on the Dashboard.** The whole interface switches
+  instantly, on every page: navigation, headings, buttons, statuses, tabs, the assistant's own
+  wording. It's remembered per browser and also reachable from the top bar. What deliberately does
+  **not** translate is the controlled documents' own text — format numbers (F/HR/17), the printed
+  check points transcribed verbatim from the paper form, the licence and its terms, the Statements of
+  Compliance — because translating a controlled record's wording would break the traceability the
+  system exists to provide. (The Gujarati F/QC/13 in-process sheet stays Gujarati either way.) Ask
+  the assistant something in Gujarati and it answers in Gujarati.
+- **The assistant listens and talks.** Press the microphone on the Assistant page (or in the floating
+  widget) and speak — the browser's own speech recognition turns it into text, which then follows
+  exactly the same path as anything typed, so nothing is sent anywhere extra. A question asked out
+  loud is answered out loud; the speaker button turns that on for typed questions too. Both follow the
+  chosen language (Indian English or Gujarati). Chrome and Edge support it; where a browser doesn't
+  (Firefox), the button says so instead of failing silently. Listening is always press-to-talk — the
+  microphone is never left open.
 - **The assistant only answers about this software.** It is a tool for operating this record system,
   not a general chatbot: ask it something outside the system — general knowledge, news, weather, a
   joke, a poem, coding or medical/legal advice — and it politely declines and offers what it can do

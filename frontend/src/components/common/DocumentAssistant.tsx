@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { FiMessageCircle, FiMove, FiSend, FiX, FiZap } from "react-icons/fi";
+import { FiMessageCircle, FiMic, FiMicOff, FiMove, FiSend, FiX, FiZap } from "react-icons/fi";
 import { ApiError, assistantApi } from "../../api/client";
 import { useAssistantTarget } from "../../store/AssistantContext";
 import { useAuth } from "../../store/AuthContext";
@@ -22,6 +22,10 @@ import {
   type GuidedStep,
 } from "../../engine/guidedChecklist";
 import { buildAssistantContext, localAnswer, offTopicReply } from "../../engine/assistantLocal";
+import { useLanguage, useT } from "../../i18n";
+import { SPEECH_LOCALES } from "../../i18n/strings";
+import { settingsRepository } from "../../data/repositories/settingsRepository";
+import { isVoiceInputSupported, listenOnce, speak, stopSpeaking, type VoiceSession } from "../../utils/speech";
 import { formatDisplayDate, todayISO } from "../../utils/date";
 import { generateId } from "../../utils/id";
 import { openBriefing } from "./AssistantBriefingPopup";
@@ -44,7 +48,6 @@ const PLACEHOLDER_BY_KIND: Record<string, string> = {
   gap: "e.g. Found a gap near the loading dock, corrective action: install a net, target 20 Sept",
   training: "e.g. Training on 3 Sept, topic pest control basics, trainer ABC Pest Solutions",
 };
-const DEFAULT_PLACEHOLDER = "Ask me about this system — \"show August's reports\", \"open CAPA\"…";
 
 interface ChatMessage {
   id: string;
@@ -69,7 +72,11 @@ export function DocumentAssistant() {
   const { user } = useAuth();
   const { version, currentUser, mode } = useAppStore();
   const { path, navigate } = useRouter();
+  const { lang } = useLanguage();
+  const t = useT();
   const isDemo = mode === "demo";
+  const speechLocale = SPEECH_LOCALES[lang];
+  const voiceSupported = isVoiceInputSupported();
 
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -78,6 +85,8 @@ export function DocumentAssistant() {
   const [guided, setGuided] = useState<{ step: GuidedStep; prompt: GuidedPrompt } | null>(null);
   const [pickingDate, setPickingDate] = useState(false);
   const [awaitingSendBackReason, setAwaitingSendBackReason] = useState(false);
+  const [listening, setListening] = useState(false);
+  const sessionRef = useRef<VoiceSession | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const startedRef = useRef<Set<string>>(new Set());
@@ -291,23 +300,38 @@ export function DocumentAssistant() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Never leave the microphone open or a reply mid-sentence when the widget
+  // unmounts (navigating to the full-page Assistant does exactly that).
+  useEffect(() => {
+    return () => {
+      sessionRef.current?.stop();
+      stopSpeaking();
+    };
+  }, []);
+
   // ---- sending free text ---------------------------------------------------
-  const send = async () => {
-    const text = input.trim();
+  // `spoken` = the question came in by voice, so the answer is read back even
+  // when "read replies aloud" is off.
+  const send = async (raw?: string, spoken = false) => {
+    const text = (raw ?? input).trim();
     if (!text || loading) return;
     setInput("");
-    const t = getTarget();
+    const t2 = getTarget();
+    const speakReplies = settingsRepository.get().speakReplies;
+    const readOut = (reply: string) => {
+      if (spoken || speakReplies) speak(reply, speechLocale);
+    };
 
-    if (awaitingSendBackReason && t?.checklist) {
+    if (awaitingSendBackReason && t2?.checklist) {
       me(text);
       setAwaitingSendBackReason(false);
-      t.checklist.sendBack(text);
+      t2.checklist.sendBack(text);
       bot("Sent back with your note. It's back with whoever prepared it.");
       return;
     }
 
     const g = guidedRef.current;
-    if (g && t?.checklist) {
+    if (g && t2?.checklist) {
       if (g.prompt.freeText === "header") {
         answerGuided({ type: "text", text }, text);
         return;
@@ -316,7 +340,7 @@ export function DocumentAssistant() {
         me(text);
         setLoading(true);
         try {
-          const activity = t.checklist.getData().sections[g.step.sectionIndex].items[g.step.itemIndex].activity;
+          const activity = t2.checklist.getData().sections[g.step.sectionIndex].items[g.step.itemIndex].activity;
           const parsed = await assistantApi.checklistAnswer(activity, text, todayISO());
           answerGuided({ type: "parsed", ...parsed });
         } catch {
@@ -342,9 +366,10 @@ export function DocumentAssistant() {
       /\?\s*$/.test(text) || /^(is|was|are|were|when|which|what|who|how|do|does|did|can|could|will|tell me|list|show|give me|i want|find|get me)\b/i.test(text);
     // With a record open, free text is normally data to fill in — but an
     // out-of-scope message never is, so it is declined either way.
-    const local = !t || looksLikeQuestion ? localAnswer(text, isDemo, user?.name) : offTopicReply(text);
+    const local = !t2 || looksLikeQuestion ? localAnswer(text, isDemo, user?.name) : offTopicReply(text);
     if (local) {
       bot(local.reply, local.chips);
+      readOut(local.reply);
       return;
     }
     setLoading(true);
@@ -353,31 +378,59 @@ export function DocumentAssistant() {
         message: text,
         today: todayISO(),
         currentRoute: path,
-        documentKind: t?.documentKind,
-        currentData: t?.currentData,
+        documentKind: t2?.documentKind,
+        currentData: t2?.currentData,
         context: buildAssistantContext(isDemo, user?.name),
+        language: lang,
       });
-      if (result.action === "fill" && t) {
+      if (result.action === "fill" && t2) {
         const fields = Object.keys(result.patch ?? {});
         if (fields.length === 0) {
           bot("Hmm, I couldn't pick anything out of that — mind rephrasing?");
         } else {
-          t.onApply(result.patch ?? {});
+          t2.onApply(result.patch ?? {});
           bot(`${result.reply}\nI've filled in ${fields.join(", ")} — take a look and Save when it's right.`);
         }
+        readOut(result.reply);
         return;
       }
       if (result.action === "navigate" && result.route && isValidAppRoute(result.route)) {
         bot(result.reply);
+        readOut(result.reply);
         navigate(result.route);
         return;
       }
       bot(result.reply);
+      readOut(result.reply);
     } catch (err) {
-      bot(err instanceof ApiError ? err.message : "Sorry, something went wrong on my end — try again in a moment.");
+      bot(err instanceof ApiError ? err.message : t("ai.error"));
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleListening = () => {
+    if (listening) {
+      sessionRef.current?.stop();
+      sessionRef.current = null;
+      setListening(false);
+      return;
+    }
+    if (!voiceSupported) {
+      bot(t("ai.voiceUnsupported"));
+      return;
+    }
+    stopSpeaking();
+    setListening(true);
+    sessionRef.current = listenOnce({
+      lang: speechLocale,
+      onResult: (transcript) => void send(transcript, true),
+      onError: (kind) => bot(kind === "denied" ? t("ai.voiceDenied") : t("ai.voiceError")),
+      onEnd: () => {
+        sessionRef.current = null;
+        setListening(false);
+      },
+    });
   };
 
   const describeDocument = () => {
@@ -395,9 +448,9 @@ export function DocumentAssistant() {
       : guided.prompt.freeText === "header"
         ? "Type it here"
         : "Tap an answer above, or ask me something else"
-    : (targetKind && PLACEHOLDER_BY_KIND[targetKind]) || DEFAULT_PLACEHOLDER;
+    : (targetKind && PLACEHOLDER_BY_KIND[targetKind]) || t("ai.defaultPlaceholder");
 
-  const subtitle = getTarget()?.checklist?.title ?? (hasTarget ? "A record is open — tell me what to fill in" : "Ask, navigate, fill — this system only");
+  const subtitle = getTarget()?.checklist?.title ?? (hasTarget ? t("ai.recordOpenSubtitle") : t("ai.widgetSubtitle"));
 
   // The full-page Assistant IS the chat on that screen — two chat boxes
   // would just be confusing. (After every hook above, so the hook order is
@@ -415,7 +468,7 @@ export function DocumentAssistant() {
           }}
           {...dragHandleProps}
         >
-          <FiMessageCircle size={15} /> Ask the assistant
+          <FiMessageCircle size={15} /> {t("ai.widgetOpen")}
         </button>
       )}
       {open && (
@@ -434,7 +487,7 @@ export function DocumentAssistant() {
               </span>
               <div style={{ minWidth: 0 }}>
                 <div className="text-sm font-semibold flex items-center gap-1">
-                  Assistant <FiMove size={10} className="text-faint" />
+                  {t("ai.title")} <FiMove size={10} className="text-faint" />
                 </div>
                 <div className="text-xs text-muted truncate" style={{ maxWidth: 250 }}>
                   {subtitle}
@@ -447,6 +500,16 @@ export function DocumentAssistant() {
                   ?
                 </button>
               )}
+              <button
+                className={`btn btn-ghost btn-sm btn-icon ${listening ? "voice-on" : ""}`}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={toggleListening}
+                aria-label={listening ? t("ai.stopVoice") : t("ai.startVoice")}
+                title={voiceSupported ? (listening ? t("ai.stopVoice") : t("ai.startVoice")) : t("ai.voiceUnsupported")}
+                aria-pressed={listening}
+              >
+                {listening ? <FiMicOff size={14} /> : <FiMic size={14} />}
+              </button>
               <button className="btn btn-ghost btn-sm" onPointerDown={(e) => e.stopPropagation()} onClick={() => setOpen(false)} aria-label="Close assistant">
                 <FiX size={14} />
               </button>
@@ -522,7 +585,7 @@ export function DocumentAssistant() {
                 }}
                 disabled={loading}
               />
-              <button className="btn btn-primary btn-sm" style={{ alignSelf: "stretch" }} onClick={send} disabled={loading || !input.trim()} aria-label="Send">
+              <button className="btn btn-primary btn-sm" style={{ alignSelf: "stretch" }} onClick={() => send()} disabled={loading || !input.trim()} aria-label="Send">
                 <FiSend size={13} />
               </button>
             </div>

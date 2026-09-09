@@ -243,7 +243,7 @@ const ROUTE_RE = /^\/[a-z0-9/_-]*$/i;
 
 app.post("/api/assistant/chat", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = (req as AuthedRequest).user.id;
-  const { message, today, currentRoute, documentKind, currentData, context } = req.body ?? {};
+  const { message, today, currentRoute, documentKind, currentData, context, language } = req.body ?? {};
 
   if (typeof message !== "string" || !message.trim()) {
     res.status(400).json({ error: "Message is required." });
@@ -282,6 +282,10 @@ app.post("/api/assistant/chat", requireAuth, async (req: Request, res: Response)
     res.status(400).json({ error: "context must be a short string." });
     return;
   }
+  if (language !== undefined && language !== "en" && language !== "gu") {
+    res.status(400).json({ error: "Unsupported language." });
+    return;
+  }
   if (isAssistantThrottled(userId)) {
     res.status(429).json({ error: "Too many assistant requests. Try again in a few minutes." });
     return;
@@ -289,7 +293,7 @@ app.post("/api/assistant/chat", requireAuth, async (req: Request, res: Response)
 
   recordAssistantCall(userId);
   try {
-    const result = await runAssistant({ message: message.trim(), today, currentRoute, documentKind, currentData, context });
+    const result = await runAssistant({ message: message.trim(), today, currentRoute, documentKind, currentData, context, language });
     res.json(result);
   } catch (err) {
     // Log the real detail server-side (may include a vendor error body from

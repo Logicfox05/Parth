@@ -220,6 +220,7 @@ export async function runAssistant({
   documentKind,
   currentData,
   context,
+  language,
 }: {
   message: string;
   today: string;
@@ -231,6 +232,10 @@ export async function runAssistant({
   // what's due) — see frontend/src/engine/assistantLocal.ts. Capped by the
   // route handler.
   context?: string;
+  // "en" | "gu" — the interface language the user is working in. Only the
+  // prose in `reply` follows it; routes, field keys and record values are
+  // identifiers and stay exactly as the app defines them.
+  language?: string;
 }): Promise<AssistantResult> {
   if (typeof message !== "string" || !message.trim()) throw new Error("Message is required.");
 
@@ -256,6 +261,12 @@ export async function runAssistant({
       'can do here. Greetings, thanks and "what can you do?" are in scope — answer warmly in one line.',
     ].join(" "),
     `Today's date is ${today} (ISO). The user is currently on the app route "${currentRoute}".`,
+    // The plant is in Mehsana, Gujarat; the shop floor works in Gujarati.
+    // Only the prose changes — routes, field keys and stored values are
+    // identifiers the app parses, and must stay exactly as specified.
+    language === "gu"
+      ? 'The user is working in Gujarati. Write the "reply" text in Gujarati (ગુજરાતી), in simple everyday language. Keep document format numbers (F/HR/17), route paths, JSON field names and any value you put in "patch" exactly as specified in English — translate only the sentence you show the user.'
+      : "",
     ROUTE_GUIDE,
     context && context.trim()
       ? `Live facts from the app right now — rely on these for anything about dates, holidays, the weekly off, adjustment days or what is due, and never contradict them:\n${context.trim()}`

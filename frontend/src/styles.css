@@ -159,6 +159,24 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   .licence-scan { break-inside: avoid; }
 }
 
+/* ---- Language switcher (Dashboard + top bar) ---- */
+.lang-select { width: auto; min-width: 104px; }
+.dash-language { text-align: right; }
+.dash-language .pill-tabs { justify-content: flex-end; }
+
+/* ---- Voice controls (assistant page + widget) ---- */
+.btn.voice-on { color: var(--color-danger); }
+.assistant-voice-note {
+  display: flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 12.5px;
+  color: var(--color-text-muted); border-top: 1px solid var(--color-border); background: var(--color-surface-alt);
+}
+.assistant-voice-note.listening { color: var(--color-danger); }
+.voice-pulse { width: 9px; height: 9px; border-radius: 50%; background: var(--color-danger); animation: voice-pulse 1.1s ease-in-out infinite; flex-shrink: 0; }
+@keyframes voice-pulse {
+  0%, 100% { transform: scale(0.75); opacity: 0.55; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
 /* The full-page Assistant (pages/AssistantPage.tsx) — chat-app layout */
 .assistant-page { display: flex; gap: 16px; height: calc(100vh - 58px - 44px - 60px); min-height: 520px; }
 .assistant-side { width: 250px; flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden; }

@@ -3,26 +3,25 @@ import { FiUser, FiPlayCircle, FiCheckCircle, FiLogOut, FiZap } from "react-icon
 import { useAppStore } from "../../store/AppStore";
 import { useAuth } from "../../store/AuthContext";
 import { useRouter } from "../../store/router";
+import { useT } from "../../i18n";
 import { NotificationBell } from "./NotificationBell";
+import { LanguageSwitcher } from "../common/LanguageSwitcher";
 import { openBriefing } from "../common/AssistantBriefingPopup";
 
 export function Topbar() {
   const { mode, setMode } = useAppStore();
   const { user, logout } = useAuth();
   const { navigate } = useRouter();
+  const t = useT();
 
   return (
     <>
       <div className="app-topbar no-print">
         <div className="flex items-center gap-3">
           <div className="pill-tabs">
-            <div
-              className={`pill-tab ${mode === "live" ? "active" : ""}`}
-              onClick={() => setMode("live")}
-              title="Live Mode: actual company operation"
-            >
+            <div className={`pill-tab ${mode === "live" ? "active" : ""}`} onClick={() => setMode("live")} title={t("top.liveModeTitle")}>
               <FiCheckCircle size={13} style={{ marginRight: 5, verticalAlign: -2 }} />
-              Live Mode
+              {t("top.liveMode")}
             </div>
             <div
               className={`pill-tab ${mode === "demo" ? "active" : ""}`}
@@ -30,33 +29,32 @@ export function Topbar() {
                 setMode("demo");
                 navigate("/demo");
               }}
-              title="Demo Mode: synthetic data for testing & demonstrations"
+              title={t("top.demoModeTitle")}
             >
               <FiPlayCircle size={13} style={{ marginRight: 5, verticalAlign: -2 }} />
-              Demo Mode
+              {t("top.demoMode")}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button className="btn btn-secondary btn-sm" onClick={openBriefing} title="What has your assistant prepared for you today?">
-            <FiZap size={13} /> Today's briefing
+          {/* The full picker lives on the Dashboard; this keeps it reachable
+              from every other screen without hunting for it. */}
+          <LanguageSwitcher variant="compact" />
+          <button className="btn btn-secondary btn-sm" onClick={openBriefing} title={t("top.briefingTitle")}>
+            <FiZap size={13} /> {t("top.todaysBriefing")}
           </button>
           <NotificationBell />
           <div className="flex items-center gap-2" title={user?.email}>
             <FiUser size={15} className="text-muted" />
             <span className="text-sm font-semibold">{user?.name}</span>
-            {user?.role === "admin" && <span className="badge badge-Verified">Admin</span>}
+            {user?.role === "admin" && <span className="badge badge-Verified">{t("top.admin")}</span>}
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={() => logout()} title="Log out">
-            <FiLogOut size={13} /> Log Out
+          <button className="btn btn-ghost btn-sm" onClick={() => logout()} title={t("top.logOut")}>
+            <FiLogOut size={13} /> {t("top.logOut")}
           </button>
         </div>
       </div>
-      <div className={`mode-banner no-print ${mode}`}>
-        {mode === "demo"
-          ? "DEMO MODE — records shown/created here are synthetic test data, not real company records."
-          : "LIVE MODE — actual company operation. Records here are real controlled records."}
-      </div>
+      <div className={`mode-banner no-print ${mode}`}>{mode === "demo" ? t("top.demoBanner") : t("top.liveBanner")}</div>
     </>
   );
 }

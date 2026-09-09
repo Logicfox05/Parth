@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { FiCalendar, FiCheckCircle, FiClock, FiAlertTriangle, FiBookOpen, FiArrowRight, FiZap, FiTrash2, FiX } from "react-icons/fi";
+import { FiCalendar, FiCheckCircle, FiClock, FiAlertTriangle, FiBookOpen, FiArrowRight, FiZap, FiTrash2, FiX, FiGlobe } from "react-icons/fi";
 import { useAppStore } from "../store/AppStore";
 import { useAuth } from "../store/AuthContext";
 import { useRouter } from "../store/router";
@@ -15,6 +15,8 @@ import { ensureDemoRecordsGeneratedForYear } from "../data/demoGenerator";
 import { openCorrectiveActionsCount, refreshGapFindingStatuses, moduleSummaries, rodentsInMonth } from "../data/selectors";
 import { masterRepository } from "../data/repositories/masterRepository";
 import { dayInfo, upcomingHolidays, weeklyOffDay, WEEKDAY_LONG } from "../engine/holidays";
+import { useT } from "../i18n";
+import { LanguageSwitcher } from "../components/common/LanguageSwitcher";
 import { todayISO, formatDisplayDate, MONTH_NAMES } from "../utils/date";
 import { StatusBadge } from "../components/common/StatusBadge";
 import { DemoTag } from "../components/common/DemoTag";
@@ -48,6 +50,7 @@ export function DashboardPage() {
   const { mode, version, bump } = useAppStore();
   const { user } = useAuth();
   const { navigate } = useRouter();
+  const t = useT();
   const isDemo = mode === "demo";
   const today = todayISO();
   const now = new Date();
@@ -124,7 +127,7 @@ export function DashboardPage() {
     <div className={isDemo ? "demo-watermark" : ""}>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl">Digital Controlled Record System</h1>
+          <h1 className="text-2xl">{t("dash.title")}</h1>
           <p className="text-muted mt-1">
             {formatDisplayDate(today)} · {todayInfo.weekday}
             {todayInfo.kind !== "working" && (
@@ -132,19 +135,31 @@ export function DashboardPage() {
                 {todayInfo.short}
               </span>
             )}{" "}
-            · Gujarat Printpack Publication Pvt. Ltd. — Pest Control · Lamination QC & Production · Compliance
+            · {t("dash.company")}
           </p>
           {nextHolidays.length > 0 && (
             <p className="text-xs text-faint mt-1">
-              Next on the leave calendar:{" "}
-              {nextHolidays.map((h) => `${h.kind === "adjustment" ? "adjustment (working) day" : h.name} ${formatDisplayDate(h.date)} (${h.weekday.slice(0, 3)})`).join(" · ")} · weekly off every{" "}
-              {WEEKDAY_LONG[weeklyOffDay(master)]}
+              {t("dash.nextOnLeaveCalendar")}{" "}
+              {nextHolidays
+                .map((h) => `${h.kind === "adjustment" ? t("dash.adjustmentWorkingDay") : h.name} ${formatDisplayDate(h.date)} (${h.weekday.slice(0, 3)})`)
+                .join(" · ")}{" "}
+              · {t("dash.weeklyOffEvery")} {WEEKDAY_LONG[weeklyOffDay(master)]}
             </p>
           )}
         </div>
-        <button className="btn btn-primary" onClick={() => navigate("/calendar")}>
-          <FiCalendar size={15} /> Open Calendar
-        </button>
+        <div className="flex items-center gap-3 wrap" style={{ justifyContent: "flex-end" }}>
+          {/* The language choice lives here, on the Dashboard, and applies to
+              every screen the moment it changes. */}
+          <div className="dash-language">
+            <div className="text-xs text-muted mb-1 flex items-center gap-1">
+              <FiGlobe size={11} /> {t("common.language")}
+            </div>
+            <LanguageSwitcher />
+          </div>
+          <button className="btn btn-primary" onClick={() => navigate("/calendar")}>
+            <FiCalendar size={15} /> {t("dash.openCalendar")}
+          </button>
+        </div>
       </div>
 
       {!isDemo && !noiseDismissed && (noiseCount > 0 || purged !== null) && (
@@ -194,41 +209,43 @@ export function DashboardPage() {
                 <FiZap size={17} />
               </div>
               <div>
-                <div className="font-semibold">{briefing.greeting} Here's where today stands.</div>
+                <div className="font-semibold">
+                  {briefing.greeting} {t("dash.heresWhereTodayStands")}
+                </div>
                 <div className="text-sm text-muted mt-1">{briefingHeadline(briefing)}</div>
               </div>
             </div>
             <div className="flex gap-2">
               {briefing.ready.length > 0 && (
                 <button className="btn btn-secondary btn-sm" onClick={() => navigate(briefing.ready[0].route)}>
-                  Review first record <FiArrowRight size={12} />
+                  {t("dash.reviewFirstRecord")} <FiArrowRight size={12} />
                 </button>
               )}
               <button className="btn btn-primary btn-sm" onClick={openBriefing}>
-                <FiZap size={12} /> Open briefing
+                <FiZap size={12} /> {t("dash.openBriefing")}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <h3 className="text-sm uppercase text-muted mb-2">Today</h3>
+      <h3 className="text-sm uppercase text-muted mb-2">{t("dash.today")}</h3>
       <div className="flex gap-3 wrap mb-6">
-        <StatTile icon={FiClock} value={stats.dueToday} label="Records Due Today" />
-        <StatTile icon={FiCheckCircle} value={stats.completedToday} label="Records Completed Today" tone="var(--color-success)" />
-        <StatTile icon={FiAlertTriangle} value={stats.pendingVerification} label="Pending Verification" tone="var(--color-warning)" />
-        <StatTile icon={FiAlertTriangle} value={stats.openCorrective} label="Open Corrective Actions" tone="var(--color-danger)" />
+        <StatTile icon={FiClock} value={stats.dueToday} label={t("dash.dueToday")} />
+        <StatTile icon={FiCheckCircle} value={stats.completedToday} label={t("dash.completedToday")} tone="var(--color-success)" />
+        <StatTile icon={FiAlertTriangle} value={stats.pendingVerification} label={t("dash.pendingVerification")} tone="var(--color-warning)" />
+        <StatTile icon={FiAlertTriangle} value={stats.openCorrective} label={t("dash.openCorrective")} tone="var(--color-danger)" />
       </div>
 
       <h3 className="text-sm uppercase text-muted mb-2">
-        This Month — {MONTH_NAMES[now.getMonth()]} {now.getFullYear()}
+        {t("dash.thisMonth")} — {MONTH_NAMES[now.getMonth()]} {now.getFullYear()}
       </h3>
       <div className="flex gap-3 wrap mb-6">
-        <StatTile icon={FiBookOpen} value={stats.month.total} label="Total Records" />
-        <StatTile icon={FiCheckCircle} value={stats.month.completed} label="Completed Records" tone="var(--color-success)" />
-        <StatTile icon={FiClock} value={stats.month.pending} label="Pending Records" tone="var(--color-info)" />
-        <StatTile icon={FiAlertTriangle} value={stats.month.overdue} label="Overdue Records" tone="var(--color-danger)" />
-        <StatTile icon={FiAlertTriangle} value={stats.rodentsThisMonth} label="Rodents Trapped This Month" tone={stats.rodentsThisMonth ? "var(--color-danger)" : "var(--color-success)"} />
+        <StatTile icon={FiBookOpen} value={stats.month.total} label={t("dash.totalRecords")} />
+        <StatTile icon={FiCheckCircle} value={stats.month.completed} label={t("dash.completedRecords")} tone="var(--color-success)" />
+        <StatTile icon={FiClock} value={stats.month.pending} label={t("dash.pendingRecords")} tone="var(--color-info)" />
+        <StatTile icon={FiAlertTriangle} value={stats.month.overdue} label={t("dash.overdueRecords")} tone="var(--color-danger)" />
+        <StatTile icon={FiAlertTriangle} value={stats.rodentsThisMonth} label={t("dash.rodentsThisMonth")} tone={stats.rodentsThisMonth ? "var(--color-danger)" : "var(--color-success)"} />
       </div>
 
       <div className="flex gap-4 wrap" style={{ alignItems: "flex-start" }}>
@@ -238,15 +255,17 @@ export function DashboardPage() {
             table scrolling internally within its flex-basis. */}
         <div className="card" style={{ flex: "2 1 420px", minWidth: 0 }}>
           <div className="card-header">
-            <h3 className="text-lg">Records Due Today</h3>
-            <span className="text-muted text-sm">{dueTodayRecords.length} record(s)</span>
+            <h3 className="text-lg">{t("dash.recordsDueToday")}</h3>
+            <span className="text-muted text-sm">
+              {dueTodayRecords.length} {t("common.records")}
+            </span>
           </div>
           <div className="doc-table" style={{ border: "none" }}>
             <table>
               <thead>
                 <tr>
-                  <th>Document</th>
-                  <th>Status</th>
+                  <th>{t("common.document")}</th>
+                  <th>{t("common.status")}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -254,7 +273,7 @@ export function DashboardPage() {
                 {dueTodayRecords.length === 0 && (
                   <tr>
                     <td colSpan={3} className="text-muted text-center" style={{ padding: 20 }}>
-                      No records due today.
+                      {t("dash.noRecordsDueToday")}
                     </td>
                   </tr>
                 )}
@@ -270,7 +289,7 @@ export function DashboardPage() {
                         </div>
                         {prepared && (
                           <span className="prepared-chip mt-1">
-                            <FiZap size={9} /> Prepared — review &amp; submit
+                            <FiZap size={9} /> {t("dash.preparedReview")}
                           </span>
                         )}
                       </td>
@@ -279,7 +298,7 @@ export function DashboardPage() {
                       </td>
                       <td style={{ textAlign: "right" }}>
                         <button className="btn btn-ghost btn-sm" onClick={() => navigate(route)}>
-                          Open <FiArrowRight size={13} />
+                          {t("common.open")} <FiArrowRight size={13} />
                         </button>
                       </td>
                     </tr>
@@ -292,7 +311,7 @@ export function DashboardPage() {
 
         <div className="card" style={{ flex: "1 1 260px", minWidth: 0 }}>
           <div className="card-header">
-            <h3 className="text-lg">Modules</h3>
+            <h3 className="text-lg">{t("dash.modules")}</h3>
           </div>
           <div className="card-pad">
             {modules.map((m) => (
@@ -303,10 +322,12 @@ export function DashboardPage() {
                 onClick={() => navigate("/library")}
               >
                 <div>
-                  <div className="font-semibold">{m.module}</div>
-                  <div className="text-muted text-xs">{m.documentCount} document(s) identified</div>
+                  <div className="font-semibold">{t(`module.${m.module}`)}</div>
+                  <div className="text-muted text-xs">
+                    {m.documentCount} {t("dash.documentsConfigured")}
+                  </div>
                 </div>
-                <span className="badge badge-Verified">{m.configuredCount} Configured</span>
+                <span className="badge badge-Verified">{m.configuredCount}</span>
               </div>
             ))}
           </div>

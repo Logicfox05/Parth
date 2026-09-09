@@ -7,8 +7,10 @@ import { masterRepository } from "../data/repositories/masterRepository";
 import { ensureRecordsGeneratedForMonth } from "../engine/recordGenerator";
 import { dayInfo, weeklyOffDay, WEEKDAY_LONG } from "../engine/holidays";
 import { daysInMonth, MONTH_NAMES, pad2, todayISO, WEEKDAY_NAMES } from "../utils/date";
+import { useT } from "../i18n";
 
 export function CalendarPage({ year, month }: { year?: number; month?: number }) {
+  const t = useT();
   const now = new Date();
   const [y, setY] = useState(year ?? now.getFullYear());
   const [m, setM] = useState(month !== undefined ? month : now.getMonth());
@@ -66,7 +68,7 @@ export function CalendarPage({ year, month }: { year?: number; month?: number })
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl mb-1">Record Calendar</h1>
+          <h1 className="text-2xl mb-1">{t("cal.title")}</h1>
           <p className="text-muted">
             Select a date to view records due, completed, pending or overdue. {offDay}s are the weekly off; festival holidays and adjustment (working) days follow the
             Gujarat Print Pack Leave Calendar 2026 — anything scheduled on a closed day is due the next working day.

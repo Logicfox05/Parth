@@ -192,7 +192,7 @@ def main():
         pace(page)
         before = page_bubbles.count()
         page.fill("textarea.assistant-input", "which day of the week is our weekly off? answer in one line")
-        page.click("button[aria-label='Send message']")
+        page.click("button[data-action='send']")
         wait_for_reply(page, page_bubbles, before)
         page_reply = page_bubbles.last.inner_text()
         print(f"    (assistant page replied: {ascii_safe(page_reply[:160])!r}; url now {page.url})")

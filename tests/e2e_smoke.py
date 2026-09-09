@@ -554,25 +554,37 @@ def main():
             "Assistant page opens from the sidebar with suggestions and a composer",
             "#/assistant" in page.url and page.locator(".assistant-suggestion").count() >= 4 and page.locator("textarea.assistant-input").count() == 1,
         )
+        # Voice: press-to-talk on the composer, and a speaker toggle for
+        # reading replies aloud. Chromium exposes webkitSpeechRecognition, so
+        # the control is live here; actually speaking can't be driven from a
+        # headless browser, so this checks it is present, labelled and does
+        # not break the page (utils/speech.ts).
         check(
-            "Assistant page has no voice / microphone control",
-            page.locator(".assistant-page button[aria-label*='oice']").count() == 0 and page.locator(".assistant-page button[aria-label*='icrophone']").count() == 0,
+            "Assistant page offers voice input (press-to-talk) and a read-aloud toggle",
+            page.locator("button[data-action='voice']").count() == 1 and page.locator("button[data-action='speak-replies']").count() == 1,
         )
+        page.locator("button[data-action='voice']").click()
+        page.wait_for_timeout(400)
+        check("Pressing the microphone starts listening (or explains why it can't)", page.locator(".assistant-voice-note").count() == 1)
+        # Stop listening again so the mic isn't left open for the rest of the run.
+        if page.locator("button[data-action='voice'][aria-pressed='true']").count():
+            page.locator("button[data-action='voice'][aria-pressed='true']").click()
+            page.wait_for_timeout(200)
         # Fixed dates, so the expected wording never depends on the day the
         # suite happens to run: 10-Sep-2026 is a Thursday (weekly off),
         # 22-Oct-2026 a Thursday the plant works (adjustment day).
         page.fill("textarea.assistant-input", "is 2026-09-10 a holiday?")
-        page.click("button[aria-label='Send message']")
+        page.click("button[data-action='send']")
         page.wait_for_timeout(500)
         reply = page.locator(".assistant-page .chat-msg.bot").last.inner_text().lower()
         check("Assistant answers a weekly-off date from the working calendar (no network needed)", "weekly off" in reply and "thursday" in reply)
         page.fill("textarea.assistant-input", "is 2026-10-22 a holiday?")
-        page.click("button[aria-label='Send message']")
+        page.click("button[data-action='send']")
         page.wait_for_timeout(500)
         reply_adj = page.locator(".assistant-page .chat-msg.bot").last.inner_text().lower()
         check("Assistant explains an adjustment day as a working Thursday", "adjustment day" in reply_adj and "working day" in reply_adj)
         page.fill("textarea.assistant-input", "when is the next company holiday?")
-        page.click("button[aria-label='Send message']")
+        page.click("button[data-action='send']")
         page.wait_for_timeout(500)
         reply2 = page.locator(".assistant-page .chat-msg.bot").last.inner_text().lower()
         check("Assistant lists what's next on the leave calendar (or says the year's list is done) and names the weekly off", "weekly off" in reply2 and ("coming up" in reply2 or "no festival holidays" in reply2))
@@ -590,7 +602,7 @@ def main():
         # file) always has a Daily Pest Control Monitoring Record by now — it
         # was opened, filled and submitted in section 3.
         page.fill("textarea.assistant-input", f"show me daily pest control monitoring record documents from {WORK_DAY} to {WORK_DAY}")
-        page.click("button[aria-label='Send message']")
+        page.click("button[data-action='send']")
         page.wait_for_timeout(500)
         reply_single = page.locator(".assistant-page .chat-msg.bot").last.inner_text()
         check(
@@ -601,7 +613,7 @@ def main():
         # exactly that span's count of days, never a full month's worth.
         span_end = date.fromisoformat(WORK_DAY) + timedelta(days=6)
         page.fill("textarea.assistant-input", f"i want pest control records from {WORK_DAY} to {span_end.isoformat()}")
-        page.click("button[aria-label='Send message']")
+        page.click("button[data-action='send']")
         page.wait_for_timeout(500)
         reply_span = page.locator(".assistant-page .chat-msg.bot").last.inner_text()
         check(
@@ -614,7 +626,7 @@ def main():
         # model carries the same rule for everything else (its SCOPE block in
         # backend/assistant.ts, exercised in e2e_assistant_chat.py).
         page.fill("textarea.assistant-input", "tell me a joke")
-        page.click("button[aria-label='Send message']")
+        page.click("button[data-action='send']")
         page.wait_for_timeout(500)
         reply_off = page.locator(".assistant-page .chat-msg.bot").last.inner_text()
         check("Assistant declines a general (non-software) question", "only cover this Digital Controlled Record System" in reply_off)
@@ -622,7 +634,7 @@ def main():
         # Name-dropping a pest-control word doesn't make a general request in
         # scope — it's the request that's judged, not the keywords.
         page.fill("textarea.assistant-input", "write me a poem about rodents")
-        page.click("button[aria-label='Send message']")
+        page.click("button[data-action='send']")
         page.wait_for_timeout(500)
         check(
             "A general request that mentions a pest-control word is still declined",
@@ -631,12 +643,40 @@ def main():
         # ...and the scope guard must not over-block: the very next in-scope
         # question is answered normally.
         page.fill("textarea.assistant-input", "is 2026-09-10 a holiday?")
-        page.click("button[aria-label='Send message']")
+        page.click("button[data-action='send']")
         page.wait_for_timeout(500)
         check(
             "An in-scope question straight after is still answered normally (scope guard does not over-block)",
             "weekly off" in page.locator(".assistant-page .chat-msg.bot").last.inner_text().lower(),
         )
+
+        # ---- 15d. Language: English / Gujarati across every page ----
+        # The choice lives on the Dashboard and applies app-wide immediately —
+        # nothing to reload (src/i18n, wired through AppStore).
+        page.click("a[href='#/dashboard']")
+        page.wait_for_timeout(400)
+        check("Dashboard offers both languages", page.locator(".dash-language .pill-tab[data-lang='en']").count() == 1 and page.locator(".dash-language .pill-tab[data-lang='gu']").count() == 1)
+        page.click(".dash-language .pill-tab[data-lang='gu']")
+        page.wait_for_timeout(400)
+        check("Choosing Gujarati translates the Dashboard", "ડેશબોર્ડ" in page.locator(".app-sidebar").inner_text() and "આજે" in page.locator(".app-content").inner_text())
+        check("...and the sidebar's module names", "જીવાત નિયંત્રણ" in page.locator(".app-sidebar").inner_text())
+        check("...and the top bar / mode banner", "લાઇવ મોડ" in page.locator(".mode-banner").inner_text())
+        page.goto(f"{BASE}/index.html#/pest/daily")
+        page.wait_for_timeout(500)
+        pest_gu = page.locator(".app-content").inner_text()
+        check("Other pages follow the same language without a reload", "દૈનિક રિપોર્ટ" in pest_gu)
+        check("Controlled document text (F/HR/17 and its check points) stays exactly as issued", "F/HR/17" in pest_gu and "Total number of rodent traps provided" in pest_gu)
+        page.goto(f"{BASE}/index.html#/calendar")
+        page.wait_for_timeout(400)
+        check("The Record Calendar is translated too", "રેકોર્ડ કેલેન્ડર" in page.locator(".app-content").inner_text())
+        # Back to English for the remaining checks (and so a re-run starts clean).
+        page.click("a[href='#/dashboard']")
+        page.wait_for_timeout(300)
+        page.click(".dash-language .pill-tab[data-lang='en']")
+        page.wait_for_timeout(300)
+        check("Switching back to English restores it everywhere", "Dashboard" in page.locator(".app-sidebar").inner_text())
+        page.goto(f"{BASE}/index.html#/assistant")
+        page.wait_for_timeout(300)
 
         # Regression guard for "a generic reports request must still reach the
         # model to navigate, not get hijacked by this local intent" lives in

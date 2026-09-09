@@ -5,6 +5,7 @@ import { documentRepository } from "../data/repositories/documentRepository";
 import { allGapFindings, openCorrectiveActionsCount } from "../data/selectors";
 import { formatDisplayDate, pad2, todayISO } from "../utils/date";
 import { DemoTag } from "../components/common/DemoTag";
+import { useT } from "../i18n";
 
 // The three document kinds that represent an actual pest-control inspection
 // / monitoring visit (as opposed to CAPA, training, or reference material).
@@ -22,6 +23,7 @@ interface Stage {
 // here relies on GapFinding.status === "Verified", which this app never
 // actually sets (confirmed by code search), so it would always read 0.
 export function ProcessFlowPage() {
+  const t = useT();
   const { mode } = useAppStore();
   const isDemo = mode === "demo";
   const now = new Date();
@@ -72,7 +74,7 @@ export function ProcessFlowPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-2xl mb-1">Process Flow</h1>
+        <h1 className="text-2xl mb-1">{t("flow.title")}</h1>
         {isDemo && <DemoTag />}
       </div>
       <p className="text-muted mb-4">

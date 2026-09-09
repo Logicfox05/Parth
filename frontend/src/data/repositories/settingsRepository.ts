@@ -1,4 +1,5 @@
 import { readJSON, writeJSON } from "../storageAdapter";
+import type { Language } from "../../i18n/strings";
 
 export type AppMode = "live" | "demo";
 
@@ -25,12 +26,21 @@ export interface AppSettings {
   // obligations for dates the digital system didn't exist yet (see
   // engine/backlogCleanup.ts for cleaning up any that already got created).
   liveStartDate: string | null;
+  // Interface language (Dashboard → Language, and the top bar). Controlled
+  // document text is never translated — see src/i18n/strings.ts.
+  language: Language;
+  // Read the assistant's replies aloud after a voice question (the user can
+  // turn it on for typed messages too). Voice input itself is always
+  // press-to-talk, never left listening.
+  speakReplies: boolean;
 }
 
 const KEY = "settings";
 
 const DEFAULTS: AppSettings = {
   mode: "live",
+  language: "en",
+  speakReplies: false,
   workdayStart: "09:00",
   workdayEnd: "18:00",
   briefingShown: { date: "", slots: [] },

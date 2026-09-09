@@ -8,6 +8,7 @@ import { formatDisplayDate } from "../utils/date";
 import { StatusBadge } from "../components/common/StatusBadge";
 import { DemoTag } from "../components/common/DemoTag";
 import { routeForRecord } from "../engine/reminders";
+import { useT } from "../i18n";
 import type {
   ComplaintChecklistData,
   DailyPestMonitoringData,
@@ -109,6 +110,7 @@ function buildIndex(isDemo: boolean): SearchRow[] {
 }
 
 export function SearchPage() {
+  const t = useT();
   const { mode } = useAppStore();
   const { navigate } = useRouter();
   const [q, setQ] = useState("");
@@ -119,7 +121,7 @@ export function SearchPage() {
 
   return (
     <div>
-      <h1 className="text-2xl mb-1">Search</h1>
+      <h1 className="text-2xl mb-1">{t("search.title")}</h1>
       <p className="text-muted mb-4">
         Search by record ID, document, format no., date, area, employee, checker, PC ID, job name, PO number, batch number or status.
       </p>

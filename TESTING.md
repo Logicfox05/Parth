@@ -43,7 +43,7 @@ python tests/e2e_assistant_chat.py # needs backend/.env's GROQ_API_KEY to actual
 Both scripts now sign up a fresh, randomly-emailed account at the start of the run (the app gates
 every page behind login — see `frontend/src/main.tsx`/`AuthProvider`) before exercising the rest of the app.
 
-## Results (last full run — 09-Sep-2026, on the TypeScript-only backend/scripts, after the licence-held-as-supplied batch)
+## Results (last full run — 09-Sep-2026, on the TypeScript-only backend/scripts, after the Gujarati + voice-assistant batch)
 
 The run below is the production shape end to end: `frontend/scripts/build.ts` builds the bundle,
 `backend/index.ts` (run directly by Node 23.6, no compile step) serves it plus the API, and every
@@ -173,6 +173,37 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   Monitoring Summary, and prints as three pages. Checked by four new smoke assertions (3 register
   pages / 10 check points / 31 date rows; the format's instruction wording; the summary table; the
   Reports tab) and a re-targeted one (the pre-marked HOLIDAY row is now found by `tr[data-day]`).
+- **Two languages, English and ગુજરાતી** (09-Sep-2026). `src/i18n` holds one string table per
+  language — `en` is `as const` and defines the key set, `gu` is typed against it, so a missing
+  Gujarati string is a compile error, never a silent English fallback. The choice sits on the
+  Dashboard (and in the top bar) in `AppSettings.language`, held in `AppStore` so setting it
+  re-renders every screen at once: navigation, page titles, buttons, statuses, frequencies, module
+  names, report tabs, the calendar / Day View, the Pest Control pages, and the assistant's chrome,
+  briefing and canned replies. The backend is told the language too, so a Gujarati question gets a
+  Gujarati answer. **Controlled document text is deliberately excluded** — format numbers, the
+  verbatim check points, the licence, the SOCs — because translating a controlled record's wording
+  would break source-to-digital traceability (REQUIREMENTS §24). Checked by eight new smoke
+  assertions: both languages offered on the Dashboard; Gujarati translates the Dashboard, the
+  sidebar's module names and the mode banner; another page follows without a reload; **F/HR/17 and
+  "Total number of rodent traps provided" are still on screen in Gujarati** (the traceability
+  guard); the Calendar is translated; switching back restores English. Plus two visual-QA
+  screenshots (`21_dashboard_gujarati.png`, `22_pest_control_gujarati.png`), reviewed on screen —
+  the whole Dashboard reads correctly in Gujarati while the document titles stay as issued.
+- **A voice assistant** (09-Sep-2026), reversing the earlier "text only, no voice" decision at the
+  department's request. `src/utils/speech.ts` wraps the browser's Web Speech API: press-to-talk on
+  the Assistant page and in the floating widget, one utterance per press, the transcript handed
+  straight to the same `send()` a typed message uses (nothing extra leaves the browser), and the
+  reply read back — always for a spoken question, and for typed ones via the speaker toggle
+  (`AppSettings.speakReplies`). Both follow the chosen language (`en-IN` / `gu-IN`), and both stop
+  listening/speaking when the page is left. Where a browser has no recognition (Firefox) the control
+  explains itself instead of failing. Checked by two new smoke assertions (both controls present;
+  pressing the microphone produces a listening/explanation state without breaking the page) and one
+  visual-QA check with a screenshot; real speech can't be driven from headless Chromium, so that
+  part was verified by hand.
+- **Test selectors moved off translated text.** The Send / microphone / speaker buttons now carry
+  `data-action` hooks, because their `aria-label`s are (correctly) translated and a suite that
+  selects on user-visible English would break the moment someone switches language — which is
+  exactly how this surfaced: `button[aria-label='Send message']` timed out on the first run.
 - **The licence is held with no changes at all** (09-Sep-2026, on the department re-confirming it
   must stay exactly as supplied). The app previously showed only page *renderings* of the PDF; the
   supplied file itself is now served too, byte for byte — `frontend/public/source/gurudev-insecticide-licence.pdf`,
@@ -230,7 +261,7 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   Python's `print` raised `UnicodeEncodeError` mid-run. Labels are ASCII-only now (em dashes are
   fine in cp1252; arrows are not).
 
-### `e2e_smoke.py` — all 113 check sites passed (the "Section C / D / E is announced next" row runs three times, so 115 checks at run time), 0 unexpected console errors
+### `e2e_smoke.py` — all 122 check sites passed (the "Section C / D / E is announced next" row runs three times, so 124 checks at run time), 0 unexpected console errors
 
 | # | Check | Result |
 |---|---|---|
@@ -336,17 +367,26 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
 | 100 | Daily Report register pre-marks the next weekly-off Thursday as a HOLIDAY row | PASS |
 | 101 | Master Data shows the weekly off (Thursday) and the leave calendar's five adjustment days | PASS |
 | 102 | Assistant page opens from the sidebar with suggestions and a composer | PASS |
-| 103 | Assistant page has no voice / microphone control | PASS |
-| 104 | Assistant answers a weekly-off date from the working calendar (no network needed) | PASS |
-| 105 | Assistant explains an adjustment day as a working Thursday | PASS |
-| 106 | Assistant lists what's next on the leave calendar (or says the year's list is done) and names the weekly off | PASS |
-| 107 | Assistant conversation persists across a reload | PASS |
-| 108 | Assistant lists a document's records for an explicit single-day range, not the whole month | PASS |
-| 109 | Assistant scopes a module's listing to the exact multi-day span asked for | PASS |
-| 110 | Assistant declines a general (non-software) question | PASS |
-| 111 | Declining a general question does not navigate away | PASS |
-| 112 | A general request that mentions a pest-control word is still declined | PASS |
-| 113 | An in-scope question straight after is still answered normally (scope guard does not over-block) | PASS |
+| 103 | Assistant page offers voice input (press-to-talk) and a read-aloud toggle | PASS |
+| 104 | Pressing the microphone starts listening (or explains why it can't) | PASS |
+| 105 | Assistant answers a weekly-off date from the working calendar (no network needed) | PASS |
+| 106 | Assistant explains an adjustment day as a working Thursday | PASS |
+| 107 | Assistant lists what's next on the leave calendar (or says the year's list is done) and names the weekly off | PASS |
+| 108 | Assistant conversation persists across a reload | PASS |
+| 109 | Assistant lists a document's records for an explicit single-day range, not the whole month | PASS |
+| 110 | Assistant scopes a module's listing to the exact multi-day span asked for | PASS |
+| 111 | Assistant declines a general (non-software) question | PASS |
+| 112 | Declining a general question does not navigate away | PASS |
+| 113 | A general request that mentions a pest-control word is still declined | PASS |
+| 114 | An in-scope question straight after is still answered normally (scope guard does not over-block) | PASS |
+| 115 | Dashboard offers both languages | PASS |
+| 116 | Choosing Gujarati translates the Dashboard | PASS |
+| 117 | ...and the sidebar's module names | PASS |
+| 118 | ...and the top bar / mode banner | PASS |
+| 119 | Other pages follow the same language without a reload | PASS |
+| 120 | Controlled document text (F/HR/17 and its check points) stays exactly as issued | PASS |
+| 121 | The Record Calendar is translated too | PASS |
+| 122 | Switching back to English restores it everywhere | PASS |
 
 (One benign console entry — the pre-login `GET /api/auth/me` 401, expected on every fresh
 session — is filtered out of the "unexpected console errors" check rather than counted as a
@@ -360,7 +400,7 @@ it now deliberately fills the year so far on entering Demo Mode, so the check wa
 assert what the original bug was actually about: demo data exists and is real data, not blank
 shells.
 
-### `visual_qa.py` — 14/14 interaction checks passed (14 `check()` calls at run time), 0 JS errors
+### `visual_qa.py` — 16/16 interaction checks passed (16 `check()` calls at run time), 0 JS errors
 
 | # | Check | Result |
 |---|---|---|
@@ -374,10 +414,12 @@ shells.
 | 8 | Pest Control overview renders its four groups — Daily Report / Service Reports / Trend Analysis / Training & Reference (captured as `15_pest_control_overview.png`; the Fly Catcher Infestation page as `16_pest_fly_catcher_infestation.png`) | PASS |
 | 9 | Assistant page renders its suggestions and composer (captured as `17_assistant_page.png`; the October-2026 Record Calendar with its Weekly off / Working day chips as `18_calendar_october_holidays.png`) | PASS |
 | 10 | Licence page shows both scanned pages of the Form III licence (captured as `20_service_provider_licence.png`; the Daily Report in its F/HR/17 three-page register layout as `19_daily_register_fhr17.png`) | PASS |
-| 11 | SOC detail page renders | PASS |
-| 12 | Print media emulation renders a clean original-style layout (no sidebar/topbar/buttons) | PASS |
-| 13 | 24 full-page screenshots captured for visual review (`tests/shots/`) | PASS |
-| 14 | No JS errors across the whole pass | PASS |
+| 11 | Dashboard switches to Gujarati — the whole interface (captured as `21_dashboard_gujarati.png`; Pest Control in Gujarati as `22_pest_control_gujarati.png`) | PASS |
+| 12 | Assistant page shows voice input and a read-aloud toggle (captured as `23_assistant_voice.png`) | PASS |
+| 13 | SOC detail page renders | PASS |
+| 14 | Print media emulation renders a clean original-style layout (no sidebar/topbar/buttons) | PASS |
+| 15 | 27 full-page screenshots captured for visual review (`tests/shots/`) | PASS |
+| 16 | No JS errors across the whole pass | PASS |
 
 ### `e2e_assistant_chat.py` — 12/12 checks passed, 0 JS errors (real Groq calls, paced ~22 s apart)
 

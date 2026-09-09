@@ -17,6 +17,7 @@ import { useSetAssistantTarget } from "../store/AssistantContext";
 import { startGuidedChecklist } from "../components/common/DocumentAssistant";
 import { generateId } from "../utils/id";
 import { formatDisplayDate, todayISO } from "../utils/date";
+import { useT } from "../i18n";
 
 const GAP_DOC_ID = "gap-inspection";
 
@@ -24,6 +25,7 @@ const GAP_DOC_ID = "gap-inspection";
 // /gap — the CAPA module's front door: Internal or External.
 
 export function CapaHomePage() {
+  const t = useT();
   const { mode, version } = useAppStore();
   const { navigate } = useRouter();
   const isDemo = mode === "demo";
@@ -43,7 +45,7 @@ export function CapaHomePage() {
 
   return (
     <div>
-      <h1 className="text-2xl mb-1">CAPA (Corrective and Preventive Action)</h1>
+      <h1 className="text-2xl mb-1">{t("capa.title")}</h1>
       <p className="text-muted mb-5">Where did the issue come from? Pick one — the assistant takes it from there.</p>
 
       <div className="flex gap-4 wrap">

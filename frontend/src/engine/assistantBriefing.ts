@@ -10,6 +10,7 @@ import { computeReminders, routeForRecord } from "./reminders";
 import { submitRecord } from "./recordLifecycle";
 import { validateForSubmit } from "./validation";
 import { addDays, compareISO, formatDisplayDate, todayISO } from "../utils/date";
+import { t } from "../i18n";
 
 // THE LOGIN BRIEFING. Everything the assistant tells the user when they
 // arrive: what it prepared for them, what still needs a human, what's
@@ -65,7 +66,7 @@ function toItem(doc: DocumentDefinition, r: RecordInstance, errors: string[] = [
 
 export function greetingFor(name: string | undefined, now = new Date()): string {
   const h = now.getHours();
-  const part = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  const part = t(h < 12 ? "brief.morning" : h < 17 ? "brief.afternoon" : "brief.evening");
   const first = name?.trim().split(/\s+/)[0];
   return first ? `${part}, ${first}!` : `${part}!`;
 }
@@ -167,11 +168,11 @@ export function submitPreparedRecords(items: BriefingItem[], actorName: string):
 // dashboard card and the assistant widget so they never disagree.
 export function briefingHeadline(b: Briefing): string {
   const parts: string[] = [];
-  if (b.ready.length) parts.push(`${b.ready.length} record${b.ready.length === 1 ? " is" : "s are"} filled in and ready for your OK`);
-  if (b.needsInput.length) parts.push(`${b.needsInput.length} need${b.needsInput.length === 1 ? "s" : ""} a detail only you know`);
-  if (b.overdue.length) parts.push(`${b.overdue.length} still open from earlier`);
-  if (b.awaitingVerification.length) parts.push(`${b.awaitingVerification.length} waiting for verification`);
-  if (parts.length === 0) return "Everything is up to date — nothing is waiting on you right now.";
+  if (b.ready.length) parts.push(t("brief.ready", { n: b.ready.length }));
+  if (b.needsInput.length) parts.push(t("brief.needsInput", { n: b.needsInput.length }));
+  if (b.overdue.length) parts.push(t("brief.overdue", { n: b.overdue.length }));
+  if (b.awaitingVerification.length) parts.push(t("brief.awaiting", { n: b.awaitingVerification.length }));
+  if (parts.length === 0) return t("brief.allClear");
   return parts.join(", ") + ".";
 }
 

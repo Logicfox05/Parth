@@ -26,10 +26,13 @@ import {
 import type { IconType } from "react-icons";
 import { Link, useRouter } from "../../store/router";
 import { readJSON, writeJSON } from "../../data/storageAdapter";
+import { useT } from "../../i18n";
 
 interface NavItem {
   to: string;
-  label: string;
+  // Translation key — the label itself lives in src/i18n/strings.ts so the
+  // whole navigation changes with the language.
+  labelKey: string;
   icon: IconType;
 }
 
@@ -37,26 +40,28 @@ interface NavItem {
 // sub-headings — the Pest Control module uses these for the groups the
 // department itself thinks in (Daily Report / Service Reports / Trend
 // Analysis / Training & Reference).
-type NavEntry = NavItem | { heading: string };
-const isHeading = (e: NavEntry): e is { heading: string } => "heading" in e;
+type NavEntry = NavItem | { headingKey: string };
+const isHeading = (e: NavEntry): e is { headingKey: string } => "headingKey" in e;
 
 const NAV_MAIN: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: FiGrid },
-  // The assistant as a screen of its own (ChatGPT-style, text only) — the
-  // same assistant as the floating widget, see pages/AssistantPage.tsx.
-  { to: "/assistant", label: "Assistant", icon: FiMessageSquare },
-  { to: "/process-flow", label: "Process Flow", icon: FiGitBranch },
-  { to: "/library", label: "Document Library", icon: FiBookOpen },
-  { to: "/calendar", label: "Record Calendar", icon: FiCalendar },
-  { to: "/search", label: "Search", icon: FiSearch },
+  { to: "/dashboard", labelKey: "nav.dashboard", icon: FiGrid },
+  // The assistant as a screen of its own (ChatGPT-style, text and voice) —
+  // the same assistant as the floating widget, see pages/AssistantPage.tsx.
+  { to: "/assistant", labelKey: "nav.assistant", icon: FiMessageSquare },
+  { to: "/process-flow", labelKey: "nav.processFlow", icon: FiGitBranch },
+  { to: "/library", labelKey: "nav.documentLibrary", icon: FiBookOpen },
+  { to: "/calendar", labelKey: "nav.recordCalendar", icon: FiCalendar },
+  { to: "/search", labelKey: "nav.search", icon: FiSearch },
 ];
 
 // One collapsible section per module — this is the "close it and open it
 // like a navbar" grouping. Keys must match DocumentDefinition.module exactly
-// (see data/seed/documentDefinitions.ts); the /library/{slug} links use
-// moduleSlug() so they land on Document Library pre-filtered to that module,
-// which is how modules without their own dedicated list page (the lamination
-// log sheets, the QC inspection records) still get a real destination here.
+// (see data/seed/documentDefinitions.ts) — they are identifiers, not display
+// text; the visible name comes from t(`module.${module}`). The /library/{slug}
+// links use moduleSlug() so they land on Document Library pre-filtered to that
+// module, which is how modules without their own dedicated list page (the
+// lamination log sheets, the QC inspection records) still get a real
+// destination here.
 const MODULE_ORDER = [
   "Pest Control",
   "CAPA (Corrective & Preventive Action)",
@@ -72,42 +77,36 @@ const MODULE_LINKS: Record<(typeof MODULE_ORDER)[number], NavEntry[]> = {
   // Control's three service reports, the two trend analyses drawn from
   // them, and the training / reference material.
   "Pest Control": [
-    { to: "/pest-control", label: "Overview", icon: FiHome },
-    { heading: "Daily Report" },
-    { to: "/pest/daily", label: "Daily Pest Control Monitoring", icon: FiClipboard },
-    { heading: "Service Reports" },
-    { to: "/pest/service/rodent", label: "Rat / Mice — Rodent Control", icon: FiTruck },
-    { to: "/pest/service/general", label: "Ants & Cockroaches — General Pest", icon: FiTruck },
-    { to: "/pest/service/fly", label: "Fly Control", icon: FiTruck },
-    { heading: "Trend Analysis" },
-    { to: "/pest/trend/rodent", label: "Rodent Catch Trend", icon: FiTrendingUp },
-    { to: "/pest/trend/fly-catcher", label: "Fly Catcher Infestation", icon: FiActivity },
-    { heading: "Training & Reference" },
-    { to: "/training", label: "Training Records", icon: FiAward },
-    { to: "/chemical-master", label: "Chemical Master", icon: FiDroplet },
-    { to: "/sop", label: "SOP Reference", icon: FiFileText },
-    { to: "/licence", label: "Service Provider Licence", icon: FiShield },
+    { to: "/pest-control", labelKey: "nav.overview", icon: FiHome },
+    { headingKey: "nav.dailyReport" },
+    { to: "/pest/daily", labelKey: "nav.dailyPestMonitoring", icon: FiClipboard },
+    { headingKey: "nav.serviceReports" },
+    { to: "/pest/service/rodent", labelKey: "nav.ratMice", icon: FiTruck },
+    { to: "/pest/service/general", labelKey: "nav.antsCockroaches", icon: FiTruck },
+    { to: "/pest/service/fly", labelKey: "nav.flyControl", icon: FiTruck },
+    { headingKey: "nav.trendAnalysis" },
+    { to: "/pest/trend/rodent", labelKey: "nav.rodentTrend", icon: FiTrendingUp },
+    { to: "/pest/trend/fly-catcher", labelKey: "nav.flyCatcherInfestation", icon: FiActivity },
+    { headingKey: "nav.trainingReference" },
+    { to: "/training", labelKey: "nav.trainingRecords", icon: FiAward },
+    { to: "/chemical-master", labelKey: "nav.chemicalMaster", icon: FiDroplet },
+    { to: "/sop", labelKey: "nav.sopReference", icon: FiFileText },
+    { to: "/licence", labelKey: "nav.licence", icon: FiShield },
   ],
   "CAPA (Corrective & Preventive Action)": [
-    { to: "/gap/internal", label: "Internal — Inspection Findings", icon: FiAlertCircle },
-    { to: "/gap/external", label: "External — Customer Complaints", icon: FiUsers },
+    { to: "/gap/internal", labelKey: "nav.capaInternal", icon: FiAlertCircle },
+    { to: "/gap/external", labelKey: "nav.capaExternal", icon: FiUsers },
   ],
-  "Lamination — Quality Control": [
-    { to: "/library/lamination-quality-control", label: "Lamination QC Documents", icon: FiBookOpen },
-  ],
-  "Lamination — Production": [
-    { to: "/library/lamination-production", label: "Lamination Production Documents", icon: FiBookOpen },
-  ],
-  "Quality Control — Inspection Records": [
-    { to: "/library/quality-control-inspection-records", label: "Inspection Record Documents", icon: FiBookOpen },
-  ],
-  "Quality — Compliance": [{ to: "/soc", label: "Statements of Compliance", icon: FiShield }],
+  "Lamination — Quality Control": [{ to: "/library/lamination-quality-control", labelKey: "nav.laminationQcDocs", icon: FiBookOpen }],
+  "Lamination — Production": [{ to: "/library/lamination-production", labelKey: "nav.laminationProductionDocs", icon: FiBookOpen }],
+  "Quality Control — Inspection Records": [{ to: "/library/quality-control-inspection-records", labelKey: "nav.inspectionRecordDocs", icon: FiBookOpen }],
+  "Quality — Compliance": [{ to: "/soc", labelKey: "nav.statementsOfCompliance", icon: FiShield }],
 };
 
 const NAV_SYSTEM: NavItem[] = [
-  { to: "/reports", label: "Reports", icon: FiBarChart2 },
-  { to: "/master-data", label: "Master Data", icon: FiDatabase },
-  { to: "/demo", label: "Demo Mode", icon: FiPlayCircle },
+  { to: "/reports", labelKey: "nav.reports", icon: FiBarChart2 },
+  { to: "/master-data", labelKey: "nav.masterData", icon: FiDatabase },
+  { to: "/demo", labelKey: "nav.demoMode", icon: FiPlayCircle },
 ];
 
 const SIDEBAR_STATE_KEY = "sidebar-open-modules";
@@ -117,13 +116,14 @@ function loadOpenState(): Record<string, boolean> {
 }
 
 function NavGroup({ items, path }: { items: NavEntry[]; path: string }) {
+  const t = useT();
   return (
     <>
       {items.map((item, i) => {
         if (isHeading(item)) {
           return (
             <div key={`heading-${i}`} className="nav-sub-label">
-              {item.heading}
+              {t(item.headingKey)}
             </div>
           );
         }
@@ -131,7 +131,7 @@ function NavGroup({ items, path }: { items: NavEntry[]; path: string }) {
         const active = path === item.to || path.startsWith(item.to + "/");
         return (
           <Link key={item.to} to={item.to} className={active ? "active" : ""}>
-            <Icon size={16} /> {item.label}
+            <Icon size={16} /> {t(item.labelKey)}
           </Link>
         );
       })}
@@ -141,6 +141,7 @@ function NavGroup({ items, path }: { items: NavEntry[]; path: string }) {
 
 export function Sidebar() {
   const { path } = useRouter();
+  const t = useT();
   const [openState, setOpenState] = useState<Record<string, boolean>>(loadOpenState);
   // Undefined (never explicitly toggled) defaults to open — discoverable
   // without a click. Once a module has been explicitly opened or closed,
@@ -161,8 +162,8 @@ export function Sidebar() {
   return (
     <aside className="app-sidebar no-print">
       <div className="app-sidebar-brand">
-        <div className="title">Digital Controlled Record System</div>
-        <div className="subtitle">Gujarat Printpack Publication Pvt. Ltd. · Pest Control · Lamination QC & Production · Compliance</div>
+        <div className="title">{t("dash.title")}</div>
+        <div className="subtitle">{t("nav.brandSubtitle")}</div>
       </div>
       <nav className="app-nav">
         <NavGroup items={NAV_MAIN} path={path} />
@@ -173,7 +174,7 @@ export function Sidebar() {
             <div key={module} className="nav-module">
               <button type="button" className="nav-module-header" onClick={() => toggle(module)} aria-expanded={open}>
                 {open ? <FiChevronDown size={12} /> : <FiChevronRight size={12} />}
-                <span>{module}</span>
+                <span>{t(`module.${module}`)}</span>
               </button>
               {open && (
                 <div className="nav-module-body">
@@ -184,10 +185,10 @@ export function Sidebar() {
           );
         })}
 
-        <div className="nav-section-label">System</div>
+        <div className="nav-section-label">{t("nav.system")}</div>
         <NavGroup items={NAV_SYSTEM} path={path} />
       </nav>
-      <div className="app-sidebar-foot">Phase 1 Prototype · Local data only</div>
+      <div className="app-sidebar-foot">{t("nav.foot")}</div>
     </aside>
   );
 }

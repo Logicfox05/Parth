@@ -18,6 +18,7 @@ import { FlyCatcherTrendReport, RodentTrendReport } from "./ReportsPage";
 import { StatusBadge } from "../components/common/StatusBadge";
 import { DemoTag } from "../components/common/DemoTag";
 import { DailyRegisterSheet, FHR17_ORIGINAL_PAGES } from "../components/records/DailyRegisterSheet";
+import { useT } from "../i18n";
 import { MONTH_NAMES, WEEKDAY_NAMES, compareISO, daysInMonth, formatDisplayDate, fromISODate, pad2, todayISO } from "../utils/date";
 import type { DailyPestMonitoringData, DocumentDefinition, FlyCatcherData, RecordInstance, ServiceReportData, TrainingRecordData } from "../types";
 
@@ -135,6 +136,7 @@ function DocMeta({ doc }: { doc: DocumentDefinition }) {
 
 export function PestControlOverviewPage() {
   const { mode, version } = useAppStore();
+  const t = useT();
   const { navigate } = useRouter();
   const isDemo = mode === "demo";
   const today = todayISO();
@@ -169,9 +171,9 @@ export function PestControlOverviewPage() {
   return (
     <div className={isDemo ? "demo-watermark" : ""}>
       <div className="flex items-center justify-between mb-1 wrap gap-3">
-        <h1 className="text-2xl">Pest Control</h1>
+        <h1 className="text-2xl">{t("pest.title")}</h1>
         <button className="btn btn-secondary btn-sm" onClick={() => navigate("/library/pest-control")}>
-          <FiBookOpen size={13} /> All Pest Control documents
+          <FiBookOpen size={13} /> {t("pest.allDocuments")}
         </button>
       </div>
       <p className="text-muted mb-4">
@@ -185,7 +187,7 @@ export function PestControlOverviewPage() {
         <div className="card">
           <div className="card-header">
             <h3 className="text-base font-semibold">
-              <FiClipboard size={14} style={{ verticalAlign: -2 }} /> Daily Report
+              <FiClipboard size={14} style={{ verticalAlign: -2 }} /> {t("pest.dailyReportTitle")}
             </h3>
             <span className="badge badge-Due">Daily</span>
           </div>
@@ -215,10 +217,10 @@ export function PestControlOverviewPage() {
             </div>
             <div className="flex gap-2 wrap">
               <button className="btn btn-primary btn-sm" onClick={() => navigate(todayRecord ? `/record/${todayRecord.id}` : `/day/${today}`)}>
-                Open today's record <FiArrowRight size={12} />
+                {t("pest.openTodaysRecord")} <FiArrowRight size={12} />
               </button>
               <button className="btn btn-secondary btn-sm" onClick={() => navigate("/pest/daily")}>
-                <FiCalendar size={12} /> Month register
+                <FiCalendar size={12} /> {t("pest.monthRegister")}
               </button>
             </div>
           </div>
@@ -228,7 +230,7 @@ export function PestControlOverviewPage() {
         <div className="card">
           <div className="card-header">
             <h3 className="text-base font-semibold">
-              <FiTruck size={14} style={{ verticalAlign: -2 }} /> Service Reports
+              <FiTruck size={14} style={{ verticalAlign: -2 }} /> {t("pest.serviceReportsTitle")}
             </h3>
             <span className="badge badge-Due">Fortnightly</span>
           </div>
@@ -278,7 +280,7 @@ export function PestControlOverviewPage() {
         <div className="card">
           <div className="card-header">
             <h3 className="text-base font-semibold">
-              <FiTrendingUp size={14} style={{ verticalAlign: -2 }} /> Trend Analysis
+              <FiTrendingUp size={14} style={{ verticalAlign: -2 }} /> {t("pest.trendAnalysisTitle")}
             </h3>
             <span className="badge badge-Due">Monthly</span>
           </div>
@@ -310,7 +312,7 @@ export function PestControlOverviewPage() {
         <div className="card">
           <div className="card-header">
             <h3 className="text-base font-semibold">
-              <FiAward size={14} style={{ verticalAlign: -2 }} /> Training & Reference
+              <FiAward size={14} style={{ verticalAlign: -2 }} /> {t("pest.trainingReferenceTitle")}
             </h3>
             <span className="badge badge-Due">Yearly / reference</span>
           </div>
@@ -346,6 +348,7 @@ export function PestControlOverviewPage() {
 
 export function DailyMonitoringListPage({ year: initialYear, month: initialMonth }: { year?: number; month?: number }) {
   const { mode, version } = useAppStore();
+  const t = useT();
   const { navigate } = useRouter();
   const isDemo = mode === "demo";
   const now = new Date();
@@ -381,7 +384,7 @@ export function DailyMonitoringListPage({ year: initialYear, month: initialMonth
     <div className={isDemo ? "demo-watermark" : ""}>
       <div className="flex items-center justify-between mb-1 wrap gap-3">
         <div>
-          <h1 className="text-2xl mb-1">Daily Report — Daily Pest Control Monitoring</h1>
+          <h1 className="text-2xl mb-1">{t("pest.dailyReportTitle")} — {t("nav.dailyPestMonitoring")}</h1>
           {doc && <DocMeta doc={doc} />}
         </div>
         <div className="flex gap-2 wrap">
@@ -397,31 +400,31 @@ export function DailyMonitoringListPage({ year: initialYear, month: initialMonth
       <div className="flex gap-3 wrap mb-4">
         <div className="stat-tile">
           <div className="stat-value">{stats.recorded}</div>
-          <div className="stat-label">Days recorded in {MONTH_NAMES[month]}</div>
+          <div className="stat-label">{t("pest.daysRecorded", { month: MONTH_NAMES[month] })}</div>
         </div>
         <div className="stat-tile">
           <div className="stat-value" style={stats.awaiting ? { color: "var(--color-warning)" } : undefined}>
             {stats.awaiting}
           </div>
-          <div className="stat-label">Awaiting submit</div>
+          <div className="stat-label">{t("pest.awaitingSubmit")}</div>
         </div>
         <div className="stat-tile">
           <div className="stat-value" style={stats.findings ? { color: "var(--color-danger)" } : undefined}>
             {stats.findings}
           </div>
-          <div className="stat-label">Findings flagged</div>
+          <div className="stat-label">{t("pest.findingsFlagged")}</div>
         </div>
         <div className="stat-tile">
           <div className="stat-value" style={stats.rodents ? { color: "var(--color-danger)" } : { color: "var(--color-success)" }}>
             {stats.rodents}
           </div>
-          <div className="stat-label">Rodents trapped</div>
+          <div className="stat-label">{t("pest.rodentsTrapped")}</div>
         </div>
       </div>
 
       <div className="flex gap-2 wrap mb-3">
         <button className="btn btn-primary btn-sm" onClick={() => navigate(todayRecord ? `/record/${todayRecord.id}` : `/day/${today}`)}>
-          Open today's record <FiArrowRight size={12} />
+          {t("pest.openTodaysRecord")} <FiArrowRight size={12} />
         </button>
         <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/reports/${year}/${month}/daily`)}>
           Daily Monitoring Summary report
@@ -430,21 +433,21 @@ export function DailyMonitoringListPage({ year: initialYear, month: initialMonth
           <FiTrendingUp size={12} /> Rodent Catch Trend
         </button>
         <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
-          Print register
+          {t("pest.printRegister")}
         </button>
       </div>
 
       <div className="flex items-center justify-between wrap gap-2 mb-2 no-print">
         <div className="pill-tabs">
           <div className={`pill-tab ${view === "register" ? "active" : ""}`} onClick={() => setView("register")}>
-            Register (F/HR/17 format)
+            {t("pest.registerView")}
           </div>
           <div className={`pill-tab ${view === "list" ? "active" : ""}`} onClick={() => setView("list")}>
-            Status list
+            {t("pest.statusListView")}
           </div>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={() => setShowOriginal((s) => !s)}>
-          {showOriginal ? "Hide" : "Show"} the original blank format (as supplied)
+          {showOriginal ? t("pest.hideOriginal") : t("pest.showOriginal")}
         </button>
       </div>
 
@@ -516,6 +519,7 @@ export function DailyMonitoringListPage({ year: initialYear, month: initialMonth
 
 export function ServiceReportListPage({ slug, year: initialYear }: { slug: string; year?: number }) {
   const { mode, version } = useAppStore();
+  const t = useT();
   const { navigate } = useRouter();
   const isDemo = mode === "demo";
   const now = new Date();
@@ -567,7 +571,7 @@ export function ServiceReportListPage({ slug, year: initialYear }: { slug: strin
           <div className="stat-value" style={{ fontSize: 18 }}>
             {next ? formatDisplayDate(next) : "—"}
           </div>
-          <div className="stat-label">Next visit due</div>
+          <div className="stat-label">{t("pest.nextVisitDue")}</div>
         </div>
         <div className="stat-tile">
           <div className="stat-value" style={{ fontSize: 18 }}>
@@ -577,7 +581,7 @@ export function ServiceReportListPage({ slug, year: initialYear }: { slug: strin
         </div>
         <div className="stat-tile">
           <div className="stat-value">{completed}</div>
-          <div className="stat-label">Visits completed in {year}</div>
+          <div className="stat-label">{t("pest.visitsCompleted", { year })}</div>
         </div>
         <div className="stat-tile">
           <div className="stat-value" style={{ fontSize: 15, lineHeight: 1.3 }}>
@@ -592,7 +596,7 @@ export function ServiceReportListPage({ slug, year: initialYear }: { slug: strin
       <div className="flex gap-2 wrap mb-3">
         {last && (
           <button className="btn btn-primary btn-sm" onClick={() => navigate(`/record/${last.id}`)}>
-            Open latest visit <FiArrowRight size={12} />
+            {t("pest.openLatestVisit")} <FiArrowRight size={12} />
           </button>
         )}
         <button className="btn btn-secondary btn-sm" onClick={() => navigate("/chemical-master")}>
@@ -660,6 +664,7 @@ export function ServiceReportListPage({ slug, year: initialYear }: { slug: strin
 
 export function RodentTrendPage({ year: initialYear }: { year?: number }) {
   const { mode } = useAppStore();
+  const t = useT();
   const { navigate } = useRouter();
   const isDemo = mode === "demo";
   const [year, setYear] = useState(initialYear ?? new Date().getFullYear());
@@ -669,7 +674,7 @@ export function RodentTrendPage({ year: initialYear }: { year?: number }) {
     <div className={isDemo ? "demo-watermark" : ""}>
       <div className="flex items-center justify-between mb-1 wrap gap-3">
         <div>
-          <h1 className="text-2xl mb-1">Trend Analysis — Rodent Catch</h1>
+          <h1 className="text-2xl mb-1">{t("pest.trendAnalysisTitle")} — {t("nav.rodentTrend")}</h1>
           <div className="text-xs text-muted">
             Counted from checkpoint 7 of the Daily Report ({doc?.formatNo}) — trap box, location and number of rodents on each day's record.
           </div>
@@ -694,6 +699,7 @@ export function RodentTrendPage({ year: initialYear }: { year?: number }) {
 
 export function FlyCatcherTrendPage({ year: initialYear }: { year?: number }) {
   const { mode, version } = useAppStore();
+  const t = useT();
   const { navigate } = useRouter();
   const isDemo = mode === "demo";
   const now = new Date();
@@ -724,7 +730,7 @@ export function FlyCatcherTrendPage({ year: initialYear }: { year?: number }) {
     <div className={isDemo ? "demo-watermark" : ""}>
       <div className="flex items-center justify-between mb-1 wrap gap-3">
         <div>
-          <h1 className="text-2xl mb-1">Trend Analysis — Fly Catcher Infestation</h1>
+          <h1 className="text-2xl mb-1">{t("pest.trendAnalysisTitle")} — {t("nav.flyCatcherInfestation")}</h1>
           {doc && <DocMeta doc={doc} />}
         </div>
         <div className="flex gap-2 wrap">

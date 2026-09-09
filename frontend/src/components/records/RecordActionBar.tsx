@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { FiSave, FiSend, FiCheckCircle, FiXCircle, FiPrinter, FiRotateCcw, FiTrash2 } from "react-icons/fi";
 import type { RecordStatus } from "../../types";
 import { Modal } from "../common/Modal";
+import { useT } from "../../i18n";
 
 export function RecordActionBar({
   status,
@@ -28,6 +29,7 @@ export function RecordActionBar({
   // page hasn't wired a destination to navigate back to after deleting).
   onDelete?: () => void;
 }) {
+  const t = useT();
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -44,37 +46,38 @@ export function RecordActionBar({
     <div className="flex items-center justify-end gap-2 wrap no-print" style={{ marginTop: 16 }}>
       {onDelete && deletableStatuses.includes(status) && (
         <button className="btn btn-danger btn-sm" onClick={() => setConfirmingDelete(true)} style={{ marginRight: "auto" }}>
-          <FiTrash2 size={13} /> Delete
+          <FiTrash2 size={13} /> {t("common.delete")}
         </button>
       )}
       <button className="btn btn-secondary btn-sm" onClick={onPrint}>
-        <FiPrinter size={13} /> Print Original-Style Record
+        <FiPrinter size={13} /> {t("common.printRecord")}
       </button>
 
       {editableStatuses.includes(status) && (
         <>
           <button className="btn btn-secondary" onClick={onSave} disabled={!dirty}>
-            <FiSave size={14} /> Save
+            <FiSave size={14} /> {t("common.save")}
           </button>
           <button className="btn btn-primary" onClick={onSubmit}>
-            <FiSend size={14} /> Submit
+            <FiSend size={14} /> {t("common.submit")}
           </button>
         </>
       )}
 
       {status === "Rejected" && (
         <button className="btn btn-primary" onClick={onResume}>
-          <FiRotateCcw size={14} /> Resume Editing
+          <FiRotateCcw size={14} /> {t("common.resumeEditing")}
         </button>
       )}
 
       {verifiableStatuses.includes(status) && (
         <>
           <button className="btn btn-danger" onClick={() => setRejecting(true)}>
-            <FiXCircle size={14} /> Reject
+            <FiXCircle size={14} /> {t("common.reject")}
           </button>
           <button className="btn btn-success" onClick={onVerify}>
-            <FiCheckCircle size={14} /> Verify{isDemo ? " (Demo)" : ""}
+            <FiCheckCircle size={14} /> {t("common.verify")}
+            {isDemo ? ` (${t("common.demo")})` : ""}
           </button>
         </>
       )}
@@ -86,7 +89,7 @@ export function RecordActionBar({
           footer={
             <div className="flex justify-end gap-2 w-full">
               <button className="btn btn-secondary" onClick={() => setRejecting(false)}>
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 className="btn btn-danger"
@@ -97,7 +100,7 @@ export function RecordActionBar({
                 }}
                 disabled={!reason.trim()}
               >
-                Reject Record
+                {t("common.reject")}
               </button>
             </div>
           }
@@ -116,7 +119,7 @@ export function RecordActionBar({
           footer={
             <div className="flex justify-end gap-2 w-full">
               <button className="btn btn-secondary" onClick={() => setConfirmingDelete(false)}>
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 className="btn btn-danger"
@@ -125,7 +128,7 @@ export function RecordActionBar({
                   onDelete();
                 }}
               >
-                <FiTrash2 size={13} /> Delete Permanently
+                <FiTrash2 size={13} /> {t("common.deletePermanently")}
               </button>
             </div>
           }

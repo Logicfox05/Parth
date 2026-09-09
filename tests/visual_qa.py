@@ -193,6 +193,27 @@ def main():
         check("Licence page shows both scanned pages of the Form III licence", page.locator(".licence-scan img").count() == 2)
         page.screenshot(path="tests/shots/20_service_provider_licence.png", full_page=True)
 
+        # --- Gujarati: the whole interface, every page ---
+        page.goto(f"{BASE}/index.html#/dashboard")
+        page.wait_for_timeout(400)
+        page.click(".dash-language .pill-tab[data-lang='gu']")
+        page.wait_for_timeout(400)
+        check("Dashboard switches to Gujarati", "ડેશબોર્ડ" in page.locator(".app-sidebar").inner_text())
+        page.screenshot(path="tests/shots/21_dashboard_gujarati.png", full_page=True)
+        page.goto(f"{BASE}/index.html#/pest-control")
+        page.wait_for_timeout(500)
+        page.screenshot(path="tests/shots/22_pest_control_gujarati.png", full_page=True)
+        page.goto(f"{BASE}/index.html#/dashboard")
+        page.wait_for_timeout(400)
+        page.click(".dash-language .pill-tab[data-lang='en']")
+        page.wait_for_timeout(300)
+
+        # --- The assistant's voice controls ---
+        page.goto(f"{BASE}/index.html#/assistant")
+        page.wait_for_timeout(400)
+        check("Assistant page shows voice input and a read-aloud toggle", page.locator("button[data-action='voice']").count() == 1 and page.locator("button[data-action='speak-replies']").count() == 1)
+        page.screenshot(path="tests/shots/23_assistant_voice.png", full_page=True)
+
         # --- Master data ---
         page.click("text=Master Data")
         page.wait_for_timeout(300)

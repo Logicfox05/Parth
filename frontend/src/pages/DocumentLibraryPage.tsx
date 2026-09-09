@@ -6,6 +6,7 @@ import { useRouter } from "../store/router";
 import { getDocumentInfo } from "../engine/documentInfo";
 import { formatDisplayDate } from "../utils/date";
 import { moduleSlug } from "../utils/moduleSlug";
+import { useT } from "../i18n";
 
 function openTarget(docId: string, kind: string): string {
   if (kind === "chemical-master") return "/chemical-master";
@@ -32,6 +33,7 @@ const sectionRank = (section: string | undefined) => {
 };
 
 export function DocumentLibraryPage({ moduleSlug: activeSlug }: { moduleSlug?: string }) {
+  const t = useT();
   const { navigate } = useRouter();
   const [query, setQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -65,7 +67,7 @@ export function DocumentLibraryPage({ moduleSlug: activeSlug }: { moduleSlug?: s
 
   return (
     <div>
-      <h1 className="text-2xl mb-1">Document Library</h1>
+      <h1 className="text-2xl mb-1">{t("lib.title")}</h1>
       <p className="text-muted mb-4">
         Every controlled document identified from the uploaded source files. {docs.length} documents configured — click
         a row for the full What / How / Who / When summary.

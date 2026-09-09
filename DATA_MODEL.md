@@ -179,6 +179,26 @@ full-page `pages/AssistantPage.tsx` send as `context` with every `/api/assistant
 backend caps it at 4 KB and folds it into the system prompt). The page persists conversations under
 the `assistant-conversations` storage key (30 conversations × 200 messages max).
 
+**Interface language (i18n).** `src/i18n/strings.ts` holds one table per language; `en` is declared
+`as const` and is the source of truth for the key set, and `gu` is typed `Record<StringKey, string>`
+so a missing Gujarati string is a compile error rather than a silent English fallback. `src/i18n`
+exposes `tr(lang, key, vars)`, a module-level `t(key, vars)` for code outside React (engines, the
+assistant's canned replies — it reads the stored language at call time) and `useT()` for components,
+which resolves through `AppStore` so changing the language re-renders every screen at once. The
+choice lives in `AppSettings.language` (Dashboard → Language, and the top-bar picker), and
+`setLang` also stamps `document.documentElement.lang`. `{name}` placeholders are interpolated.
+Controlled document text is deliberately excluded — see the header comment in `strings.ts` and
+REQUIREMENTS §24. Identifiers never translate: module names in `MODULE_ORDER`, report tab keys
+(`TAB_KEYS`, which are route segments) and `data-action` hooks stay stable, and only their labels
+are looked up.
+
+**Voice.** `src/utils/speech.ts` wraps the browser's Web Speech API: `isVoiceInputSupported()`,
+`listenOnce({lang, onResult, onError, onEnd})` (press-to-talk, one utterance, `abort()` to stop) and
+`speak(text, lang)` / `stopSpeaking()`. Both the Assistant page and the floating widget use it, in
+`SPEECH_LOCALES[lang]` (`en-IN` / `gu-IN`); a transcript is handed straight to the same `send()` a
+typed message uses, with a `spoken` flag so the reply is read back even when the read-aloud toggle
+(`AppSettings.speakReplies`) is off. Both components stop listening and speaking on unmount.
+
 **Scope (this software only).** The assistant declines anything that isn't about this system, in two
 layers. The authoritative one is the `SCOPE` block at the top of the system prompt in
 `backend/assistant.ts` — it names what is in scope, lists the out-of-scope categories, forbids

@@ -10,6 +10,7 @@ import { scheduleLabel } from "../engine/frequencyEngine";
 import { resolveResponsibleEmployees } from "../engine/documentInfo";
 import { weeklyOffDay, WEEKDAY_LONG } from "../engine/holidays";
 import type { AdjustmentDay, CompanyHoliday, Employee } from "../types";
+import { useT } from "../i18n";
 
 type Tab = "employees" | "chemicals" | "pcLocations" | "rodentStations" | "areas" | "checkpoints" | "documents" | "holidays" | "settings";
 
@@ -26,13 +27,14 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 export function MasterDataPage() {
+  const t = useT();
   const { bump, version } = useAppStore();
   const [tab, setTab] = useState<Tab>("employees");
   const master = masterRepository.get();
 
   return (
     <div>
-      <h1 className="text-2xl mb-1">Master Data</h1>
+      <h1 className="text-2xl mb-1">{t("master.title")}</h1>
       <p className="text-muted mb-4">
         Administrator-managed reference data. Everything here was seeded from the uploaded source documents — see
         REQUIREMENTS.md for provenance. Add rows as the company confirms additional locations, chemicals or staff.

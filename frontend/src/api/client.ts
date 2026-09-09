@@ -63,6 +63,9 @@ export interface AssistantChatRequest {
   // the weekly off, upcoming holidays / adjustment days, what's due) so the
   // model answers from the app's own data — see engine/assistantLocal.ts.
   context?: string;
+  // Interface language: the reply comes back in this language, so a user
+  // working in Gujarati is answered in Gujarati.
+  language?: "en" | "gu";
 }
 
 export interface ChecklistAnswerResult {

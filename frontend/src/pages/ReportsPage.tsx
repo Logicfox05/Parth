@@ -17,6 +17,7 @@ import { toCSV, downloadCSV } from "../utils/csv";
 import { MiniBarChart } from "../components/reports/MiniBarChart";
 import { DemoTag } from "../components/common/DemoTag";
 import { DailyRegisterSheet } from "../components/records/DailyRegisterSheet";
+import { useT } from "../i18n";
 import type {
   ComplaintChecklistData,
   DailyPestMonitoringData,
@@ -28,18 +29,11 @@ import type {
 } from "../types";
 
 type Tab = "monthly" | "daily" | "rodent" | "flycatcher" | "chemical" | "gap" | "training" | "lamination";
-const TABS: { key: Tab; label: string }[] = [
-  { key: "monthly", label: "Monthly Records Report" },
-  { key: "daily", label: "Daily Monitoring Summary" },
-  { key: "rodent", label: "Rodent Catch Trend" },
-  { key: "flycatcher", label: "Fly Catcher Infestation" },
-  { key: "chemical", label: "Chemical Usage" },
-  { key: "gap", label: "CAPA Status" },
-  { key: "training", label: "Training Status" },
-  { key: "lamination", label: "Lamination QC" },
-];
+// The tab key is the route segment (/reports/{y}/{m}/{tab}) and never
+// changes; only the label shown follows the language.
+const TAB_KEYS: Tab[] = ["monthly", "daily", "rodent", "flycatcher", "chemical", "gap", "training", "lamination"];
 
-const isTab = (v: string | undefined): v is Tab => !!v && TABS.some((t) => t.key === v);
+const isTab = (v: string | undefined): v is Tab => !!v && (TAB_KEYS as string[]).includes(v);
 
 export function ReportsPage({
   initialYear,
@@ -51,6 +45,7 @@ export function ReportsPage({
   initialTab?: string;
 }) {
   const { mode, version } = useAppStore();
+  const t = useT();
   const isDemo = mode === "demo";
   const now = new Date();
   const [tab, setTab] = useState<Tab>(isTab(initialTab) ? initialTab : "monthly");
@@ -84,7 +79,7 @@ export function ReportsPage({
   return (
     <div className={isDemo ? "demo-watermark" : ""}>
       <div className="flex items-center justify-between mb-4 wrap gap-3">
-        <h1 className="text-2xl">Reports</h1>
+        <h1 className="text-2xl">{t("rep.title")}</h1>
         <div className="flex gap-2">
           <select className="input input-sm" style={{ width: 90 }} value={year} onChange={(e) => setYear(Number(e.target.value))}>
             {[year - 1, year, year + 1].map((y) => (
@@ -104,9 +99,9 @@ export function ReportsPage({
       </div>
 
       <div className="pill-tabs mb-4" style={{ flexWrap: "wrap" }}>
-        {TABS.map((t) => (
-          <div key={t.key} className={`pill-tab ${tab === t.key ? "active" : ""}`} onClick={() => setTab(t.key)}>
-            {t.label}
+        {TAB_KEYS.map((key) => (
+          <div key={key} className={`pill-tab ${tab === key ? "active" : ""}`} onClick={() => setTab(key)}>
+            {t(`rep.tab.${key}`)}
           </div>
         ))}
       </div>

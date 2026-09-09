@@ -5,8 +5,10 @@ import { useRouter } from "../store/router";
 import { generateDemoRecordsForMonth, clearAllDemoData } from "../data/demoGenerator";
 import { recordRepository } from "../data/repositories/recordRepository";
 import { MONTH_NAMES } from "../utils/date";
+import { useT } from "../i18n";
 
 export function DemoModePage() {
+  const t = useT();
   const { mode, setMode, bump } = useAppStore();
   const { navigate } = useRouter();
   const now = new Date();
@@ -31,7 +33,7 @@ export function DemoModePage() {
 
   return (
     <div>
-      <h1 className="text-2xl mb-1">Demo Mode</h1>
+      <h1 className="text-2xl mb-1">{t("demo.title")}</h1>
       <p className="text-muted mb-6">
         Generate realistic synthetic records for development, testing and management demonstrations. Every generated
         record is stamped <strong>isDemo = true</strong> and rendered with a DEMO / SYNTHETIC watermark — it is never
