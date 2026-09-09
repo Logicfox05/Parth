@@ -173,11 +173,31 @@ adjustment rows an admin deleted so the additive seed merge never resurrects the
 
 **The assistant's local layer.** `engine/assistantLocal.ts` answers a few intents on the client
 (holiday / weekly-off / adjustment questions with a date reference, "next holiday", "what's due
-today", "briefing", "help") and builds `buildAssistantContext()` — a ≤ 3.8 KB plain-text digest of live
-facts that both the widget and the full-page `pages/AssistantPage.tsx` send as `context` with every
-`/api/assistant/chat` call (the backend caps it at 4 KB and folds it into the system prompt). The
-page persists conversations under the `assistant-conversations` storage key (30 conversations × 200
-messages max).
+today", "briefing", a date-range document listing (below), "help") and builds
+`buildAssistantContext()` — a ≤ 3.8 KB plain-text digest of live facts that both the widget and the
+full-page `pages/AssistantPage.tsx` send as `context` with every `/api/assistant/chat` call (the
+backend caps it at 4 KB and folds it into the system prompt). The page persists conversations under
+the `assistant-conversations` storage key (30 conversations × 200 messages max).
+
+**Date-range document listing.** `listDocumentsAnswer()` (called from `localAnswer()`, after the
+holiday/due-today/briefing intents, before help) answers "documents of X from date to date" entirely
+on the client: `matchDocuments(lower)` maps free text to document ids via a static alias table
+(`DOC_KEYWORDS`), falling back to every recordable document in a named module (`MODULE_KEYWORDS`)
+when no single document is named — returns `[]` (and the function bails to `null`, letting the
+message reach the model) when nothing is recognised. `parseDateRange(text, today)` resolves what span
+was named — `extractExplicitDates()` pulls every ISO / dd-mm-yyyy / "D Month[ Year]" date out of the
+message (including the shorthand "D to D Month" where the month is stated once) and takes the
+min/max; failing that, "this/last/next week", "this/last/next month", or a bare month name resolve to
+that whole span; failing that, `parseDateRef()` (the same single-date parser the holiday intent uses)
+covers today/tomorrow/yesterday/a weekday. Both a document/module match AND a date match are required
+to fire — that's what keeps "show me all reports of august" (no document named) going to the model
+unchanged. Once both resolve, it calls `ensureRecordsGeneratedForMonth({documentIds: docIds})` (Live)
+or `ensureDemoRecordsGeneratedForYear()` (Demo) for just the touched months before querying
+`recordRepository`, so a span nobody has browsed to yet still resolves correctly (Live still respects
+the launch-date floor). The reply lists every matching record (capped at `MAX_LISTED_RECORDS = 40` —
+a safety bound, not a normal truncation, since the span is one the user themselves named) with a
+"Holiday" status override for a pre-marked Daily Monitoring row; chips open each record directly when
+six or fewer are shown, else a single "Open Calendar" chip.
 
 ## Record lifecycle (state diagram)
 

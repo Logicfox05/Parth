@@ -338,7 +338,8 @@ export function DocumentAssistant() {
     // With a record open, an instruction like "mark today as holiday" is a
     // fill request for the model, not a calendar question — only genuine
     // questions take the local path then.
-    const looksLikeQuestion = /\?\s*$/.test(text) || /^(is|was|are|were|when|which|what|who|how|do|does|did|can|could|will|tell me|list)\b/i.test(text);
+    const looksLikeQuestion =
+      /\?\s*$/.test(text) || /^(is|was|are|were|when|which|what|who|how|do|does|did|can|could|will|tell me|list|show|give me|i want|find|get me)\b/i.test(text);
     const local = !t || looksLikeQuestion ? localAnswer(text, isDemo, user?.name) : null;
     if (local) {
       bot(local.reply, local.chips);

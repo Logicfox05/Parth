@@ -1,13 +1,18 @@
 import type { Chip } from "./guidedChecklist";
+import type { DailyPestMonitoringData, DocumentDefinition } from "../types";
 import { masterRepository } from "../data/repositories/masterRepository";
 import { recordRepository } from "../data/repositories/recordRepository";
+import { documentRepository } from "../data/repositories/documentRepository";
+import { ensureDemoRecordsGeneratedForYear } from "../data/demoGenerator";
 import { computeBriefing } from "./assistantBriefing";
+import { ensureRecordsGeneratedForMonth } from "./recordGenerator";
+import { routeForRecord } from "./reminders";
 import { dayInfo, describeDay, nextWeeklyOff, upcomingHolidays, weeklyOffDay, WEEKDAY_LONG, type DayInfo } from "./holidays";
-import { addDays, formatDisplayDate, fromISODate, pad2, todayISO } from "../utils/date";
+import { addDays, compareISO, daysInMonth, formatDisplayDate, fromISODate, MONTH_NAMES, pad2, todayISO } from "../utils/date";
 
 // WHAT THE ASSISTANT KNOWS WITHOUT ASKING THE MODEL.
 //
-// Two things live here:
+// Three things live here:
 //  * buildAssistantContext() — a short, plain-text digest of live facts (today,
 //    the weekly off, the next holidays and adjustment days, what's due) sent
 //    with every chat message so the model answers calendar / workload
@@ -15,7 +20,16 @@ import { addDays, formatDisplayDate, fromISODate, pad2, todayISO } from "../util
 //  * localAnswer() — a handful of intents answered entirely on the client,
 //    instantly and without the network: "is Thursday a holiday?", "next
 //    holiday?", "adjustment days?", "what's due today?", "my briefing",
-//    "help". Everything else goes to the model (with the context above).
+//    "list <document/module> records from <date> to <date>", "help".
+//    Everything else goes to the model (with the context above).
+//  * listDocumentsAnswer() — "I want documents of daily pest control
+//    monitoring record from 1 January to 19 January", "pest records for
+//    September", "fly catcher inspections this week": enumerates exactly the
+//    records due in the date span the user named (never a whole month unless
+//    they asked for one), for the document(s)/module they named. Only fires
+//    when BOTH a document/module is recognisable AND a date is present —
+//    "show me all reports of august" (no document named) still goes to the
+//    model and navigates to the Reports page, unchanged.
 
 export interface LocalAnswer {
   reply: string;
@@ -31,6 +45,7 @@ export const SUGGESTED_PROMPTS: { title: string; text: string }[] = [
   { title: "Rat / Mice service reports", text: "Open the rat and mice service reports" },
   { title: "Daily pest control report", text: "Take me to the daily pest control report" },
   { title: "Rodent trend", text: "Show me the rodent catch trend for this year" },
+  { title: "Documents for a date range", text: "Show me daily pest control monitoring record documents from 1 to 19 January" },
 ];
 
 const WEEKDAY_RE = /\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)\b/i;
@@ -119,6 +134,266 @@ function listAdjustmentDays(today: string): string {
   return `${upcoming.length ? "Upcoming adjustment days" : "Adjustment days this year"} — everyone reports to the company on these ${off}s, so records are due as on any working day:\n${lines.join("\n")}`;
 }
 
+// ---------------------------------------------------------------------------
+// "documents of <document/module> from <date> to <date>" — enumerate exactly
+// the records due in the named span, not a whole month unless that's what
+// was asked. Two independent recognisers feed this: which document(s) the
+// message names (matchDocuments) and what date span it names
+// (parseDateRange) — both must find something, or this stays silent and the
+// message goes to the model like anything else.
+
+// Longer/more specific phrases are matched with the same weight as short
+// ones (all via word-boundary regex against the whole message) — a message
+// can name more than one, e.g. "rat and mice", which is fine: their ids just
+// both go into the result set.
+const DOC_KEYWORDS: { id: string; aliases: string[] }[] = [
+  { id: "daily-pest-monitoring", aliases: ["daily pest control monitoring", "daily pest monitoring", "daily monitoring record", "daily monitoring", "f/hr/17", "daily report"] },
+  { id: "fly-catcher", aliases: ["fly catcher", "flycatcher", "f/hr/18"] },
+  { id: "service-report-rodent", aliases: ["rat / mice", "rat and mice", "rat & mice", "rodent control service", "rodent service", "rat report", "mice report", "rat", "mice", "rodent"] },
+  { id: "service-report-general", aliases: ["general pest control", "general pest service", "ants and cockroaches", "cockroach", "cockroaches", "ants", "ant"] },
+  { id: "service-report-fly", aliases: ["fly control service", "fly control services", "fly service"] },
+  { id: "gap-inspection", aliases: ["internal inspection", "capa internal", "gap report", "gap analysis", "inspection finding"] },
+  { id: "capa-customer-complaint", aliases: ["customer complaint", "capa external", "f/mkt/05", "complaint checklist", "complaint"] },
+  { id: "training-record", aliases: ["training record", "training"] },
+  { id: "qc-viscosity", aliases: ["adhesive viscosity", "viscosity record", "f-qc-30", "viscosity"] },
+  { id: "qc-adhesive-mixing", aliases: ["adhesive mixing", "mixing ratio", "f-qc-32"] },
+  { id: "qc-temperature", aliases: ["hot room temperature", "temperature monitoring", "f-qc-40"] },
+  { id: "prd-process-parameter", aliases: ["process parameter record", "process parameter"] },
+  { id: "prd-alc-production", aliases: ["alc production", "alc & production", "f-prd-18", "alc report"] },
+  { id: "qc-inspection-pouching", aliases: ["pouching inspection", "pouching process", "f/qc/37", "pouching"] },
+  { id: "qc-inspection-slitting", aliases: ["slitting inspection", "f/qc/35", "slitting"] },
+  { id: "qc-inspection-printed-film", aliases: ["printed film inspection", "printed film", "f/qc/34"] },
+  { id: "qc-inprocess-printing", aliases: ["in process quality control", "in-process quality control", "in process printing", "f/qc/13"] },
+];
+
+const MODULE_KEYWORDS: { module: string; aliases: string[] }[] = [
+  { module: "Pest Control", aliases: ["pest control", "pest"] },
+  { module: "Lamination — Quality Control", aliases: ["lamination qc", "lamination quality control", "lamination quality"] },
+  { module: "Lamination — Production", aliases: ["lamination production"] },
+  { module: "Quality Control — Inspection Records", aliases: ["inspection records", "inspection record", "qc inspection"] },
+  { module: "CAPA (Corrective & Preventive Action)", aliases: ["capa"] },
+];
+
+function escapeReg(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function mentionsAny(lower: string, aliases: string[]): boolean {
+  return aliases.some((a) => new RegExp(`\\b${escapeReg(a)}\\b`, "i").test(lower));
+}
+
+// Which document id(s) the message names — a specific document first
+// ("daily pest control monitoring record"), falling back to a whole module
+// ("pest", "lamination") only when no single document was recognised, so a
+// precise request never gets diluted into every document in the module.
+function matchDocuments(lower: string): string[] {
+  const ids = new Set<string>();
+  for (const { id, aliases } of DOC_KEYWORDS) if (mentionsAny(lower, aliases)) ids.add(id);
+  if (ids.size > 0) return Array.from(ids);
+
+  const recordable = documentRepository.getRecordable();
+  for (const { module, aliases } of MODULE_KEYWORDS) {
+    if (mentionsAny(lower, aliases)) recordable.filter((d) => d.module === module).forEach((d) => ids.add(d.id));
+  }
+  if (ids.size === 0 && /\blamination\b/i.test(lower)) {
+    recordable.filter((d) => d.module.startsWith("Lamination")).forEach((d) => ids.add(d.id));
+  }
+  return Array.from(ids);
+}
+
+interface DateRange {
+  from: string;
+  to: string;
+  label: string;
+}
+
+function isValidYMD(y: number, m: number, d: number): boolean {
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+  const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+}
+
+// Every explicit calendar date named in the message (ISO, dd-mm-yyyy,
+// "1 January[ 2026]", "January 1[, 2026]"), deduplicated — used for BOTH a
+// two-sided range ("from 1 January to 19 January" finds both) and a single
+// date ("documents for 5 September" finds one, so from===to).
+function extractExplicitDates(text: string, yearFallback: number): string[] {
+  const out = new Set<string>();
+  const push = (y: number, m: number, d: number) => {
+    if (isValidYMD(y, m, d)) out.add(`${y}-${pad2(m)}-${pad2(d)}`);
+  };
+  // Shorthand where the month is only stated once for both ends — "1 to 19
+  // January", "1-19 January 2026" — checked first so both day numbers get
+  // the trailing month attached, not just the second one.
+  for (const m of text.matchAll(
+    /\b(\d{1,2})(?:st|nd|rd|th)?\s*(?:to|-|–|—)\s*(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?:\s+(\d{4}))?\b/gi
+  )) {
+    const year = m[4] ? Number(m[4]) : yearFallback;
+    const mi = MONTHS.indexOf(m[3].toLowerCase()) + 1;
+    push(year, mi, Number(m[1]));
+    push(year, mi, Number(m[2]));
+  }
+  for (const m of text.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) push(Number(m[1]), Number(m[2]), Number(m[3]));
+  for (const m of text.matchAll(/\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})\b/g)) push(Number(m[3]), Number(m[2]), Number(m[1]));
+  for (const m of text.matchAll(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?:\s+(\d{4}))?\b/gi)) {
+    push(m[3] ? Number(m[3]) : yearFallback, MONTHS.indexOf(m[2].toLowerCase()) + 1, Number(m[1]));
+  }
+  for (const m of text.matchAll(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b/gi)) {
+    push(m[3] ? Number(m[3]) : yearFallback, MONTHS.indexOf(m[1].toLowerCase()) + 1, Number(m[2]));
+  }
+  return Array.from(out);
+}
+
+function monthRange(year: number, month: number, label: string): DateRange {
+  return { from: `${year}-${pad2(month + 1)}-01`, to: `${year}-${pad2(month + 1)}-${pad2(daysInMonth(year, month))}`, label };
+}
+
+function weekBounds(today: string, weekOffset: number): { from: string; to: string } {
+  const dow = fromISODate(today).getDay();
+  const from = addDays(today, -dow + weekOffset * 7);
+  return { from, to: addDays(from, 6) };
+}
+
+// What span the user named — an explicit day-to-day range, a single day, a
+// week, or a whole month (bare month name, or "this/last/next month") — so
+// "1 to 19 January" lists 19 days and "for January" lists the whole month,
+// exactly as asked. Returns null when no date reference is found at all.
+function parseDateRange(text: string, today: string): DateRange | null {
+  const lower = text.toLowerCase();
+  const year0 = fromISODate(today).getFullYear();
+
+  const explicit = extractExplicitDates(text, year0);
+  if (explicit.length >= 1) {
+    const sorted = explicit.slice().sort(compareISO);
+    const from = sorted[0];
+    const to = sorted[sorted.length - 1];
+    return { from, to, label: from === to ? formatDisplayDate(from) : `${formatDisplayDate(from)} to ${formatDisplayDate(to)}` };
+  }
+
+  if (/\bthis week\b/.test(lower)) {
+    const { from, to } = weekBounds(today, 0);
+    return { from, to, label: `this week (${formatDisplayDate(from)} to ${formatDisplayDate(to)})` };
+  }
+  if (/\blast week\b/.test(lower)) {
+    const { from, to } = weekBounds(today, -1);
+    return { from, to, label: `last week (${formatDisplayDate(from)} to ${formatDisplayDate(to)})` };
+  }
+  if (/\bnext week\b/.test(lower)) {
+    const { from, to } = weekBounds(today, 1);
+    return { from, to, label: `next week (${formatDisplayDate(from)} to ${formatDisplayDate(to)})` };
+  }
+
+  const d = fromISODate(today);
+  if (/\bthis month\b/.test(lower)) return monthRange(d.getFullYear(), d.getMonth(), `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`);
+  if (/\blast month\b/.test(lower)) {
+    const m = (d.getMonth() + 11) % 12;
+    const y = d.getMonth() === 0 ? d.getFullYear() - 1 : d.getFullYear();
+    return monthRange(y, m, `${MONTH_NAMES[m]} ${y}`);
+  }
+  if (/\bnext month\b/.test(lower)) {
+    const m = (d.getMonth() + 1) % 12;
+    const y = d.getMonth() === 11 ? d.getFullYear() + 1 : d.getFullYear();
+    return monthRange(y, m, `${MONTH_NAMES[m]} ${y}`);
+  }
+
+  const monthMatch = lower.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/);
+  if (monthMatch) {
+    const mi = MONTHS.indexOf(monthMatch[1]);
+    const yearMatch = lower.match(/\b(20\d{2})\b/);
+    const year = yearMatch ? Number(yearMatch[1]) : year0;
+    return monthRange(year, mi, `${MONTH_NAMES[mi]} ${year}`);
+  }
+
+  const ref = parseDateRef(text, today);
+  if (ref) return { from: ref.date, to: ref.date, label: ref.phrase };
+  return null;
+}
+
+const LIST_INTENT_RE = /\b(document|documents|record|records|report|reports|register|registers)\b/i;
+// A safety bound, not a normal truncation — a real request never approaches
+// it (a year is 12 months); it only stops a wildly wide accidental range
+// (e.g. a typo'd year) from generating three years of records inline.
+const MAX_MONTHS_GENERATED = 36;
+
+function monthsBetween(fromISO: string, toISO: string): { year: number; month: number }[] {
+  const out: { year: number; month: number }[] = [];
+  let y = fromISODate(fromISO).getFullYear();
+  let m = fromISODate(fromISO).getMonth();
+  const endY = fromISODate(toISO).getFullYear();
+  const endM = fromISODate(toISO).getMonth();
+  while ((y < endY || (y === endY && m <= endM)) && out.length < MAX_MONTHS_GENERATED) {
+    out.push({ year: y, month: m });
+    m += 1;
+    if (m > 11) {
+      m = 0;
+      y += 1;
+    }
+  }
+  return out;
+}
+
+// Rows for this many days fit comfortably on screen without needing "…and N
+// more" — a bounded date range the user themselves named (never "everything
+// pending") is meant to be shown in full, so this is generous compared to
+// the briefing's MAX_ROWS=12.
+const MAX_LISTED_RECORDS = 40;
+
+function listDocumentsAnswer(text: string, isDemo: boolean): LocalAnswer | null {
+  const lower = text.toLowerCase();
+  if (!LIST_INTENT_RE.test(lower)) return null;
+  const docIds = matchDocuments(lower);
+  if (docIds.length === 0) return null; // no document/module named — let the model handle plain navigation requests
+  const today = todayISO();
+  const range = parseDateRange(text, today);
+  if (!range) return null; // no date reference — e.g. "open the rat and mice service reports" navigates instead
+
+  const months = monthsBetween(range.from, range.to);
+  if (isDemo) {
+    for (const year of Array.from(new Set(months.map((m) => m.year)))) ensureDemoRecordsGeneratedForYear(year);
+  } else {
+    // Scoped to just the named document(s) — cheap even across many months,
+    // and the launch-date floor still applies (see engine/recordGenerator.ts),
+    // so a range before this browser went live correctly comes back empty.
+    for (const { year, month } of months) ensureRecordsGeneratedForMonth(year, month, { documentIds: docIds, isDemo: false });
+  }
+
+  const docs = docIds.map((id) => documentRepository.getById(id)).filter((x): x is DocumentDefinition => !!x);
+  const records = recordRepository
+    .query({ isDemo, fromDate: range.from, toDate: range.to })
+    .filter((r) => docIds.includes(r.documentId))
+    .sort((a, b) => compareISO(a.dueDate, b.dueDate) || a.documentId.localeCompare(b.documentId));
+
+  const scopeLabel = docs.length === 1 ? docs[0].name : docs.length > 0 ? `${docs.length} matching documents` : "matching documents";
+  const calendarChip: Chip = { label: "Open Calendar", action: { type: "navigate", route: `/calendar/${fromISODate(range.from).getFullYear()}/${fromISODate(range.from).getMonth()}` } };
+
+  if (records.length === 0) {
+    return {
+      reply: `No ${scopeLabel} records between ${formatDisplayDate(range.from)} and ${formatDisplayDate(range.to)}${isDemo ? " (demo)" : ""}.`,
+      chips: [calendarChip],
+    };
+  }
+
+  const shown = records.slice(0, MAX_LISTED_RECORDS);
+  const lines = shown.map((r) => {
+    const doc = docs.length > 1 ? documentRepository.getById(r.documentId) : docs[0];
+    const holiday = r.documentId === "daily-pest-monitoring" && (r.data as DailyPestMonitoringData)?.isHoliday;
+    const status = holiday ? "Holiday" : r.status;
+    const prefix = docs.length > 1 ? `${formatDisplayDate(r.dueDate)} — ${doc?.name ?? r.documentId}` : formatDisplayDate(r.dueDate);
+    return `• ${prefix} — ${status}${r.isDemo ? " (demo)" : ""}`;
+  });
+  const more = records.length > shown.length ? `\n…and ${records.length - shown.length} more — open the calendar for the rest.` : "";
+  const reply = `${scopeLabel} — ${range.label} (${records.length} record${records.length === 1 ? "" : "s"}):\n${lines.join("\n")}${more}`;
+
+  const chips: Chip[] = [];
+  if (shown.length === 1) {
+    chips.push({ label: "Open it", action: { type: "navigate", route: routeForRecord(documentRepository.getById(shown[0].documentId), shown[0].id) }, tone: "primary" });
+  } else if (shown.length <= 6) {
+    for (const r of shown) chips.push({ label: formatDisplayDate(r.dueDate), action: { type: "navigate", route: routeForRecord(documentRepository.getById(r.documentId), r.id) } });
+  } else {
+    chips.push(calendarChip);
+  }
+  return { reply, chips };
+}
+
 function answerForDay(info: DayInfo, phrase: string, today: string): string {
   const master = masterRepository.get();
   const off = WEEKDAY_LONG[weeklyOffDay(master)];
@@ -197,10 +472,13 @@ export function localAnswer(message: string, isDemo: boolean, userName?: string)
     };
   }
 
+  const listing = listDocumentsAnswer(text, isDemo);
+  if (listing) return listing;
+
   if (/^(help|\?|what can you do\??|how do you work\??)$/.test(lower) || /\b(what can you do|what do you do|how can you help)\b/.test(lower)) {
     const off = WEEKDAY_LONG[weeklyOffDay(master)];
     return {
-      reply: `I can take you anywhere in the app in plain words ("show me August's reports", "open the rat / mice service reports"), fill in a record you have open ("checker is Ramesh, time 9:15"), tell you what's due and what I've already prepared, and answer calendar questions — holidays, the ${off} weekly off, adjustment days. Text only, no voice.`,
+      reply: `I can take you anywhere in the app in plain words ("show me August's reports", "open the rat / mice service reports"), list a document's records for a date range ("daily pest control monitoring record from 1 to 19 January", "pest records for September"), fill in a record you have open ("checker is Ramesh, time 9:15"), tell you what's due and what I've already prepared, and answer calendar questions — holidays, the ${off} weekly off, adjustment days. Text only, no voice.`,
       chips: [
         { label: "What's due today?", action: { type: "navigate", route: `/day/${today}` } },
         { label: "Pest Control", action: { type: "navigate", route: "/pest-control" } },

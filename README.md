@@ -68,6 +68,16 @@ The app behaves like a personal assistant rather than a blank form:
   Source / Unit / Target Pest / Year / Jan–Dec / Total layout; **Training & Reference** — Training
   Records, Chemical Master, SOP. The assistant navigates there from plain speech ("show me the rat
   reports", "fly catcher infestation for this year").
+- **The assistant lists a document's records for exactly the date span you name** — "I want documents
+  of daily pest control monitoring record from 1 to 19 January", "pest control records for this
+  week", "fly catcher documents for September". Answered locally (`src/engine/assistantLocal.ts`), so
+  it's instant: an explicit day-to-day span (even shorthand like "1 to 19 January", month stated once)
+  lists only those days, never a whole month unless that's what was asked (a bare month name, or
+  "this/last/next month", does list the whole month); the document or module you name (over 30
+  recognised aliases, falling back to the whole module — "pest", "lamination" — when you don't name
+  one document) scopes which records show. Only fires when both a document/module and a date are
+  named, so plain navigation phrasing ("show me all reports of august") is untouched and still goes
+  to the model.
 - **The assistant also has a screen of its own** — **Assistant** in the sidebar (`/assistant`,
   `src/pages/AssistantPage.tsx`): a ChatGPT-style page with your conversations on the left, the thread
   in the middle, suggested questions when a chat is empty and a composer at the bottom. Text only —

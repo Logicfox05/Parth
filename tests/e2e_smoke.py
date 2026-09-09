@@ -44,6 +44,11 @@ def next_working_day(d):
     return d
 
 
+def display_date(iso):
+    """Mirrors the app's formatDisplayDate (utils/date.ts): DD-Mon-YYYY."""
+    return date.fromisoformat(iso).strftime("%d-%b-%Y")
+
+
 WORK_DAY = next_working_day(date.today()).isoformat()
 # The assistant prepares records due today or earlier — so on a closed day
 # (when WORK_DAY is tomorrow or later) the opened records are blank shells and
@@ -548,6 +553,38 @@ def main():
             got_it.first.click()
             page.wait_for_timeout(200)
         check("Assistant conversation persists across a reload", page.locator(".assistant-page .chat-msg.user").count() >= 2)
+
+        # ---- 15b. Date-range document listing ("documents of X from date to
+        # date"), answered locally, no network needed (engine/assistantLocal.ts).
+        # A single explicit day (today's WORK_DAY, computed at the top of this
+        # file) always has a Daily Pest Control Monitoring Record by now — it
+        # was opened, filled and submitted in section 3.
+        page.fill("textarea.assistant-input", f"show me daily pest control monitoring record documents from {WORK_DAY} to {WORK_DAY}")
+        page.click("button[aria-label='Send message']")
+        page.wait_for_timeout(500)
+        reply_single = page.locator(".assistant-page .chat-msg.bot").last.inner_text()
+        check(
+            "Assistant lists a document's records for an explicit single-day range, not the whole month",
+            "Daily Pest Control Monitoring Record" in reply_single and "(1 record)" in reply_single and "No " not in reply_single,
+        )
+        # A whole-module request over an explicit multi-day span — must return
+        # exactly that span's count of days, never a full month's worth.
+        span_end = date.fromisoformat(WORK_DAY) + timedelta(days=6)
+        page.fill("textarea.assistant-input", f"i want pest control records from {WORK_DAY} to {span_end.isoformat()}")
+        page.click("button[aria-label='Send message']")
+        page.wait_for_timeout(500)
+        reply_span = page.locator(".assistant-page .chat-msg.bot").last.inner_text()
+        check(
+            "Assistant scopes a module's listing to the exact multi-day span asked for",
+            f"{display_date(WORK_DAY)} to {display_date(span_end.isoformat())}" in reply_span,
+        )
+        # Regression guard for "a generic reports request must still reach the
+        # model to navigate, not get hijacked by this local intent" lives in
+        # e2e_assistant_chat.py's "Navigated to Reports for August via free
+        # text" check instead of here — that assertion needs a real network
+        # round trip (there is nothing local to observe when the local layer
+        # correctly stays silent), which this network-independent suite
+        # deliberately never makes.
 
         browser.close()
 

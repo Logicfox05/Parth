@@ -43,7 +43,7 @@ python tests/e2e_assistant_chat.py # needs backend/.env's GROQ_API_KEY to actual
 Both scripts now sign up a fresh, randomly-emailed account at the start of the run (the app gates
 every page behind login — see `frontend/src/main.tsx`/`AuthProvider`) before exercising the rest of the app.
 
-## Results (last full run — 08-Sep-2026 17:30, on the TypeScript-only backend/scripts, after the working-calendar + Assistant-page batch)
+## Results (last full run — 09-Sep-2026, on the TypeScript-only backend/scripts, after the date-range document-listing batch)
 
 The run below is the production shape end to end: `frontend/scripts/build.ts` builds the bundle,
 `backend/index.ts` (run directly by Node 23.6, no compile step) serves it plus the API, and every
@@ -142,6 +142,25 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   account's tokens-per-minute allowance, five calls in ~20 s each carrying the route guide + context).
   `backend/groq.ts` now retries a 429 once after the delay Groq asks for (bounded), and the suite
   pauses before its final model call.
+- **Date-range document listing** (09-Sep-2026): "I want documents of daily pest control monitoring
+  record from 1 to 19 January", "pest control records for this week", "fly catcher documents for
+  September" are now answered locally (`engine/assistantLocal.ts`, `listDocumentsAnswer` +
+  `parseDateRange` + `matchDocuments`) — enumerating exactly the records due in the span named (a
+  bare month or "this/last/next month" lists the whole month; an explicit day-to-day span, including
+  the shorthand "1 to 19 January" with the month stated once, lists only those days), scoped to the
+  document(s) or module named (a 30+ alias table over every recordable document, falling back to the
+  module when no single document is named — "pest", "lamination"). Generates records for just the
+  touched months/documents on demand (`ensureRecordsGeneratedForMonth`/`ensureDemoRecordsGeneratedForYear`)
+  so a query about a month nobody has browsed to yet still resolves correctly, while the launch-date
+  floor still applies in Live mode. Deliberately requires BOTH a recognisable document/module AND a
+  date reference before firing, so it never intercepts a plain navigation request — "show me all
+  reports of august" and "open the rat and mice service reports" (no date) still reach the model and
+  navigate exactly as before (`e2e_assistant_chat.py`'s existing "Navigated to Reports for August"
+  check, unchanged, still passing, is the regression guard — it needs a real Groq round trip, which
+  the network-independent smoke suite deliberately never makes). Checked with 2 new smoke assertions
+  (a single-day range on a real record, a 7-day span scoped exactly to those 7 days) and a throwaway
+  Playwright sanity pass over 13 phrasings (7 that must trigger the listing, 6 that must not) before
+  committing to the smoke suite's two.
 - **Bug found by running the suite at 17:10 — a double briefing.** A first-ever open inside a slot
   window (09:00–10:00 or 17:00–18:00) showed the "first" briefing and then, the instant it was
   dismissed, the slot's own briefing straight over the page — a modal overlay that swallowed every
@@ -154,7 +173,7 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   Python's `print` raised `UnicodeEncodeError` mid-run. Labels are ASCII-only now (em dashes are
   fine in cp1252; arrows are not).
 
-### `e2e_smoke.py` — all 97 check sites passed (the "Section C / D / E is announced next" row runs three times, so 99 checks at run time), 0 unexpected console errors
+### `e2e_smoke.py` — all 99 check sites passed (the "Section C / D / E is announced next" row runs three times, so 101 checks at run time), 0 unexpected console errors
 
 | # | Check | Result |
 |---|---|---|
@@ -255,6 +274,8 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
 | 95 | Assistant explains an adjustment day as a working Thursday | PASS |
 | 96 | Assistant lists what's next on the leave calendar (or says the year's list is done) and names the weekly off | PASS |
 | 97 | Assistant conversation persists across a reload | PASS |
+| 98 | Assistant lists a document's records for an explicit single-day range, not the whole month | PASS |
+| 99 | Assistant scopes a module's listing to the exact multi-day span asked for | PASS |
 
 (One benign console entry — the pre-login `GET /api/auth/me` 401, expected on every fresh
 session — is filtered out of the "unexpected console errors" check rather than counted as a

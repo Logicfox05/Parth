@@ -593,6 +593,37 @@ service-report variant that had no source specimen (§5). The assistant's route 
 (`backend/assistant.ts`) knows every page, so "show me the rat reports" / "fly catcher infestation
 for this year" navigate straight there.
 
+## 21. Assistant: date-range document listing (09-Sep-2026)
+
+```
+DIGITAL TEMPLATE     src/engine/assistantLocal.ts — listDocumentsAnswer(), parseDateRange(),
+                      matchDocuments(); wired into localAnswer() (widget + /assistant page)
+```
+
+The department's own request: to ask the assistant for a document's records over a specific span —
+"I want documents of daily pest control monitoring record from 1 to 19 January", "pest control
+records for this week", "fly catcher documents for September" — and get back exactly that span, not
+a whole month unless a whole month is what was asked for. Answered entirely on the client, instantly:
+
+- **Which document(s)**: a ~30-entry alias table matches a specific document by name/format-no
+  ("daily pest control monitoring", "rat and mice", "f/hr/18", "pouching"), falling back to every
+  recordable document in a named module ("pest", "pest control", "lamination") only when no single
+  document is named, so a precise request is never diluted across an entire module.
+- **Which span**: an explicit day-to-day range (including the shorthand "1 to 19 January", where the
+  month is only stated once), a single explicit date, "this/last/next week", a bare month name (with
+  or without a year) or "this/last/next month" for a whole month, or today/tomorrow/yesterday/a
+  weekday (reusing the same single-date parser the holiday questions use).
+- **Deliberately requires both** — a message naming a document/module with no date, or a date with no
+  document/module, falls straight through to the model exactly as before. This is what keeps existing
+  plain-navigation phrasing ("show me all reports of august", "open the rat and mice service reports")
+  routed to the model and its `/reports/{y}/{m}/{tab}` navigation unchanged — confirmed by rerunning
+  `tests/e2e_assistant_chat.py` (all 9 checks, including "Navigated to Reports for August") after
+  adding this.
+- Generates records for just the touched months/document(s) on demand before answering, so a span
+  nobody has browsed to yet (Live) or that predates the current year's demo generation (Demo) still
+  resolves correctly; the Live launch-date floor still applies (a pre-launch span correctly comes back
+  "No … records").
+
 ## Master data provenance summary
 
 | Master list | Source | Notes |
