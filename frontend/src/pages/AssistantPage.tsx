@@ -237,7 +237,7 @@ export function AssistantPage() {
           </span>
           <div style={{ minWidth: 0 }}>
             <div className="font-semibold">Assistant</div>
-            <div className="text-xs text-muted truncate">Ask, navigate, fill — in plain words. Knows today's work, the leave calendar and every register. Text only.</div>
+            <div className="text-xs text-muted truncate">Ask, navigate, fill — in plain words. Knows today's work, the leave calendar and every register. This system only; text only.</div>
           </div>
         </header>
 
@@ -246,8 +246,8 @@ export function AssistantPage() {
             <div className="assistant-welcome">
               <h2 className="text-xl mb-1">Hi {firstName} 👋</h2>
               <p className="text-muted mb-4" style={{ maxWidth: 560 }}>
-                I'm your buddy for this system. Ask me what's due, where something is, whether a day is a holiday, or tell me what happened and I'll fill it in. Pick a question to start, or
-                type your own.
+                I'm your buddy for this system. Ask me what's due, where something is, whether a day is a holiday, or tell me what happened and I'll fill it in. I answer about this
+                software and its records only — anything outside it I'll politely decline. Pick a question to start, or type your own.
               </p>
               <div className="assistant-suggestions">
                 {SUGGESTED_PROMPTS.map((p) => (
@@ -313,7 +313,8 @@ export function AssistantPage() {
           </button>
         </div>
         <div className="text-xs text-faint" style={{ padding: "0 16px 12px" }}>
-          Text only — no voice input. Conversations are saved in this browser. The assistant never submits or verifies anything by itself.
+          Answers cover this record system only — not general questions. Text only, no voice input. Conversations are saved in this browser. The assistant never submits or verifies
+          anything by itself.
         </div>
       </section>
     </div>

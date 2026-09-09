@@ -68,6 +68,14 @@ The app behaves like a personal assistant rather than a blank form:
   Source / Unit / Target Pest / Year / Jan–Dec / Total layout; **Training & Reference** — Training
   Records, Chemical Master, SOP. The assistant navigates there from plain speech ("show me the rat
   reports", "fly catcher infestation for this year").
+- **The assistant only answers about this software.** It is a tool for operating this record system,
+  not a general chatbot: ask it something outside the system — general knowledge, news, weather, a
+  joke, a poem, coding or medical/legal advice — and it politely declines and offers what it can do
+  here instead, without answering the question even partially. That rule is enforced twice: a hard
+  SCOPE block in the model's system prompt (`backend/assistant.ts`), plus a small client-side list of
+  unmistakably-general phrasings declined instantly with no network call
+  (`offTopicReply`, `src/engine/assistantLocal.ts`). Greetings and "what can you do?" are still
+  answered warmly — and questions about the plant's own work are, of course, in scope.
 - **The assistant lists a document's records for exactly the date span you name** — "I want documents
   of daily pest control monitoring record from 1 to 19 January", "pest control records for this
   week", "fly catcher documents for September". Answered locally (`src/engine/assistantLocal.ts`), so

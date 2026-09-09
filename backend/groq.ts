@@ -16,8 +16,10 @@ const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 // being briefly exhausted (a burst of chat messages, each carrying the route
 // guide and the live-facts context). Groq says how long to wait — in a
 // Retry-After header and/or "Please try again in 2.6s" in the body — so wait
-// that long (bounded) and try once more before giving up.
+// that long (bounded) and try again before giving up. Two retries, because a
+// single one still fails when several messages land inside the same minute.
 const RETRY_MAX_MS = 8000;
+const MAX_RETRIES = 2;
 
 function retryDelayMs(res: Response, bodyText: string): number {
   const header = Number(res.headers.get("retry-after"));
@@ -56,10 +58,10 @@ export async function groqChatJSON({ system, user, temperature = 0.2 }: { system
   });
 
   let res = await postChat(apiKey, payload);
-  if (res.status === 429) {
+  for (let attempt = 1; attempt <= MAX_RETRIES && res.status === 429; attempt++) {
     const text = await res.text().catch(() => "");
     const delay = retryDelayMs(res, text);
-    console.warn(`Groq rate limit (429) — retrying once in ${delay} ms`);
+    console.warn(`Groq rate limit (429) — retry ${attempt} of ${MAX_RETRIES} in ${delay} ms`);
     await new Promise((resolve) => setTimeout(resolve, delay + 250));
     res = await postChat(apiKey, payload);
   }

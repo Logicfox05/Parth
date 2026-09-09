@@ -58,16 +58,53 @@ def open_widget(page):
         page.wait_for_timeout(200)
 
 
+# This account's Groq tier allows 8000 tokens per minute and each call carries
+# the route guide, the scope rule and the live-facts context (~2.5k tokens), so
+# the suite paces its model-bound messages rather than firing them back to back
+# — otherwise later calls 429 (backend/groq.ts retries, but the whole minute's
+# budget can already be gone). See TESTING.md.
+PACE_SECONDS = 22
+_last_model_call = [0.0]
+
+
+def pace(page):
+    wait = PACE_SECONDS - (time.time() - _last_model_call[0])
+    if _last_model_call[0] and wait > 0:
+        page.wait_for_timeout(int(wait * 1000))
+    _last_model_call[0] = time.time()
+
+
+def wait_for_reply(page, locator, before, timeout_ms=45000):
+    """Wait for a new bot bubble carrying actual text. A fixed sleep is not
+    enough: a real Groq round trip plus a rate-limit retry can take tens of
+    seconds. The typing indicator is also a .chat-msg.bot but has no text, so
+    requiring non-empty text skips it."""
+    deadline = time.time() + timeout_ms / 1000
+    while time.time() < deadline:
+        if locator.count() > before and locator.last.inner_text().strip():
+            return True
+        page.wait_for_timeout(250)
+    return False
+
+
 def ask(page, text):
     open_widget(page)
+    pace(page)
+    before = bot_messages(page).count()
     box = page.locator("textarea.input")
     box.fill(text)
     page.click("button[aria-label='Send']")
-    page.wait_for_timeout(3500)  # real Groq round-trip
+    wait_for_reply(page, bot_messages(page), before)
 
 
 def bot_messages(page):
     return page.locator(".chat-msg.bot")
+
+
+def ascii_safe(text):
+    """The Windows console is cp1252; a model reply can carry an emoji or a
+    character it cannot encode, which would crash print() mid-run."""
+    return text.encode("ascii", "replace").decode("ascii")
 
 
 def main():
@@ -111,6 +148,19 @@ def main():
         check("A conversational message did not navigate anywhere", page.url == url_before)
         check("Assistant gave a reply message", bot_messages(page).count() > before)
 
+        # ---- 3b. Out of scope: the model declines instead of answering ----
+        # Deliberately phrased so the client-side scope guard does NOT catch it
+        # (engine/assistantLocal.ts keeps its pattern list tiny), so this
+        # exercises the SCOPE block in backend/assistant.ts. If the model had
+        # answered the question, the reply would carry its giveaway words.
+        url_before = page.url
+        ask(page, "explain how photosynthesis works")
+        reply = bot_messages(page).last.inner_text().lower()
+        print(f"    (out-of-scope reply: {ascii_safe(reply[:160])!r})")
+        check("Model declines an out-of-scope question instead of answering it", not any(w in reply for w in ["chlorophyll", "sunlight", "carbon dioxide", "glucose"]))
+        check("Declining an out-of-scope question says what it does cover", any(w in reply for w in ["record", "system", "document", "pest"]))
+        check("Declining an out-of-scope question does not navigate", page.url == url_before)
+
         # ---- 4. Natural-language fill on an already-open record ----
         # Close the panel first: it sits bottom-right, over the Day View's
         # "Open" buttons, same as a real user would tuck it away to click.
@@ -136,17 +186,16 @@ def main():
         # No date/weekday in the question, so it is NOT answered locally
         # (engine/assistantLocal.ts) — it goes to Groq with the context digest
         # attached, which states the weekly off is Thursday.
-        # The four model calls above fit in one minute of this account's
-        # tokens-per-minute allowance only just (each carries the route guide
-        # + context); pause so this one isn't the request that trips it.
-        page.wait_for_timeout(15000)
         page.goto(f"{BASE}/index.html#/assistant")
         page.wait_for_timeout(400)
+        page_bubbles = page.locator(".assistant-page .chat-msg.bot")
+        pace(page)
+        before = page_bubbles.count()
         page.fill("textarea.assistant-input", "which day of the week is our weekly off? answer in one line")
         page.click("button[aria-label='Send message']")
-        page.wait_for_timeout(3500)
-        page_reply = page.locator(".assistant-page .chat-msg.bot").last.inner_text()
-        print(f"    (assistant page replied: {page_reply[:160]!r}; url now {page.url})")
+        wait_for_reply(page, page_bubbles, before)
+        page_reply = page_bubbles.last.inner_text()
+        print(f"    (assistant page replied: {ascii_safe(page_reply[:160])!r}; url now {page.url})")
         check("Assistant page answers from the live app context (weekly off = Thursday)", "thursday" in page_reply.lower())
 
         browser.close()

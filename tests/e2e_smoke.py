@@ -599,6 +599,36 @@ def main():
             "Assistant scopes a module's listing to the exact multi-day span asked for",
             f"{display_date(WORK_DAY)} to {display_date(span_end.isoformat())}" in reply_span,
         )
+        # ---- 15c. Scope: this assistant answers about this software only ----
+        # An unmistakably general message is declined instantly on the client
+        # (engine/assistantLocal.ts offTopicReply) — no network call. The
+        # model carries the same rule for everything else (its SCOPE block in
+        # backend/assistant.ts, exercised in e2e_assistant_chat.py).
+        page.fill("textarea.assistant-input", "tell me a joke")
+        page.click("button[aria-label='Send message']")
+        page.wait_for_timeout(500)
+        reply_off = page.locator(".assistant-page .chat-msg.bot").last.inner_text()
+        check("Assistant declines a general (non-software) question", "only cover this Digital Controlled Record System" in reply_off)
+        check("Declining a general question does not navigate away", "#/assistant" in page.url)
+        # Name-dropping a pest-control word doesn't make a general request in
+        # scope — it's the request that's judged, not the keywords.
+        page.fill("textarea.assistant-input", "write me a poem about rodents")
+        page.click("button[aria-label='Send message']")
+        page.wait_for_timeout(500)
+        check(
+            "A general request that mentions a pest-control word is still declined",
+            "only cover this Digital Controlled Record System" in page.locator(".assistant-page .chat-msg.bot").last.inner_text(),
+        )
+        # ...and the scope guard must not over-block: the very next in-scope
+        # question is answered normally.
+        page.fill("textarea.assistant-input", "is 2026-09-10 a holiday?")
+        page.click("button[aria-label='Send message']")
+        page.wait_for_timeout(500)
+        check(
+            "An in-scope question straight after is still answered normally (scope guard does not over-block)",
+            "weekly off" in page.locator(".assistant-page .chat-msg.bot").last.inner_text().lower(),
+        )
+
         # Regression guard for "a generic reports request must still reach the
         # model to navigate, not get hijacked by this local intent" lives in
         # e2e_assistant_chat.py's "Navigated to Reports for August via free

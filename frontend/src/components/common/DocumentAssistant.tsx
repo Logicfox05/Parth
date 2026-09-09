@@ -21,7 +21,7 @@ import {
   type GuidedPrompt,
   type GuidedStep,
 } from "../../engine/guidedChecklist";
-import { buildAssistantContext, localAnswer } from "../../engine/assistantLocal";
+import { buildAssistantContext, localAnswer, offTopicReply } from "../../engine/assistantLocal";
 import { formatDisplayDate, todayISO } from "../../utils/date";
 import { generateId } from "../../utils/id";
 import { openBriefing } from "./AssistantBriefingPopup";
@@ -44,7 +44,7 @@ const PLACEHOLDER_BY_KIND: Record<string, string> = {
   gap: "e.g. Found a gap near the loading dock, corrective action: install a net, target 20 Sept",
   training: "e.g. Training on 3 Sept, topic pest control basics, trainer ABC Pest Solutions",
 };
-const DEFAULT_PLACEHOLDER = "Ask me anything — \"show August's reports\", \"open CAPA\"…";
+const DEFAULT_PLACEHOLDER = "Ask me about this system — \"show August's reports\", \"open CAPA\"…";
 
 interface ChatMessage {
   id: string;
@@ -340,7 +340,9 @@ export function DocumentAssistant() {
     // questions take the local path then.
     const looksLikeQuestion =
       /\?\s*$/.test(text) || /^(is|was|are|were|when|which|what|who|how|do|does|did|can|could|will|tell me|list|show|give me|i want|find|get me)\b/i.test(text);
-    const local = !t || looksLikeQuestion ? localAnswer(text, isDemo, user?.name) : null;
+    // With a record open, free text is normally data to fill in — but an
+    // out-of-scope message never is, so it is declined either way.
+    const local = !t || looksLikeQuestion ? localAnswer(text, isDemo, user?.name) : offTopicReply(text);
     if (local) {
       bot(local.reply, local.chips);
       return;
@@ -395,7 +397,7 @@ export function DocumentAssistant() {
         : "Tap an answer above, or ask me something else"
     : (targetKind && PLACEHOLDER_BY_KIND[targetKind]) || DEFAULT_PLACEHOLDER;
 
-  const subtitle = getTarget()?.checklist?.title ?? (hasTarget ? "A record is open — tell me what to fill in" : "Ask, navigate, fill — in your own words");
+  const subtitle = getTarget()?.checklist?.title ?? (hasTarget ? "A record is open — tell me what to fill in" : "Ask, navigate, fill — this system only");
 
   // The full-page Assistant IS the chat on that screen — two chat boxes
   // would just be confusing. (After every hook above, so the hook order is

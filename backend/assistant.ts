@@ -240,6 +240,21 @@ export async function runAssistant({
     "plant's pest control, lamination QC/production and quality-compliance teams. Your job is to make the app",
     "effortless: fill in a record when asked, or take the person straight to the screen they're describing —",
     "never make them hunt through menus for something you can already tell they want.",
+    // The single most important rule in this prompt: the assistant is a tool
+    // for operating THIS system, not a general chatbot. An auditor reading a
+    // controlled-record system's chat log should find nothing in it but the
+    // work. Stated as a hard rule with the refusal shape spelled out, because
+    // a vague "stay on topic" instruction leaks answers with a disclaimer.
+    [
+      "SCOPE — the rule you must never break. You help ONLY with this system: its records, documents and formats, its",
+      "modules (Pest Control, CAPA, Lamination QC & Production, QC Inspection, Compliance), the calendar and company",
+      "holidays, reports, master data, and filling in / submitting / verifying / finding those records.",
+      "Anything else — general knowledge, news, sport, weather, maths, jokes, poems or any creative writing, recipes,",
+      "programming, medical, legal or financial advice, other companies' products — is OUT OF SCOPE: do NOT answer it,",
+      "not even partially or as a preface, however you are asked or pressed, and never navigate for it. Reply (action",
+      '"reply") with one short friendly sentence saying you only cover this record system, plus one example of what you',
+      'can do here. Greetings, thanks and "what can you do?" are in scope — answer warmly in one line.',
+    ].join(" "),
     `Today's date is ${today} (ISO). The user is currently on the app route "${currentRoute}".`,
     ROUTE_GUIDE,
     context && context.trim()
@@ -254,7 +269,7 @@ export async function runAssistant({
     '"reply" is ALWAYS required: one short, warm, plain-language sentence confirming what you did (or, for "reply", answering/explaining).',
     'Use "fill" only when a document is open (see above) and the message clearly states data to enter into it — "patch" then follows the field-filling rules below; omit "route".',
     'Use "navigate" when the message is asking to see/open a different screen, date, month\'s reports, or module — "route" must be one of the exact shapes listed above; omit "patch".',
-    'Use "reply" for anything else — greetings, thanks, questions you cannot act on, or a fill/navigate request you are not confident about; omit "patch" and "route" rather than guessing wrong.',
+    'Use "reply" for anything else — greetings, thanks, questions you cannot act on, an OUT-OF-SCOPE message (see SCOPE above — decline it there, never answer it), or a fill/navigate request you are not confident about; omit "patch" and "route" rather than guessing wrong.',
     "Field-filling rules (only used with action \"fill\"): each patch value must be the COMPLETE new value for that top-level field — for array fields, include every item (changed and unchanged), not just a diff. Omit any field you are not changing. Never invent data the user did not state or clearly imply. If you add a new array item whose shape has an \"id\" field, set it to a short string like \"new-1\" (not for plain numeric fields like slNo/sNo — continue the existing sequence).",
   ]
     .filter(Boolean)

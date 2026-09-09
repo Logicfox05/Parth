@@ -36,6 +36,51 @@ export interface LocalAnswer {
   chips?: Chip[];
 }
 
+// OUT OF SCOPE — this assistant answers about this record system and nothing
+// else. The model is told the same, in far more detail (the SCOPE block in
+// backend/assistant.ts) and is what actually catches the general run of
+// off-topic messages; these few patterns are the ones that could not
+// conceivably be about the plant's paperwork, so they are declined here
+// instantly, without a network round trip or a token spent.
+//
+// Deliberately tiny and unambiguous. A pattern that might also fit a real
+// question about the work does NOT belong here — "treatment", "recipe",
+// "translate" (the F/QC/13 sheet is in Gujarati) and "weather" on its own
+// (it drives pest activity) are all left to the model on purpose. A false
+// positive here would refuse a legitimate question, which is far worse than
+// spending one model call to decline a general one.
+const OFF_TOPIC_PATTERNS: RegExp[] = [
+  /\b(tell|crack|say)\s+(me\s+)?(a|an|another)?\s*joke\b/i,
+  /\bmake me laugh\b/i,
+  /\b(write|compose|draft|give me)\s+(me\s+)?(a|an)?\s*(poem|song|story|essay|haiku|rap|novel|screenplay|shayari)\b/i,
+  /\b(what'?s|how'?s|hows)\s+the\s+weather\b/i,
+  /\bweather\s+(today|tomorrow|forecast)\b/i,
+  /\b(cricket|football|ipl|world cup|olympics)\b/i,
+  /\blatest news\b/i,
+  /\bwho\s+is\s+the\s+(president|prime minister|king|queen|richest)\b/i,
+  /\b(what'?s|what is)\s+the\s+capital\s+of\b/i,
+  // A message that is nothing but arithmetic — "what is 27 * 4?".
+  /^\s*(what\s+is|what'?s|calculate|solve)\s+[\d\s+\-*/x×÷().]+\??\s*$/i,
+];
+
+const OFF_TOPIC_REPLY =
+  "I only cover this Digital Controlled Record System — its records, documents, calendar, reports and the work of filling and verifying them — so I can't help with that one.";
+
+// Exported so the floating widget can decline an off-topic message even when
+// a record is open (where it otherwise treats free text as data to fill in).
+export function offTopicReply(message: string): LocalAnswer | null {
+  const text = message.trim();
+  if (!OFF_TOPIC_PATTERNS.some((re) => re.test(text))) return null;
+  return {
+    reply: `${OFF_TOPIC_REPLY} Ask me something like "what's due today", "daily pest control monitoring record from 1 to 19 January", or "open the rat / mice service reports".`,
+    chips: [
+      { label: "What's due today?", action: { type: "navigate", route: `/day/${todayISO()}` }, tone: "primary" },
+      { label: "Pest Control", action: { type: "navigate", route: "/pest-control" } },
+      { label: "This month's reports", action: { type: "navigate", route: "/reports" } },
+    ],
+  };
+}
+
 export const SUGGESTED_PROMPTS: { title: string; text: string }[] = [
   { title: "What's due today?", text: "What's due today and what have you already prepared for me?" },
   { title: "Is tomorrow a holiday?", text: "Is tomorrow a holiday?" },
@@ -420,6 +465,11 @@ export function localAnswer(message: string, isDemo: boolean, userName?: string)
   const today = todayISO();
   const master = masterRepository.get();
 
+  // Scope first: a message that cannot be about this system is declined
+  // before any intent routing (see offTopicReply above).
+  const offTopic = offTopicReply(text);
+  if (offTopic) return offTopic;
+
   if (HOLIDAY_RE.test(lower)) {
     if (ADJUSTMENT_RE.test(lower)) return { reply: listAdjustmentDays(today), chips: holidayChips() };
     const ref = parseDateRef(text, today);
@@ -478,7 +528,7 @@ export function localAnswer(message: string, isDemo: boolean, userName?: string)
   if (/^(help|\?|what can you do\??|how do you work\??)$/.test(lower) || /\b(what can you do|what do you do|how can you help)\b/.test(lower)) {
     const off = WEEKDAY_LONG[weeklyOffDay(master)];
     return {
-      reply: `I can take you anywhere in the app in plain words ("show me August's reports", "open the rat / mice service reports"), list a document's records for a date range ("daily pest control monitoring record from 1 to 19 January", "pest records for September"), fill in a record you have open ("checker is Ramesh, time 9:15"), tell you what's due and what I've already prepared, and answer calendar questions — holidays, the ${off} weekly off, adjustment days. Text only, no voice.`,
+      reply: `I can take you anywhere in the app in plain words ("show me August's reports", "open the rat / mice service reports"), list a document's records for a date range ("daily pest control monitoring record from 1 to 19 January", "pest records for September"), fill in a record you have open ("checker is Ramesh, time 9:15"), tell you what's due and what I've already prepared, and answer calendar questions — holidays, the ${off} weekly off, adjustment days. I stick to this record system only — I'm not a general chatbot, so anything outside this software I'll politely decline. Text only, no voice.`,
       chips: [
         { label: "What's due today?", action: { type: "navigate", route: `/day/${today}` } },
         { label: "Pest Control", action: { type: "navigate", route: "/pest-control" } },

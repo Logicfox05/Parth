@@ -43,7 +43,7 @@ python tests/e2e_assistant_chat.py # needs backend/.env's GROQ_API_KEY to actual
 Both scripts now sign up a fresh, randomly-emailed account at the start of the run (the app gates
 every page behind login — see `frontend/src/main.tsx`/`AuthProvider`) before exercising the rest of the app.
 
-## Results (last full run — 09-Sep-2026, on the TypeScript-only backend/scripts, after the F/HR/17 register + service-provider licence batch)
+## Results (last full run — 09-Sep-2026, on the TypeScript-only backend/scripts, after the assistant-scope batch)
 
 The run below is the production shape end to end: `frontend/scripts/build.ts` builds the bundle,
 `backend/index.ts` (run directly by Node 23.6, no compile step) serves it plus the API, and every
@@ -173,6 +173,33 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   Monitoring Summary, and prints as three pages. Checked by four new smoke assertions (3 register
   pages / 10 check points / 31 date rows; the format's instruction wording; the summary table; the
   Reports tab) and a re-targeted one (the pre-marked HOLIDAY row is now found by `tr[data-day]`).
+- **Assistant scope — this software only** (09-Sep-2026). The assistant is a tool for operating this
+  record system, not a general chatbot, so it now declines anything outside it (general knowledge,
+  news, sport, weather, maths, jokes, poems and other creative writing, recipes, programming,
+  medical / legal / financial advice) with one friendly sentence plus an example of what it *can* do —
+  never answering partially, as a preface or as an example, and never navigating for it. Two layers:
+  the authoritative `SCOPE` block in the model's system prompt (`backend/assistant.ts`) and a
+  deliberately tiny client-side pattern list (`offTopicReply`, `engine/assistantLocal.ts`) for
+  phrasings that could not conceivably be about the plant's paperwork — declined instantly, no
+  network call, no tokens. Ambiguous words that also belong to the work ("treatment", "recipe",
+  "translate" — F/QC/13 is Gujarati — and bare "weather", which drives pest activity) are left to the
+  model on purpose: wrongly refusing real work is worse than one call spent declining. Placeholder,
+  subtitle, welcome and footer wording updated to set the expectation. Checked with four new smoke
+  assertions (a joke request declined; "write me a poem about rodents" declined even though it
+  name-drops a pest word; no navigation; **and the very next in-scope question still answered — the
+  over-blocking guard**) and three new live-Groq assertions ("explain how photosynthesis works" came
+  back as *"I'm here to help with the plant's record-keeping system — e.g., I can open the CAPA screen
+  or navigate to the pest-control daily register"*, carrying none of chlorophyll / sunlight / carbon
+  dioxide / glucose).
+- **Groq pacing and reply-waiting in the chat suite.** The longer scope prompt pushed each call to
+  ~2.5k tokens, so six calls in quick succession exhausted the account's 8,000-tokens-per-minute
+  allowance and the suite read empty reply bubbles — which then cascaded into unrelated check
+  failures. Fixed properly rather than papered over: `backend/groq.ts` now retries a 429 up to twice
+  (still honouring the delay Groq names, capped at 8 s), and `e2e_assistant_chat.py` paces
+  model-bound messages ~22 s apart (`PACE_SECONDS`) and *waits for the reply bubble to actually carry
+  text* (`wait_for_reply`, 45 s cap) instead of sleeping a fixed 3.5 s. The rerun needed zero retries.
+  Debug prints of model output now go through `ascii_safe()` — a reply containing an emoji or a
+  typographic quote crashed `print()` on the cp1252 Windows console mid-run.
 - **The service provider's insecticide licence on file** (09-Sep-2026): Gurudev Pesticides'
   Government of Gujarat Form III licence ("Service licence GP3 kapila mam.pdf"), added to Pest
   Control > Training & Reference as `/licence` — the two scanned pages shown exactly as supplied
@@ -193,7 +220,7 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   Python's `print` raised `UnicodeEncodeError` mid-run. Labels are ASCII-only now (em dashes are
   fine in cp1252; arrows are not).
 
-### `e2e_smoke.py` — all 107 check sites passed (the "Section C / D / E is announced next" row runs three times, so 109 checks at run time), 0 unexpected console errors
+### `e2e_smoke.py` — all 111 check sites passed (the "Section C / D / E is announced next" row runs three times, so 113 checks at run time), 0 unexpected console errors
 
 | # | Check | Result |
 |---|---|---|
@@ -304,6 +331,10 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
 | 105 | Assistant conversation persists across a reload | PASS |
 | 106 | Assistant lists a document's records for an explicit single-day range, not the whole month | PASS |
 | 107 | Assistant scopes a module's listing to the exact multi-day span asked for | PASS |
+| 108 | Assistant declines a general (non-software) question | PASS |
+| 109 | Declining a general question does not navigate away | PASS |
+| 110 | A general request that mentions a pest-control word is still declined | PASS |
+| 111 | An in-scope question straight after is still answered normally (scope guard does not over-block) | PASS |
 
 (One benign console entry — the pre-login `GET /api/auth/me` 401, expected on every fresh
 session — is filtered out of the "unexpected console errors" check rather than counted as a
@@ -336,7 +367,7 @@ shells.
 | 13 | 24 full-page screenshots captured for visual review (`tests/shots/`) | PASS |
 | 14 | No JS errors across the whole pass | PASS |
 
-### `e2e_assistant_chat.py` — 9/9 checks passed, 0 JS errors (real Groq calls)
+### `e2e_assistant_chat.py` — 12/12 checks passed, 0 JS errors (real Groq calls, paced ~22 s apart)
 
 | # | Check | Result |
 |---|---|---|
@@ -348,7 +379,10 @@ shells.
 | 6 | Opened a Daily Pest Monitoring record for the fill test | PASS |
 | 7 | Fill instruction ("checker is Buddy QA Tester") applied a field | PASS |
 | 8 | Checker field actually updated in the form | PASS |
-| 9 | Assistant page: "which day of the week is our weekly off?" (no date reference, so not answered locally) — the model replied "Thursday" from the live-facts `context` attached to the call | PASS |
+| 9 | Out-of-scope question ("explain how photosynthesis works", phrased so the client-side guard does *not* catch it) declined by the model instead of answered — no chlorophyll / sunlight / carbon dioxide / glucose in the reply | PASS |
+| 10 | ...and the decline says what it does cover instead | PASS |
+| 11 | ...and does not navigate anywhere | PASS |
+| 12 | Assistant page: "which day of the week is our weekly off?" (no date reference, so not answered locally) — the model replied "Thursday" from the live-facts `context` attached to the call | PASS |
 
 Also verified directly against the Groq API (`GET /openai/v1/models`) that this account's key has no
 access to the commonly-documented `llama-3.3-70b-versatile` default (404s) — the model this app

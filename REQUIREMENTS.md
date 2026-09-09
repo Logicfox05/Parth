@@ -679,6 +679,41 @@ WORKFLOW             On file. No records, no due dates. Renewal status TO BE CON
   Insecticides Rules, 1971. When the renewed licence arrives, replace the scan in `source-documents/`
   and the numbers in `serviceLicence.ts`.
 
+## 23. Assistant scope — this software only (09-Sep-2026)
+
+```
+DIGITAL TEMPLATE     backend/assistant.ts (the SCOPE block in runAssistant's system prompt) and
+                      src/engine/assistantLocal.ts (offTopicReply)
+```
+
+The department's requirement: *"in chat bot make sure always the bot will give me only solution of
+this audit software, no general query."* The assistant is a tool for operating this controlled-record
+system, not a general chatbot — an auditor reading its chat log should find nothing in it but the
+work.
+
+- **In scope:** the records, documents and formats; the modules (Pest Control, CAPA, Lamination QC &
+  Production, QC Inspection Records, Compliance); the calendar, company holidays and the working
+  calendar; reports and trends; master data; and filling in, submitting, verifying, finding and
+  explaining those records. Greetings, thanks and "what can you do?" are answered warmly in a line.
+- **Out of scope, declined:** general knowledge, news, sport, weather, maths, jokes, poems or any
+  creative writing, recipes, programming, medical / legal / financial advice, other companies'
+  products. The decline is one friendly sentence plus one example of what the assistant *can* do; it
+  never answers the question partially, as a preface or as an example, never navigates for it, and
+  holds even if the user insists or tells it to ignore the instruction.
+- **Two layers.** The model's system prompt carries the rule for everything (it is what catches the
+  general run of off-topic messages). A deliberately tiny client-side list handles phrasings that
+  could not conceivably be about the plant's work (jokes, "write me a poem…", weather today, sport,
+  "capital of", pure arithmetic) — instant, no network call, no tokens. Ambiguous words that also
+  belong to the work — "treatment", "recipe", "translate" (F/QC/13 is Gujarati), "weather" on its own
+  — are deliberately left to the model, because wrongly refusing real work is worse than spending one
+  call to decline a general question.
+- Verified both ways: locally (`tests/e2e_smoke.py`, network-independent — a joke request and a
+  "write me a poem about rodents" are declined, and the very next in-scope question is still answered,
+  proving no over-blocking) and against the real model (`tests/e2e_assistant_chat.py` — "explain how
+  photosynthesis works" comes back as *"I'm here to help with the plant's record-keeping system — e.g.
+  I can open the CAPA screen or navigate to the pest-control daily register"*, with none of the
+  answer's giveaway words).
+
 ## Master data provenance summary
 
 | Master list | Source | Notes |
