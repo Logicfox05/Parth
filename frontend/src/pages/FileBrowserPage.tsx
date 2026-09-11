@@ -80,7 +80,7 @@ function MonthFolder({
                       {holiday ? <span className="badge badge-Scheduled">Holiday</span> : <StatusBadge status={r.status} />}
                       {r.isDemo && <DemoTag />}
                     </td>
-                    <td className="file-by text-xs text-muted">{r.verifiedBy ? `✓ ${r.verifiedBy}` : r.submittedBy ? r.submittedBy : "—"}</td>
+                    <td className="file-by text-xs text-muted notranslate" translate="no">{r.verifiedBy ? `✓ ${r.verifiedBy}` : r.submittedBy ? r.submittedBy : "—"}</td>
                     <td className="file-open">
                       <button className="btn btn-ghost btn-sm">{t("common.open")}</button>
                     </td>

@@ -246,13 +246,15 @@ export function RecordPage({ recordId }: { recordId?: string }) {
       {record.status === "Rejected" && record.rejectionReason && (
         <div className="card mb-4" style={{ borderColor: "var(--color-danger)", background: "var(--color-danger-bg)" }}>
           <div className="card-pad text-sm">
-            <strong>Rejected</strong> by {record.rejectedBy} — {record.rejectionReason}
+            <strong>Rejected</strong> by <span translate="no">{record.rejectedBy}</span> — {record.rejectionReason}
           </div>
         </div>
       )}
 
       <ErrorList errors={errors} heading={errorsFor === "verify" ? t("record.fixBeforeVerify") : t("record.fixBeforeSubmit")} />
 
+      {/* The form exactly as issued — Google Translate leaves it alone (i18n/googleTranslate.ts). */}
+      <div className="notranslate" translate="no">
       {doc.kind === "daily-pest-monitoring" && (
         <DailyPestMonitoringRecordView doc={doc} record={{ ...record, data: data as DailyPestMonitoringData }} editable={editable} onChange={handleChange} />
       )}
@@ -267,6 +269,7 @@ export function RecordPage({ recordId }: { recordId?: string }) {
         />
       )}
       {doc.kind === "log-sheet" && <LogSheetRecordView doc={doc} record={{ ...record, data: data as LogSheetData }} editable={editable} onChange={handleChange} />}
+      </div>
       {doc.kind === "training-record" && (
         <div className="empty-state">
           Training records open in the Training module.{" "}
@@ -282,12 +285,12 @@ export function RecordPage({ recordId }: { recordId?: string }) {
           {record.prepared && <div>Prepared by assistant: {new Date(record.prepared.at).toLocaleString()}</div>}
           {record.submittedAt && (
             <div>
-              Submitted: {new Date(record.submittedAt).toLocaleString()} by {record.submittedBy}
+              Submitted: {new Date(record.submittedAt).toLocaleString()} by <span translate="no">{record.submittedBy}</span>
             </div>
           )}
           {record.verifiedAt && (
             <div>
-              Verified: {new Date(record.verifiedAt).toLocaleString()} by {record.verifiedBy}
+              Verified: {new Date(record.verifiedAt).toLocaleString()} by <span translate="no">{record.verifiedBy}</span>
             </div>
           )}
           <div>Last saved: {new Date(record.updatedAt).toLocaleString()}</div>

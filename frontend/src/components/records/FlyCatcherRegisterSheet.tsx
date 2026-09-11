@@ -206,7 +206,7 @@ export function FlyCatcherRegisterSheet({
   const pageTwo = pcLocations.slice(PAGE_ONE_UNITS);
 
   return (
-    <div className="register-sheet fhr18-sheet">
+    <div className="register-sheet fhr18-sheet notranslate" translate="no">
       <section className="register-page">
         {header("1 of 2")}
         {grid(pageOne)}

@@ -738,7 +738,7 @@ function GapStatusReport({ isDemo }: { isDemo: boolean }) {
                     {s.done} / {s.total}
                     {s.notRequired ? ` (+${s.notRequired} n/r)` : ""}
                   </td>
-                  <td className="text-sm">{r.data.preparedBy.name || "—"}</td>
+                  <td className="text-sm notranslate" translate="no">{r.data.preparedBy.name || "—"}</td>
                   <td className="text-sm">{r.data.approvedBy.name || "—"}</td>
                   <td>
                     <span className={`badge badge-${r.status.replace(/\s/g, "")}`}>{r.status}</span>

@@ -13,6 +13,11 @@
 // (REQUIREMENTS.md §24). Gujarati source text stays Gujarati either way: the
 // F/QC/13 in-process sheet is already in Gujarati.
 //
+// How Gujarati is shown: choosing ગુજરાતી turns Google Translate on for the
+// whole app (the screens are written in English and Google translates them;
+// the controlled documents carry translate="no") — see i18n/googleTranslate.ts.
+// The `gu` table below is what shows when Google can't be reached.
+//
 // `en` is the source of truth for the key set; `gu` is typed against it, so a
 // missing Gujarati string is a compile error, never a silent English fallback.
 
@@ -95,6 +100,8 @@ const en = {
   "common.today": "Today",
   "common.dismiss": "Dismiss",
   "common.language": "Language",
+  "lang.translating": "Turning the page into Gujarati with Google Translate…",
+  "lang.builtIn": "Google Translate can't be reached — showing the built-in Gujarati.",
   "common.demo": "Demo",
   "common.of": "of",
 
@@ -479,6 +486,8 @@ const gu: Record<StringKey, string> = {
   "common.today": "આજે",
   "common.dismiss": "બંધ કરો",
   "common.language": "ભાષા",
+  "lang.translating": "Google Translate વડે ગુજરાતીમાં ફેરવી રહ્યા છીએ…",
+  "lang.builtIn": "Google Translate સુધી પહોંચી શકાયું નથી — બિલ્ટ-ઇન ગુજરાતી બતાવી રહ્યા છીએ.",
   "common.demo": "ડેમો",
   "common.of": "માંથી",
 

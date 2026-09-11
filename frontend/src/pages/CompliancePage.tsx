@@ -92,7 +92,7 @@ export function ComplianceDetailPage({ documentId }: { documentId: string }) {
         </div>
       </div>
 
-      <div className="doc-header">
+      <div className="doc-header notranslate" translate="no">
         <div className="company-name">GUJARAT PRINT PACK PUBLICATION PRIVATE LIMITED</div>
         <div className="doc-title">{s.headerTitle}</div>
         <div className="meta-row">
@@ -117,7 +117,7 @@ export function ComplianceDetailPage({ documentId }: { documentId: string }) {
         </div>
       </div>
 
-      <div className="doc-table mt-4">
+      <div className="doc-table mt-4 notranslate" translate="no">
         <table>
           <tbody>
             {s.sections.map((sec) => (

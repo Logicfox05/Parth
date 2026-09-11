@@ -48,7 +48,7 @@ export function RecordHistoryPanel({ record }: { record: RecordInstance }) {
                 <strong>{t(ACTION_KEY[e.action])}</strong>
                 <span className="text-muted">
                   {" "}
-                  — {e.by} · {new Date(e.at).toLocaleString()}
+                  — <span translate="no">{e.by}</span> · {new Date(e.at).toLocaleString()}
                 </span>
               </div>
               {e.note && <div className="text-sm history-note">{e.note}</div>}
@@ -62,7 +62,7 @@ export function RecordHistoryPanel({ record }: { record: RecordInstance }) {
                         <th>{t("record.after")}</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="notranslate" translate="no">
                       {e.changes.map((c) => (
                         <tr key={c.field}>
                           <td>{c.label}</td>
@@ -83,6 +83,21 @@ export function RecordHistoryPanel({ record }: { record: RecordInstance }) {
   );
 }
 
+// "reopened by {by} on …" with the person's name kept out of Google Translate
+// (a name must never be translated) — the sentence around it still is.
+function CorrectionBy({ correction }: { correction: CorrectionInfo }) {
+  const t = useT();
+  const NAME = "";
+  const [before, after = ""] = t("record.correctionBy", { by: NAME, when: new Date(correction.at).toLocaleString(), status: correction.fromStatus }).split(NAME);
+  return (
+    <>
+      {before}
+      <span translate="no">{correction.by}</span>
+      {after}
+    </>
+  );
+}
+
 /** Shown while a record that had been submitted or verified is reopened to correct it. */
 export function CorrectionBanner({ correction }: { correction: CorrectionInfo }) {
   const t = useT();
@@ -92,9 +107,9 @@ export function CorrectionBanner({ correction }: { correction: CorrectionInfo })
         <strong>
           <FiEdit3 size={13} style={{ verticalAlign: -1 }} /> {t("record.beingCorrected")}
         </strong>{" "}
-        — {t("record.correctionBy", { by: correction.by, when: new Date(correction.at).toLocaleString(), status: correction.fromStatus })}
+        — <CorrectionBy correction={correction} />
         <div className="mt-1">
-          <strong>{t("record.reason")}:</strong> {correction.reason}
+          <strong>{t("record.reason")}:</strong> <span translate="no">{correction.reason}</span>
         </div>
         <div className="text-xs text-muted mt-1">{t("record.correctionNext")}</div>
       </div>

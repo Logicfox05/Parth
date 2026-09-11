@@ -281,7 +281,7 @@ export function GapRecordPage({ recordId }: { recordId: string }) {
 
       <ErrorList errors={errors} heading={errorsFor === "verify" ? t("record.fixBeforeVerify") : t("record.fixBeforeSubmit")} />
 
-      <div className="doc-header">
+      <div className="doc-header notranslate" translate="no">
         <div className="company-name">CAPA — Internal: Pest Control Inspection Findings Report</div>
         <div className="meta-row">
           <div className="meta-cell">
@@ -322,7 +322,7 @@ export function GapRecordPage({ recordId }: { recordId: string }) {
         </div>
       </div>
 
-      <div className="doc-table mt-4">
+      <div className="doc-table mt-4 notranslate" translate="no">
         <table>
           <thead>
             <tr>

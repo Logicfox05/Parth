@@ -91,6 +91,8 @@ def main():
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
+        # Gujarati falls back to the built-in tables here; Google Translate is tested in e2e_translate.py.
+        page.route("**/translate_a/**", lambda route: route.abort())
         console_errors = []
         page.on("pageerror", lambda e: console_errors.append(str(e)))
         page.on("console", lambda m: console_errors.append(m.text) if m.type == "error" else None)

@@ -418,7 +418,7 @@ export function ComplaintChecklistPage({ recordId }: { recordId: string }) {
       {record.status === "Rejected" && record.rejectionReason && (
         <div className="card mb-4" style={{ borderColor: "var(--color-danger)", background: "var(--color-danger-bg)" }}>
           <div className="card-pad text-sm">
-            <strong>Sent back</strong> by {record.rejectedBy} — {record.rejectionReason}
+            <strong>Sent back</strong> by <span translate="no">{record.rejectedBy}</span> — {record.rejectionReason}
           </div>
         </div>
       )}
@@ -476,7 +476,7 @@ export function ComplaintChecklistPage({ recordId }: { recordId: string }) {
               {s.items.filter((it) => it.done || it.notRequired).length} / {s.items.length}
             </span>
           </div>
-          <div className="doc-table" style={{ border: "none" }}>
+          <div className="doc-table notranslate" translate="no" style={{ border: "none" }}>
             <table className="compact">
               <thead>
                 <tr>

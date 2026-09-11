@@ -655,3 +655,15 @@ textarea.input { resize: vertical; min-height: 60px; }
 .auth-error { background: var(--color-danger-bg); color: var(--color-danger); border-radius: var(--radius-sm); padding: 9px 12px; font-size: 12.5px; margin-bottom: 16px; }
 .auth-footer { text-align: center; margin-top: 20px; font-size: 12.5px; color: var(--color-text-muted); }
 .auth-role-note { text-align: center; margin-top: 14px; font-size: 11.5px; color: var(--color-text-faint); }
+
+/* ---- Gujarati through Google Translate (i18n/googleTranslate.ts) ----
+   The widget itself is off-screen (the language buttons drive it); Google's
+   toolbar, hover tooltips and highlight never show, and the page is never
+   pushed down to make room for the toolbar. */
+.gt-container { position: absolute; left: -9999px; top: 0; width: 1px; height: 1px; overflow: hidden; }
+body > .skiptranslate, iframe.skiptranslate, .goog-te-banner-frame, .goog-te-balloon-frame, #goog-gt-tt, .goog-tooltip,
+.VIpgJd-ZVi9od-ORHb-OEVmcd, .VIpgJd-ZVi9od-aZ2wEe-wOHMyf, .VIpgJd-yAWNEb-L7lbkb { display: none !important; }
+body { top: 0 !important; }
+.goog-text-highlight, .VIpgJd-yAWNEb-VIpgJd-fmcmS-sn54Q { background: none !important; box-shadow: none !important; }
+.lang-switcher { display: inline-flex; flex-direction: column; gap: 4px; }
+.lang-note { max-width: 260px; }

@@ -25,7 +25,7 @@ export function DocumentHeader({
   title?: string;
 }) {
   return (
-    <div className="doc-header">
+    <div className="doc-header notranslate" translate="no">
       <div className="company-name">{companyName ?? COMPANY.name}</div>
       <div className="doc-title">
         {title ?? doc.name.toUpperCase()}

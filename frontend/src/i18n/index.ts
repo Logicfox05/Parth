@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useAppStore } from "../store/AppStore";
 import { settingsRepository } from "../data/repositories/settingsRepository";
 import { STRINGS, type Language, type StringKey } from "./strings";
+import { uiLanguageFor } from "./googleTranslate";
 
 export { LANGUAGE_NAMES, SPEECH_LOCALES, type Language, type StringKey } from "./strings";
 
@@ -23,21 +24,23 @@ export function tr(lang: Language, key: StringKey | string, vars?: Vars): string
   return interpolate(hit, vars);
 }
 
+/** The language the user chose (voice, assistant replies). */
 export function currentLanguage(): Language {
   return settingsRepository.get().language;
 }
 
 // For code outside React (engines, the assistant's canned replies) — reads the
-// stored language at call time.
+// stored language at call time. Text is written in English while Google
+// Translate is turning the page into Gujarati (i18n/googleTranslate.ts).
 export function t(key: StringKey | string, vars?: Vars): string {
-  return tr(currentLanguage(), key, vars);
+  return tr(uiLanguageFor(currentLanguage()), key, vars);
 }
 
 // For components: identical to `t`, but reading it through the store means the
 // component re-renders when the language changes.
 export function useT(): (key: StringKey | string, vars?: Vars) => string {
-  const { lang } = useAppStore();
-  return useCallback((key: StringKey | string, vars?: Vars) => tr(lang, key, vars), [lang]);
+  const { uiLang } = useAppStore();
+  return useCallback((key: StringKey | string, vars?: Vars) => tr(uiLang, key, vars), [uiLang]);
 }
 
 export function useLanguage(): { lang: Language; setLang: (l: Language) => void } {

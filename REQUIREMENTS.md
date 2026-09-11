@@ -764,6 +764,31 @@ application in either language, chosen on the Dashboard, plus an assistant that 
 - **TO BE CONFIRMED:** whether the plant wants the ten F/HR/17 check points shown with a Gujarati
   reading aid *beside* the controlled English wording (not replacing it) for operators who fill the
   register — deliberately not added unilaterally, since it puts new text next to controlled content.
+- **Gujarati through Google Translate (11-Sep-2026).** The department found the hand-written
+  translation left too much of the site in English and asked: *"when user will click on Gujarati
+  language then google translate will automatically detect english language and change it to
+  gujarati on whole website and same applies for switching back to english."* Now:
+  - Choosing ગુજરાતી loads Google's website translator (`src/i18n/googleTranslate.ts`) and selects
+    Gujarati in it automatically; the screens are written in English for it and the whole site turns
+    Gujarati — every page, list, message, the assistant's chat — including text that appears or
+    changes later. Google's toolbar and hover pop-ups are hidden; the page is never pushed down.
+  - Choosing English clears Google's `googtrans` cookie and reloads the page on the same screen —
+    the only way to get Google's rewritten text back to the original exactly. Nothing is lost:
+    records save themselves and flush on unload. With English chosen Google is never loaded.
+  - The choice is remembered: a reload in Gujarati translates again.
+  - No internet / Google blocked → the built-in Gujarati tables (§ above) are used, and the language
+    buttons say so. So the choice always does something.
+  - Still never translated (marked `translate="no"`, so not sent to Google either): every record form
+    and register, document headers, the SOP, licence and SOC text, record history values, people's
+    names (the top bar, "submitted / verified / rejected by", the files and Day View columns) and
+    master-data rows. Google converts numbers and dates *outside* those areas to Gujarati digits
+    (૧૦, ૦૧-સપ્ટેમ્બર-૨૦૨૬) — the forms keep the figures exactly as recorded.
+  - Google rewrites text behind React's back, which normally crashes React apps or leaves stale
+    text. `src/i18n/translateGuard.ts` (installed only while Google is in use) keeps them in step —
+    removals and inserts find Google's stand-in, and changed text is shown as a fresh node so Google
+    translates the new value. Google translates text lazily as it scrolls into view.
+  - Spoken replies: a reply with no Gujarati letters is read with the English voice even in Gujarati
+    (`src/utils/speech.ts`), since the app's own replies are written in English for Google.
 
 ## 25. Records that read like a real plant's (09-Sep-2026)
 

@@ -62,7 +62,7 @@ export function Topbar() {
           <NotificationBell />
           <div className="flex items-center gap-2" title={user?.email}>
             <FiUser size={15} className="text-muted" />
-            <span className="text-sm font-semibold">{user?.name}</span>
+            <span className="text-sm font-semibold notranslate" translate="no">{user?.name}</span>
             {user?.role === "admin" && <span className="badge badge-Verified">{t("top.admin")}</span>}
           </div>
           <button className="btn btn-ghost btn-sm" onClick={() => logout()} title={t("top.logOut")}>

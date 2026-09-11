@@ -113,14 +113,20 @@ The app behaves like a personal assistant rather than a blank form:
   beside the services they belong to, on the Fly Control and Rat / Mice service pages; **Training & Reference** — Training
   Records, Chemical Master, SOP. The assistant navigates there from plain speech ("show me the rat
   reports", "fly catcher infestation for this year").
-- **Two languages — English and ગુજરાતી — chosen on the Dashboard.** The whole interface switches
-  instantly, on every page: navigation, headings, buttons, statuses, tabs, the assistant's own
-  wording. It's remembered per browser and also reachable from the top bar. What deliberately does
-  **not** translate is the controlled documents' own text — format numbers (F/HR/17), the printed
-  check points transcribed verbatim from the paper form, the licence and its terms, the Statements of
-  Compliance — because translating a controlled record's wording would break the traceability the
-  system exists to provide. (The Gujarati F/QC/13 in-process sheet stays Gujarati either way.) Ask
-  the assistant something in Gujarati and it answers in Gujarati.
+- **Two languages — English and ગુજરાતી — chosen on the Dashboard.** Choosing ગુજરાતી switches
+  **Google Translate** on automatically for the whole website: every page, menu, list, message and the
+  assistant's chat turns Gujarati as it appears, including text that changes afterwards. Choosing
+  English switches it off — the page reloads in the original English, on the same screen, with
+  nothing lost (records save themselves). Remembered per browser (a reload stays Gujarati) and also
+  reachable from the top bar. Nothing is sent to Google while English is chosen. If Google can't be
+  reached (no internet), Gujarati falls back to the app's own built-in Gujarati and says so. What
+  deliberately does **not** translate is the controlled documents' own text — every form and
+  register, format numbers (F/HR/17), the printed check points transcribed verbatim from the paper
+  form, the SOP, the licence and its terms, the Statements of Compliance — and people's and
+  master-data names, because translating a controlled record's wording would break the traceability
+  the system exists to provide (those parts are marked `translate="no"`, so they aren't sent to
+  Google either). (The Gujarati F/QC/13 in-process sheet stays Gujarati either way.) Ask the
+  assistant something in Gujarati and it answers in Gujarati.
 - **The assistant listens and talks.** Press the microphone on the Assistant page (or in the floating
   widget) and speak — the browser's own speech recognition turns it into text, which then follows
   exactly the same path as anything typed, so nothing is sent anywhere extra. **It waits until you

@@ -168,7 +168,7 @@ export function MasterDataPage() {
                 <th>Belongs To</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="notranslate" translate="no">
               {master.areas.map((a) => (
                 <tr key={a.id}>
                   <td>{a.name}</td>
@@ -190,7 +190,7 @@ export function MasterDataPage() {
                 <th>Response Type</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="notranslate" translate="no">
               {master.checkpoints.map((c) => (
                 <tr key={c.no}>
                   <td>{c.no}</td>
@@ -223,7 +223,7 @@ export function MasterDataPage() {
                   <th>Currently Assigned</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="notranslate" translate="no">
                 {documentRepository.getAll().map((d) => {
                   const keyword = master.documentRoleKeywords?.[d.id] ?? "";
                   const matched = resolveResponsibleEmployees(d, master);
@@ -436,7 +436,7 @@ function AdjustmentDaysTable({
               <th style={{ width: 40 }}></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="notranslate" translate="no">
             {days
               .slice()
               .sort((a, b) => (a.date < b.date ? -1 : 1))
@@ -502,7 +502,7 @@ function HolidaysTable({
               <th style={{ width: 40 }}></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="notranslate" translate="no">
             {holidays
               .slice()
               .sort((a, b) => (a.date < b.date ? -1 : 1))
@@ -567,7 +567,7 @@ function EmployeesTable({
               <th style={{ width: 40 }}></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="notranslate" translate="no">
             {employees.map((e, i) => (
               <tr key={e.id}>
                 <td>
@@ -661,7 +661,7 @@ function SimpleTable({
               <th style={{ width: 40 }}></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="notranslate" translate="no">
             {rows.map((r, i) => (
               <tr key={i}>
                 {r.map((cell, ci) =>

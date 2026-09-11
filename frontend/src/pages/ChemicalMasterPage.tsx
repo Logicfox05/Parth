@@ -25,7 +25,7 @@ export function ChemicalMasterPage() {
               <th>Dilution Ratio</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="notranslate" translate="no">
             {rows.map((r, i) => (
               <tr key={r.id}>
                 <td>{i + 1}</td>

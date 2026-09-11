@@ -272,6 +272,18 @@ full-page `pages/AssistantPage.tsx` send as `context` with every `/api/assistant
 backend caps it at 4 KB and folds it into the system prompt). The page persists conversations under
 the `assistant-conversations` storage key (30 conversations × 200 messages max).
 
+**Gujarati through Google Translate (11-Sep-2026).** No new stored fields — `AppSettings.language`
+still records the choice; Google's widget keeps its own `googtrans=/en/gu` cookie while Gujarati is
+on (cleared on switching back). `src/i18n/googleTranslate.ts` holds a status (`off | loading | on |
+failed`, subscribed to by `AppStore` via `useSyncExternalStore`) and `uiLanguageFor(lang, status)`:
+the screens are written in English (`AppStore.uiLang = "en"`) while Google translates them, and in
+the built-in `gu` table only when Google failed to load. `lang` itself still drives the assistant's
+reply language and the voice. `src/i18n/translateGuard.ts` patches `Node.prototype` insert / remove /
+replace and the text setters, only once Gujarati is first chosen, keeping a `WeakMap` from each
+React text node to whatever Google put in its place. Parts that must never be translated carry
+`translate="no"` (+ `notranslate` class): record views and register sheets, `DocumentHeader`, the
+SOP / licence / SOC bodies, record-history values and names, master-data rows, and people's names.
+
 **Interface language (i18n).** `src/i18n/strings.ts` holds one table per language; `en` is declared
 `as const` and is the source of truth for the key set, and `gu` is typed `Record<StringKey, string>`
 so a missing Gujarati string is a compile error rather than a silent English fallback. `src/i18n`

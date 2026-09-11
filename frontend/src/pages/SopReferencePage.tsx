@@ -12,6 +12,8 @@ export function SopReferencePage() {
         Reference configuration derived from the Standard Operating Procedure. Used to configure checkpoints, chemicals
         and frequencies across the Pest Control module — not rewritten beyond formatting for on-screen display.
       </p>
+      {/* The SOP's own wording, as issued — never machine-translated (i18n/googleTranslate.ts). */}
+      <div className="notranslate" translate="no">
       {SOP_SECTIONS.map((s) => (
         <div key={s.title} className="card mb-4">
           <div className="card-header">
@@ -41,6 +43,7 @@ export function SopReferencePage() {
           </div>
         </div>
       ))}
+      </div>
     </div>
   );
 }

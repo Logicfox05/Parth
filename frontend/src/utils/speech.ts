@@ -197,8 +197,16 @@ export function listenForUtterance({
 // Read a reply out loud. Picks a voice matching the requested language when
 // the platform has one (Gujarati is not installed everywhere — the browser
 // then falls back to its default voice rather than staying silent).
-export function speak(text: string, lang: string): void {
+//
+// A reply with no Gujarati letters in it is read with the English voice even
+// when Gujarati is chosen: with Google Translate on, the app's own replies are
+// written in English (Google translates them on screen, not for the voice),
+// and a Gujarati voice reading English words is hard to follow.
+const GUJARATI_SCRIPT = /[઀-૿]/;
+
+export function speak(text: string, requested: string): void {
   if (!isSpeechOutputSupported() || !text.trim()) return;
+  const lang = requested.startsWith("gu") && !GUJARATI_SCRIPT.test(text) ? "en-IN" : requested;
   const synth = window.speechSynthesis;
   synth.cancel();
   const utterance = new SpeechSynthesisUtterance(text);

@@ -221,6 +221,25 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   guard); the Calendar is translated; switching back restores English. Plus two visual-QA
   screenshots (`21_dashboard_gujarati.png`, `22_pest_control_gujarati.png`), reviewed on screen —
   the whole Dashboard reads correctly in Gujarati while the document titles stay as issued.
+  **Since 11-Sep-2026 Gujarati is Google Translate** (below); these smoke / visual-QA checks now
+  cover its offline fallback — both suites block `**/translate_a/**`, so the built-in tables show.
+- **Gujarati through Google Translate** (11-Sep-2026). `tests/e2e_translate.py` (18 checks,
+  network-independent) serves a stand-in for Google's widget at the same address that behaves like
+  it — hidden language box, toolbar pushed in, every English text node swapped for a `<font>` (both
+  swap styles Google uses), text it has already handled never re-translated — and proves: English
+  never loads Google; ગુજરાતી loads it and the whole page is translated from the English screens;
+  Google's toolbar is hidden and the page not pushed down; the language names, the F/HR/17 register
+  and an open record's form are left as issued; typing still saves; changed text ("All changes
+  saved", a file count) shows its new value translated; seven pages open with no crash; a reload stays
+  Gujarati; English reloads back to the original on the same screen, clears the cookie and doesn't
+  load Google; offline, the built-in Gujarati shows with a note and English returns without a reload.
+  Also checked by hand against the **real** Google Translate (network): the whole Dashboard and
+  sidebar in Gujarati, the F/HR/17 register and record form untouched, no console errors across
+  seven pages, the files count re-translated after it changed, "All changes saved" re-translated
+  once scrolled into view (Google translates lazily), English restored by reload with the cookie
+  gone. The only Gujarati left after switching back is the ગુજરાતી button and the F/QC/13 title,
+  which is issued in Gujarati. That run also caught Google translating a person's name literally —
+  names are now `translate="no"`.
 - **A voice assistant** (09-Sep-2026), reversing the earlier "text only, no voice" decision at the
   department's request. `src/utils/speech.ts` wraps the browser's Web Speech API: press-to-talk on
   the Assistant page and in the floating widget, one utterance per press, the transcript handed

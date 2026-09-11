@@ -69,7 +69,7 @@ export function LicencePage() {
 
       <div className="text-xs text-faint mb-2 no-print">Transcription (verbatim, for reading and search — the scan above is authoritative)</div>
 
-      <div className="doc-header">
+      <div className="doc-header notranslate" translate="no">
         <div className="company-name">{L.issuer}</div>
         <div className="doc-title">
           {L.form} — {L.formTitle}
@@ -99,7 +99,7 @@ export function LicencePage() {
           <div className="text-xs text-muted mb-1">{L.formRule}</div>
           <p className="text-sm mb-3">{L.grantText}</p>
           <p className="text-sm mb-2">{L.supervisionText}</p>
-          <div className="doc-table mb-3" style={{ maxWidth: 620 }}>
+          <div className="doc-table mb-3 notranslate" translate="no" style={{ maxWidth: 620 }}>
             <table className="compact">
               <tbody>
                 <tr>
@@ -148,7 +148,7 @@ export function LicencePage() {
           <h3 className="text-base font-semibold">{L.termsTitle}</h3>
           <span className="text-sm text-muted">{L.applicantLine}</span>
         </div>
-        <div className="doc-table" style={{ border: "none" }}>
+        <div className="doc-table notranslate" translate="no" style={{ border: "none" }}>
           <table className="licence-terms">
             <thead>
               <tr>

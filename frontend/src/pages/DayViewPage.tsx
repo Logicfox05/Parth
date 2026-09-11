@@ -109,7 +109,7 @@ export function DayViewPage({ date }: { date?: string }) {
                     <td>
                       <StatusBadge status={r.status} overdue={isOverdue} />
                     </td>
-                    <td className="text-sm">{r.responsibleUser ?? r.submittedBy ?? "—"}</td>
+                    <td className="text-sm notranslate" translate="no">{r.responsibleUser ?? r.submittedBy ?? "—"}</td>
                     <td style={{ textAlign: "right" }}>
                       <button className="btn btn-primary btn-sm" onClick={() => navigate(route)}>
                         Open <FiArrowRight size={13} />
