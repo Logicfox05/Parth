@@ -127,11 +127,13 @@ graph TD
   nothing is restricted by it yet).
 * **Signatures**: Digital signatures compliant with 21 CFR Part 11 / ISO 9001 guidelines (password
   confirmation on verify).
-* **Audit log**: Persist an append-only event on every state transition, surfaced as a per-record
-  timeline in the UI.
+* **Audit log** — *done (Sep-2026)*: every record carries an append-only history of each edit
+  (field, before → after), submit, verification, rejection and correction, shown as its Record
+  history (`engine/recordHistory.ts`). Next: move it server-side with the records, so it can't be
+  altered from a browser.
 * **Offline PWA Support**: Service Worker caching for plant floor tablets operating in shielded
-  factory zones — the app is already 100% static assets, which makes this a small addition
-  (a service worker + a Web App Manifest) rather than an architecture change.
+  factory zones — the frontend is static assets (only login and the assistant need the API), so
+  this is a small addition (a service worker + a Web App Manifest) rather than an architecture change.
 * **Rebuild with the originally-preferred toolchain**: once this project is opened in a normal,
   networked environment, run `npm install` to pull in Vite/Tailwind/react-router-dom/Zustand and
   follow the swap table in DEPLOYMENT.md — every substitution made here is isolated to one file.

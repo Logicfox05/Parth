@@ -32,6 +32,25 @@ The app behaves like a personal assistant rather than a blank form:
   flags is put in the first line of the record's notes — "Check this before you submit…" — so it is
   confirmed by a person, never quietly signed off. Every value is deterministic per date, so an
   auditor who comes back to 14-Aug finds exactly the record they saw. See REQUIREMENTS §25.
+- **Every record can be corrected — by hand or by asking the assistant — and nothing is lost.**
+  - *While a record is a draft* every field is editable and **saves itself** a moment after you type
+    ("All changes saved" beside the buttons), so there's no Save button to forget and leaving the page
+    loses nothing.
+  - *Once it's submitted or verified* it's locked, and offers **Correct this record**: pick or type a
+    reason, and the record reopens — a banner says who reopened it and why — you make the change, and
+    it goes through Submit and verification again. A verified record is never changed quietly.
+  - *Every change is recorded*: each record has a **Record history** listing every edit field by field
+    (before → after), every submit, verification, rejection and correction, and who did it. That is
+    what makes a correction a correction and not a rewrite.
+  - *The assistant can make the change for you*: say or type it — "14:00 viscosity is 20.4",
+    "check point 3 is no", "PC-05 count is 3", "customer sign is Kapila Barad", "Akash Patel attended".
+    Common changes are understood instantly with no network; anything else goes to the AI. Every
+    change is checked first (a word can't go into a number, "OK" can't go into a Yes/No, a printed
+    time slot can't be moved), saved, listed back to you, and can be **undone**. On a signed-off
+    record it asks before reopening it, and records your words as the reason.
+  - *Master Data* rows (chemicals, fly catcher locations, rodent stations, employees) are corrected in
+    place, and deleting one takes two taps. The service provider's licence and the Statements of
+    Compliance stay read-only: they are issued documents, reproduced exactly. See REQUIREMENTS §27.
 - **On login the assistant greets the user with a briefing**: what it filled in and why, what still
   needs a detail only a person knows, what is waiting for a verifier, what is coming up, and any
   compliance statement due for re-issue. Each prepared record can be viewed or submitted in one

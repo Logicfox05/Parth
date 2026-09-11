@@ -896,6 +896,71 @@ check point 3.
 (a fresh install read "from 18 recorded days" with nothing recorded); only days actually filled in
 count now.
 
+## 27. Correcting records — by hand or through the assistant (11-Sep-2026)
+
+```
+DIGITAL TEMPLATE     engine/recordLifecycle.ts (reopenForCorrection), engine/recordHistory.ts
+                      (the change history), engine/recordPatch.ts (checking every change, and
+                      plain-words edits), components/records/RecordHistoryPanel.tsx,
+                      RecordActionBar.tsx; the four record pages; DocumentAssistant.tsx;
+                      backend/assistant.ts (itemEdits, patch-shape checks)
+DATABASE FIELDS      RecordInstance.history (append-only), RecordInstance.correction
+```
+
+**The requirement:** any wrong data on any document can be put right — by the user directly, or by
+telling the assistant — and the system must be easy enough that nobody can get it wrong.
+
+**What was wrong before.** A verified record could never be changed at all; a submitted one only by
+rejecting and resubmitting it, which also erased the rejection. Draft edits on the main record page
+were lost by leaving without pressing Save. The service report's verifier could not type the
+customer's countersignature that Verify requires. Material and method on a service report, several
+CAPA finding fields and new Master Data rows could not be corrected at all. The assistant could only
+touch drafts, merged whatever the model returned without checking it (so "OK" could land in a Yes/No
+check point and silently defeat every rule testing for "Yes"), gave no list of what it changed and no
+undo — and on the complaint checklist it could change a *verified* record with no trace.
+
+**How it works now.**
+
+- **Drafts save themselves** (0.7 s after the last change, and on leaving the page). Save is still
+  there as "Save now" while a change is pending.
+- **Signed-off records are corrected, not edited.** Submitted / Pending Verification / Verified records
+  are locked and offer *Correct this record*. It asks for a reason (four one-tap reasons — wrong value,
+  typing mistake, information received late, something left out — or any typed one), reopens the
+  record to In Progress with a banner saying who reopened it, when, from what state and why, and the
+  record then has to be submitted and verified again. Rejected records keep *Resume editing*.
+- **Nothing is overwritten without a trace.** Every record carries an append-only history: each edit
+  as field-by-field before → after (readable labels: "Row 3 (11:00) · Viscosity", "Check point 7"),
+  and every submit, verify, reject, resume and correction, with who and when. Quick successive edits
+  by one person fold into one entry; a field changed and changed back drops out. Records created before
+  this existed show a history reconstructed from their sign-off stamps, marked as such.
+- **The assistant can make any correction.** It is registered on every record page whatever the
+  status. Every proposed change passes `applyAssistantPatch` first: unknown fields are left out, values
+  are normalised to what the form stores (Yes/No, numbers, 24-hour times, ISO dates, the exact select
+  option) or refused with the reason, printed columns and fixed rows can't be changed, and a change to
+  one row must name exactly one row. It is then saved at once, listed back field by field, logged as
+  the assistant's change, and can be undone. On a signed-off record it shows the change and asks
+  *"Go ahead?"* before reopening — nothing changes until the user says yes, and their own words become
+  the recorded reason.
+- **Common changes need no network.** `parseLocalEdit` understands plain sentences — a reading at a
+  time of day, a check point, a PC unit's count, a service area's remark, a finding's target date, a
+  header field by its printed label, "X attended" — so the most frequent corrections are instant and
+  work even when the AI service is unreachable. Anything else goes to the model, which now changes
+  single rows with `itemEdits` instead of sending back whole tables (the 8,000-token-a-minute limit),
+  and whose reply the server shape-checks before the app ever sees it.
+- **Smaller fixes that were traps:** the service report's customer countersignature stays writable
+  while the report awaits verification; material and method are editable; CAPA findings expose
+  address, contractor's action, source and the service provider's verification; the complaint, CAPA
+  and training pages no longer show a Save button that is always disabled ("All changes saved"
+  instead); errors scroll into view and say whether they block submitting or verifying; *Fill again*
+  asks before replacing the form; Master Data chemicals, fly catcher locations and rodent stations
+  are editable in place, deletes take two taps, and a new PC ID can no longer reuse a deleted one's
+  number.
+
+**Deliberately not editable:** the service provider's licence (the owner's instruction: "not a single
+change"), the Statements of Compliance and the SOP — issued documents reproduced exactly as supplied —
+and a fly catcher's PC ID, which every fly catcher record refers to (its location and floor are
+editable).
+
 ## Master data provenance summary
 
 | Master list | Source | Notes |

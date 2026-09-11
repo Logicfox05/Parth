@@ -6,8 +6,19 @@ import { recordRepository } from "../data/repositories/recordRepository";
 import { documentRepository } from "../data/repositories/documentRepository";
 import { masterRepository } from "../data/repositories/masterRepository";
 import type { RecordInstance, TrainingRecordData } from "../types";
-import { saveDraft, submitRecord, verifyRecord, rejectRecord, resumeAfterRejection } from "../engine/recordLifecycle";
+import {
+  isCorrectableStatus,
+  isEditableStatus,
+  reopenForCorrection,
+  saveDraft,
+  submitRecord,
+  verifyRecord,
+  rejectRecord,
+  resumeAfterRejection,
+} from "../engine/recordLifecycle";
+import { withEditHistory } from "../engine/recordHistory";
 import { RecordActionBar } from "../components/records/RecordActionBar";
+import { CorrectionBanner, ErrorList, RecordHistoryPanel } from "../components/records/RecordHistoryPanel";
 import { StatusBadge } from "../components/common/StatusBadge";
 import { DemoTag } from "../components/common/DemoTag";
 import { useSetAssistantTarget } from "../store/AssistantContext";
@@ -114,26 +125,48 @@ export function TrainingListPage() {
 export function TrainingRecordPage({ recordId }: { recordId: string }) {
   const { currentUser, bump } = useAppStore();
   const { navigate } = useRouter();
+  const t = useT();
   const [record, setRecord] = useState<RecordInstance<TrainingRecordData> | undefined>(
     () => recordRepository.getById(recordId) as RecordInstance<TrainingRecordData> | undefined
   );
   const [errors, setErrors] = useState<string[]>([]);
+  const [errorsFor, setErrorsFor] = useState<"submit" | "verify">("submit");
   const doc = documentRepository.getById(TRAINING_DOC_ID)!;
   const employees = masterRepository.get().employees;
 
-  const editable = !!record && ["Scheduled", "Due", "In Progress"].includes(record.status);
+  const editable = !!record && isEditableStatus(record.status);
 
-  const applyPatch = (patch: Partial<TrainingRecordData>) => {
-    if (!record) return;
-    const updated = { ...record, data: { ...record.data, ...patch } };
+  const current = () => (recordRepository.getById(recordId) as RecordInstance<TrainingRecordData> | undefined) ?? record;
+
+  // Every change is saved as it's made, with a line in the record's history.
+  const applyPatch = (patch: Partial<TrainingRecordData>, opts: { action?: "edited" | "assistant-edit"; note?: string } = {}) => {
+    const base = current();
+    if (!base) return;
+    const updated = saveDraft(base, { ...base.data, ...patch }, currentUser, opts) as RecordInstance<TrainingRecordData>;
     setRecord(updated);
-    recordRepository.upsert(updated as RecordInstance);
     bump();
   };
 
   useSetAssistantTarget(
-    record && editable
-      ? { documentKind: "training", documentId: doc.id, currentData: record.data, onApply: (patch) => applyPatch(patch as Partial<TrainingRecordData>) }
+    record
+      ? {
+          documentKind: "training",
+          documentId: doc.id,
+          recordId: record.id,
+          status: record.status,
+          editable,
+          currentData: record.data,
+          getData: () => current()?.data,
+          commit: (next, note) => applyPatch(next as TrainingRecordData, { action: "assistant-edit", note }),
+          reopen: isCorrectableStatus(record.status)
+            ? (reason) => {
+                const base = current();
+                if (!base) return;
+                setRecord(reopenForCorrection(base, currentUser, reason) as RecordInstance<TrainingRecordData>);
+                bump();
+              }
+            : undefined,
+        }
       : null
   );
 
@@ -156,20 +189,23 @@ export function TrainingRecordPage({ recordId }: { recordId: string }) {
   };
   const addTopic = () => update({ topics: [...data.topics, ""] });
 
-  const handleSave = () => {
-    setRecord(saveDraft(record, data));
-    bump();
-  };
+  const handleSave = () => undefined; // every change is already saved as it's made
   const handleSubmit = () => {
     const { record: updated, result } = submitRecord(doc, record, currentUser);
-    if (!result.valid) return setErrors(result.errors);
+    if (!result.valid) {
+      setErrorsFor("submit");
+      return setErrors(result.errors);
+    }
     setErrors([]);
     setRecord(updated as RecordInstance<TrainingRecordData>);
     bump();
   };
   const handleVerify = () => {
     const { record: updated, result } = verifyRecord(doc, record, currentUser);
-    if (!result.valid) return setErrors(result.errors);
+    if (!result.valid) {
+      setErrorsFor("verify");
+      return setErrors(result.errors);
+    }
     setErrors([]);
     setRecord(updated as RecordInstance<TrainingRecordData>);
     bump();
@@ -179,7 +215,12 @@ export function TrainingRecordPage({ recordId }: { recordId: string }) {
     bump();
   };
   const handleResume = () => {
-    setRecord(resumeAfterRejection(record) as RecordInstance<TrainingRecordData>);
+    setRecord(resumeAfterRejection(record, currentUser) as RecordInstance<TrainingRecordData>);
+    bump();
+  };
+  const handleCorrect = (reason: string) => {
+    setErrors([]);
+    setRecord(reopenForCorrection(record, currentUser, reason) as RecordInstance<TrainingRecordData>);
     bump();
   };
   const handleDelete = () => {
@@ -200,20 +241,9 @@ export function TrainingRecordPage({ recordId }: { recordId: string }) {
         </div>
       </div>
 
-      {errors.length > 0 && (
-        <div className="card mb-4 no-print" style={{ borderColor: "var(--color-danger)", background: "var(--color-danger-bg)" }}>
-          <div className="card-pad">
-            <strong className="text-danger">Please fix the following:</strong>
-            <ul style={{ margin: "8px 0 0 18px" }}>
-              {errors.map((e, i) => (
-                <li key={i} className="text-danger text-sm">
-                  {e}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
+      {record.correction && <CorrectionBanner correction={record.correction} />}
+
+      <ErrorList errors={errors} heading={errorsFor === "verify" ? t("record.fixBeforeVerify") : t("record.fixBeforeSubmit")} />
 
       {record.prepared && (
         <PreparedBanner
@@ -222,11 +252,16 @@ export function TrainingRecordPage({ recordId }: { recordId: string }) {
           onReprepare={
             editable
               ? () => {
-                  const updated = reprepareRecord(record.id) as RecordInstance<TrainingRecordData> | undefined;
-                  if (updated) {
-                    setRecord(updated);
-                    bump();
-                  }
+                  const before = current() ?? record;
+                  const refreshed = reprepareRecord(record.id) as RecordInstance<TrainingRecordData> | undefined;
+                  if (!refreshed) return;
+                  // Record exactly what the fresh fill changed.
+                  const logged = withEditHistory({ ...refreshed, data: before.data, history: before.history }, refreshed.data, "Assistant", {
+                    action: "assistant-edit",
+                    note: t("record.filledAgain"),
+                  });
+                  setRecord(recordRepository.upsert(logged as RecordInstance) as RecordInstance<TrainingRecordData>);
+                  bump();
                 }
               : undefined
           }
@@ -373,15 +408,19 @@ export function TrainingRecordPage({ recordId }: { recordId: string }) {
         </div>
       </div>
 
+      <RecordHistoryPanel record={record} />
+
       <RecordActionBar
         status={record.status}
         dirty={false}
         isDemo={record.isDemo}
+        saveState="saved"
         onSave={handleSave}
         onSubmit={handleSubmit}
         onVerify={handleVerify}
         onReject={handleReject}
         onResume={handleResume}
+        onCorrect={handleCorrect}
         onPrint={() => window.print()}
         onDelete={handleDelete}
       />

@@ -243,7 +243,7 @@ const ROUTE_RE = /^\/[a-z0-9/_-]*$/i;
 
 app.post("/api/assistant/chat", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = (req as AuthedRequest).user.id;
-  const { message, today, currentRoute, documentKind, currentData, context, language } = req.body ?? {};
+  const { message, today, currentRoute, documentKind, currentData, context, language, recordStatus } = req.body ?? {};
 
   if (typeof message !== "string" || !message.trim()) {
     res.status(400).json({ error: "Message is required." });
@@ -293,7 +293,18 @@ app.post("/api/assistant/chat", requireAuth, async (req: Request, res: Response)
 
   recordAssistantCall(userId);
   try {
-    const result = await runAssistant({ message: message.trim(), today, currentRoute, documentKind, currentData, context, language });
+    const result = await runAssistant({
+      message: message.trim(),
+      today,
+      currentRoute,
+      documentKind,
+      currentData,
+      context,
+      language,
+      // Informational only (it tells the model the app will ask before
+      // reopening a signed-off record) — anything odd is simply dropped.
+      recordStatus: typeof recordStatus === "string" && /^[A-Za-z ]{1,30}$/.test(recordStatus) ? recordStatus : undefined,
+    });
     res.json(result);
   } catch (err) {
     // Log the real detail server-side (may include a vendor error body from

@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FiMessageCircle, FiMic, FiMicOff, FiMove, FiSend, FiX, FiZap } from "react-icons/fi";
 import { ApiError, assistantApi } from "../../api/client";
-import { useAssistantTarget } from "../../store/AssistantContext";
+import { useAssistantTarget, type AssistantTarget } from "../../store/AssistantContext";
+import { applyAssistantPatch, looksLikeEdit, parseLocalEdit } from "../../engine/recordPatch";
+import { diffRecordData } from "../../engine/recordHistory";
+import type { FieldChange } from "../../types";
 import { useAuth } from "../../store/AuthContext";
 import { useAppStore } from "../../store/AppStore";
 import { useRouter, isValidAppRoute } from "../../store/router";
@@ -92,6 +95,10 @@ export function DocumentAssistant() {
   const startedRef = useRef<Set<string>>(new Set());
   const guidedRef = useRef(guided);
   guidedRef.current = guided;
+  // A change to a submitted/verified record, waiting for "Yes, correct it".
+  const pendingRef = useRef<{ next: unknown; changes: FieldChange[]; note: string; recordId: string; problems: string[] } | null>(null);
+  // What each assistant change replaced, so "Undo" can put it back.
+  const undoRef = useRef(new Map<string, { recordId: string; data: unknown }>());
 
   const firstName = (user?.name ?? currentUser).trim().split(/\s+/)[0];
 
@@ -117,7 +124,13 @@ export function DocumentAssistant() {
   useEffect(() => {
     if (!open || messages.length > 0) return;
     const t = getTarget();
-    const where = t?.checklist ? ` I can see you're on ${t.checklist.title}.` : hasTarget ? " I can see you have a record open — tell me what to put in it." : "";
+    const where = t?.checklist
+      ? ` I can see you're on ${t.checklist.title}.`
+      : t && !t.editable && t.reopen
+        ? ` This record is ${t.status} — tell me what's wrong on it and I'll help you correct it.`
+        : hasTarget
+          ? " I can see you have a record open — tell me what to put in it, or what to change."
+          : "";
     bot(`Hi ${firstName}! 👋${where}\nAsk me to open anything, or tell me what happened and I'll fill it in. The quick buttons below are always there.`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -249,6 +262,41 @@ export function DocumentAssistant() {
         setInput("");
         inputRef.current?.focus();
         return;
+      case "confirmCorrection": {
+        me(chip.label);
+        const p = pendingRef.current;
+        pendingRef.current = null;
+        const tt = getTarget();
+        if (!p || !tt || tt.recordId !== p.recordId || !tt.reopen) {
+          bot("That record isn't open any more — open it again and tell me the change.");
+          return;
+        }
+        tt.reopen(p.note);
+        commitEdit(tt, p.next, p.changes, p.note, p.problems, "Reopened for correction — it will need submitting and verifying again. ");
+        return;
+      }
+      case "cancelCorrection":
+        me(chip.label);
+        pendingRef.current = null;
+        bot("Okay — I've left the record exactly as it was.");
+        return;
+      case "undo": {
+        me(chip.label);
+        const saved = undoRef.current.get(a.id);
+        const tt = getTarget();
+        if (!saved || !tt || tt.recordId !== saved.recordId) {
+          bot("I can only undo a change while that record is still open.");
+          return;
+        }
+        if (!tt.editable) {
+          bot("This record has been submitted since then — use \"Correct this record\" to change it.");
+          return;
+        }
+        undoRef.current.delete(a.id);
+        tt.commit(saved.data, "Undo of the assistant's change");
+        bot("Undone — the record is back to what it said before.");
+        return;
+      }
     }
   };
 
@@ -262,7 +310,7 @@ export function DocumentAssistant() {
     chips.push({ label: "What's due today?", action: { type: "navigate", route: `/day/${todayISO()}` } });
     chips.push({ label: "This month's reports", action: { type: "navigate", route: "/reports" } });
     if (!path.startsWith("/gap")) chips.push({ label: "Open CAPA", action: { type: "navigate", route: "/gap" } });
-    if (hasTarget && !t?.checklist) chips.push({ label: "Fill this record for me…", action: { type: "focusInput", placeholder: "" } });
+    if (hasTarget && !t?.checklist) chips.push({ label: t && !t.editable ? "Correct this record…" : "Fill this record for me…", action: { type: "focusInput", placeholder: "" } });
     return chips;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasTarget, targetKind, targetDocumentId, targetSignature, guided, path, version]);
@@ -308,6 +356,57 @@ export function DocumentAssistant() {
       stopSpeaking();
     };
   }, []);
+
+  // ---- changing the open record ----------------------------------------------
+  // Every change — typed in plain words or proposed by the model — is checked
+  // by engine/recordPatch.ts before it touches the record, saved at once with
+  // an "assistant" line in the record's history, listed back field by field,
+  // and can be undone. A submitted/verified record is only changed after the
+  // user says yes to reopening it for correction.
+  const listChanges = (changes: FieldChange[]) => {
+    const lines = changes.slice(0, 8).map((c) => `• ${c.label}: ${c.before || "(blank)"} → ${c.after || "(blank)"}`);
+    if (changes.length > 8) lines.push(`…and ${changes.length - 8} more`);
+    return lines.join("\n");
+  };
+
+  const commitEdit = (target: AssistantTarget, next: unknown, changes: FieldChange[], note: string, problems: string[], intro = "") => {
+    const before = target.getData();
+    target.commit(next, note);
+    const id = generateId("undo");
+    undoRef.current.set(id, { recordId: target.recordId, data: before });
+    const issues = problems.length ? `\n\n${problems.join("\n")}` : "";
+    bot(`${intro}Done — saved. I changed:\n${listChanges(changes)}${issues}`, [{ label: "Undo", action: { type: "undo", id } }]);
+  };
+
+  const applyEdit = (patch: Record<string, unknown>, note: string, lead?: string) => {
+    const target = getTarget();
+    if (!target) return;
+    const before = target.getData();
+    const { data: next, problems } = applyAssistantPatch(target.documentKind, target.documentId, before, patch);
+    const changes = diffRecordData(before, next, target.labels);
+    const intro = lead ? `${lead}\n` : "";
+    const issues = problems.length ? `\n\n${problems.join("\n")}` : "";
+    if (changes.length === 0) {
+      bot(`${intro}Nothing on the form changed.${issues || ' Tell me the field and the new value, e.g. "checker is Vijay".'}`);
+      return;
+    }
+    if (!target.editable) {
+      if (!target.reopen) {
+        bot(`${intro}This record can't be changed from here.`);
+        return;
+      }
+      pendingRef.current = { next, changes, note, recordId: target.recordId, problems };
+      bot(
+        `${intro}This record is ${target.status}. To change it I'll reopen it for correction — then it has to be submitted and verified again, and its history keeps what it said before.\n\nThe change:\n${listChanges(changes)}${issues}\n\nReason I'll record: “${note}”. Go ahead?`,
+        [
+          { label: "Yes, correct it", action: { type: "confirmCorrection" }, tone: "primary" },
+          { label: "No, leave it", action: { type: "cancelCorrection" } },
+        ]
+      );
+      return;
+    }
+    commitEdit(target, next, changes, note, problems, intro);
+  };
 
   // ---- sending free text ---------------------------------------------------
   // `spoken` = the question came in by voice, so the answer is read back even
@@ -357,16 +456,25 @@ export function DocumentAssistant() {
     }
 
     me(text);
+    // A plain-words change to the open record ("14:00 viscosity is 20.4",
+    // "check point 3 is no", "customer sign is Kapila Barad") is understood
+    // right here — instant, and no network needed (engine/recordPatch.ts).
+    const localEdit = t2 ? parseLocalEdit(t2.documentKind, t2.documentId, t2.getData(), text) : null;
+    if (localEdit) {
+      applyEdit(localEdit, text);
+      return;
+    }
     // Calendar / workload / help QUESTIONS are answered right here from the
-    // app's own data — instant, and no network needed (engine/assistantLocal.ts).
-    // With a record open, an instruction like "mark today as holiday" is a
-    // fill request for the model, not a calendar question — only genuine
-    // questions take the local path then.
+    // app's own data (engine/assistantLocal.ts). With a record open, an
+    // instruction to change something ("can you fix the viscosity at 14:00")
+    // goes to the model even when it's phrased like a question — the local
+    // record-listing path would otherwise answer it with a list of records.
+    const editIntent = !!t2 && looksLikeEdit(text);
     const looksLikeQuestion =
       /\?\s*$/.test(text) || /^(is|was|are|were|when|which|what|who|how|do|does|did|can|could|will|tell me|list|show|give me|i want|find|get me)\b/i.test(text);
     // With a record open, free text is normally data to fill in — but an
     // out-of-scope message never is, so it is declined either way.
-    const local = !t2 || looksLikeQuestion ? localAnswer(text, isDemo, user?.name) : offTopicReply(text);
+    const local = !t2 || (looksLikeQuestion && !editIntent) ? localAnswer(text, isDemo, user?.name) : offTopicReply(text);
     if (local) {
       bot(local.reply, local.chips);
       readOut(local.reply);
@@ -380,17 +488,12 @@ export function DocumentAssistant() {
         currentRoute: path,
         documentKind: t2?.documentKind,
         currentData: t2?.currentData,
+        recordStatus: t2?.status,
         context: buildAssistantContext(isDemo, user?.name),
         language: lang,
       });
       if (result.action === "fill" && t2) {
-        const fields = Object.keys(result.patch ?? {});
-        if (fields.length === 0) {
-          bot("Hmm, I couldn't pick anything out of that — mind rephrasing?");
-        } else {
-          t2.onApply(result.patch ?? {});
-          bot(`${result.reply}\nI've filled in ${fields.join(", ")} — take a look and Save when it's right.`);
-        }
+        applyEdit(result.patch ?? {}, text, result.reply);
         readOut(result.reply);
         return;
       }

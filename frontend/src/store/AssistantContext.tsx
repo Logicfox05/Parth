@@ -1,20 +1,38 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
-import type { ComplaintChecklistData } from "../types";
+import type { ComplaintChecklistData, RecordStatus } from "../types";
 
-// Lets whichever document page is currently on screen hand its live data
-// and change-handler to the single, globally-mounted assistant widget (see
-// DocumentAssistant.tsx, mounted once in App.tsx). Pages that aren't a
-// fillable document simply never register a target, so the widget stays
-// visible everywhere but explains itself instead of trying to fill fields.
+// Lets whichever document page is currently on screen hand its live record to
+// the single, globally-mounted assistant widget (see DocumentAssistant.tsx,
+// mounted once in App.tsx). Pages that aren't a record simply never register
+// a target, so the widget stays visible everywhere but explains itself
+// instead of trying to change anything.
+//
+// A record registers whatever its status. The widget decides what an edit
+// needs: a draft is changed straight away; a submitted or verified record is
+// only changed after the user confirms reopening it for correction (the page
+// provides `reopen`), so an assistant edit can never slip past verification.
 export interface AssistantTarget {
+  // The server's field-guide kind ("daily-pest-monitoring", "log-sheet",
+  // "gap", "training", "complaint-checklist", ...).
   documentKind: string;
   // The specific DocumentDefinition.id — distinct from documentKind, since
   // one kind (e.g. "service-report") covers several formats (Rodent/
-  // General/Fly Control). Needed to look up the exact document for
-  // the "about this document" (What/How/Who/When) card.
+  // General/Fly Control).
   documentId: string;
+  recordId: string;
+  status: RecordStatus;
+  /** Can the data be changed right now, without reopening the record? */
+  editable: boolean;
+  /** What the model is shown (a log sheet adds its `_layout`). */
   currentData: unknown;
-  onApply: (patch: Record<string, unknown>) => void;
+  /** The record's live data, exactly as stored. */
+  getData: () => unknown;
+  /** Printed labels (log-sheet columns) for readable change lists. */
+  labels?: Record<string, string>;
+  /** Saves a checked change now, with an "assistant" entry in the record's history. */
+  commit: (next: unknown, note: string) => void;
+  /** Reopens a submitted/verified record for correction; absent when that isn't possible. */
+  reopen?: (reason: string) => void;
   // Present only on a Customer Complaint Handling Checklist page: lets the
   // widget run its guided A→E walk-through against the live record and
   // drive the submit/approve steps (see engine/guidedChecklist.ts).
@@ -37,7 +55,7 @@ export interface ChecklistBinding {
 }
 
 interface AssistantContextValue {
-  // The live target lives in a ref, not state: currentData/onApply change
+  // The live target lives in a ref, not state: its data and callbacks change
   // on every keystroke, and re-rendering the whole app on every keystroke
   // (via context state) would re-render the registering page too, which
   // would hand back a new target object and re-trigger the same update —
@@ -45,14 +63,14 @@ interface AssistantContextValue {
   // triggering a render.
   ref: React.MutableRefObject<AssistantTarget | null>;
   // Coarse, reactive signals for the widget to redraw on — only change when
-  // the active target's kind/id actually changes (navigating to a different
-  // document, or a record becoming non-editable), not on every keystroke.
+  // the active target's kind/id/status actually changes, not on every
+  // keystroke.
   targetKind: string | null;
   targetDocumentId: string | null;
-  // Changes whenever something the widget renders chips from changes on the
-  // checklist binding (editable / canApprove / autoStart) — e.g. right after
-  // Submit, so "Review & approve" appears without waiting for an unrelated
-  // re-render. Set from the registering page's effect, i.e. AFTER the ref
+  // Changes whenever something the widget renders from changes — the record,
+  // its status or editability, or the checklist binding's flags — so the
+  // widget's chips and greeting are right straight after a Submit or a
+  // correction. Set from the registering page's effect, i.e. AFTER the ref
   // has been refreshed, so anything keyed on it reads a fresh ref.
   targetSignature: string;
   setTargetKind: (kind: string | null) => void;
@@ -81,11 +99,10 @@ function useAssistantInternal(): AssistantContextValue {
 }
 
 // Called from a document page's render with its current target (or null
-// while not editable / not a fillable document). Keeps the ref fresh on
-// every render (cheap, no re-render triggered) and only flips the reactive
-// `targetKind`/`targetDocumentId` when they actually change, so navigating
-// away — or a record becoming non-editable — correctly updates the widget
-// without looping.
+// when it isn't a record page). Keeps the ref fresh on every render (cheap,
+// no re-render triggered) and only flips the reactive signals when they
+// actually change, so navigating away — or a record changing status —
+// correctly updates the widget without looping.
 export function useSetAssistantTarget(target: AssistantTarget | null) {
   const { ref, setTargetKind, setTargetDocumentId, setTargetSignature } = useAssistantInternal();
 
@@ -99,7 +116,16 @@ export function useSetAssistantTarget(target: AssistantTarget | null) {
   const kind = target?.documentKind ?? null;
   const documentId = target?.documentId ?? null;
   const c = target?.checklist;
-  const signature = [kind, documentId, c?.recordId ?? "", c?.editable ? "e" : "", c?.canApprove ? "a" : "", c?.autoStart ? "s" : ""].join("|");
+  const signature = [
+    kind,
+    documentId,
+    target?.recordId ?? "",
+    target?.status ?? "",
+    target?.editable ? "e" : "",
+    c?.editable ? "ce" : "",
+    c?.canApprove ? "a" : "",
+    c?.autoStart ? "s" : "",
+  ].join("|");
   useEffect(() => {
     setTargetKind(kind);
     setTargetDocumentId(documentId);

@@ -50,17 +50,6 @@ export function routeForRecord(doc: DocumentDefinition | undefined, recordId: st
   }
 }
 
-// Identifies which Master Data Employee record the currently logged-in
-// account corresponds to, by matching login email against Employee.email
-// (case-insensitive). Employee.email is blank until an admin fills it in
-// via Master Data — until then this correctly returns undefined rather than
-// guessing, and callers should show that as "no profile matched" rather
-// than silently showing nothing.
-export function resolveCurrentEmployee(loginEmail: string | undefined, employees: Employee[]): Employee | undefined {
-  if (!loginEmail) return undefined;
-  const needle = loginEmail.trim().toLowerCase();
-  return employees.find((e) => e.email?.trim().toLowerCase() === needle);
-}
 
 // The frequency engine only generates record shells for months someone has
 // actually opened (Calendar/Dashboard); a document due in 2 days needs its

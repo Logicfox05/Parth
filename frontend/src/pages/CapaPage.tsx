@@ -7,9 +7,19 @@ import { documentRepository } from "../data/repositories/documentRepository";
 import { refreshGapFindingStatuses, openCorrectiveActionsCount } from "../data/selectors";
 import { COMPLAINT_DOC_ID, COMPLAINT_FOOTER_NOTE, COMPLAINT_ACTIVITY_COUNT, newComplaintChecklistData } from "../data/seed/complaintChecklist";
 import type { ChecklistItem, ComplaintChecklistData, RecordInstance } from "../types";
-import { saveDraft, submitRecord, verifyRecord, rejectRecord, resumeAfterRejection } from "../engine/recordLifecycle";
+import {
+  isCorrectableStatus,
+  isEditableStatus,
+  reopenForCorrection,
+  saveDraft,
+  submitRecord,
+  verifyRecord,
+  rejectRecord,
+  resumeAfterRejection,
+} from "../engine/recordLifecycle";
 import { summarise } from "../engine/guidedChecklist";
 import { RecordActionBar } from "../components/records/RecordActionBar";
+import { CorrectionBanner, ErrorList, RecordHistoryPanel } from "../components/records/RecordHistoryPanel";
 import { DocumentHeader } from "../components/documents/DocumentHeader";
 import { StatusBadge } from "../components/common/StatusBadge";
 import { DemoTag } from "../components/common/DemoTag";
@@ -232,19 +242,29 @@ export function ComplaintChecklistPage({ recordId }: { recordId: string }) {
   const [errors, setErrors] = useState<string[]>([]);
   const doc = documentRepository.getById(COMPLAINT_DOC_ID)!;
 
-  const editable = !!record && ["Scheduled", "Due", "In Progress"].includes(record.status);
+  const t = useT();
+  const [errorsFor, setErrorsFor] = useState<"submit" | "verify">("submit");
+  const editable = !!record && isEditableStatus(record.status);
   const canApprove = !!record && ["Submitted", "Pending Verification"].includes(record.status);
+
+  const current = () => (recordRepository.getById(recordId) as RecordInstance<ComplaintChecklistData> | undefined) ?? record;
 
   const persist = (next: RecordInstance<ComplaintChecklistData>) => {
     setRecord(next);
     recordRepository.upsert(next as RecordInstance);
     bump();
   };
-  const setData = (data: ComplaintChecklistData) => {
-    if (!record) return;
-    persist({ ...record, data });
+  // Every change is saved as it's made, with a line in the record's history.
+  const setData = (data: ComplaintChecklistData, opts: { action?: "edited" | "assistant-edit"; note?: string } = {}) => {
+    const base = current();
+    if (!base) return;
+    setRecord(saveDraft(base, data, currentUser, opts) as RecordInstance<ComplaintChecklistData>);
+    bump();
   };
-  const patch = (p: Partial<ComplaintChecklistData>) => record && setData({ ...record.data, ...p });
+  const patch = (p: Partial<ComplaintChecklistData>) => {
+    const base = current();
+    if (base) setData({ ...base.data, ...p });
+  };
 
   // Submit stamps Prepared By with the logged-in user if they haven't typed
   // a name; approval (Verify) stamps Approved By with the approver. Both
@@ -262,6 +282,7 @@ export function ComplaintChecklistPage({ recordId }: { recordId: string }) {
     const { record: updated, result } = submitRecord(doc, withSignoff as RecordInstance, currentUser);
     if (!result.valid) {
       setRecord(withSignoff);
+      setErrorsFor("submit");
       setErrors(result.errors);
       bump();
       return { ok: false, errors: result.errors };
@@ -285,6 +306,7 @@ export function ComplaintChecklistPage({ recordId }: { recordId: string }) {
     const { record: updated, result } = verifyRecord(doc, withSignoff as RecordInstance, currentUser);
     if (!result.valid) {
       setRecord(withSignoff);
+      setErrorsFor("verify");
       setErrors(result.errors);
       bump();
       return { ok: false, errors: result.errors };
@@ -305,13 +327,26 @@ export function ComplaintChecklistPage({ recordId }: { recordId: string }) {
   const answered = record ? summarise(record.data) : null;
   const isFresh = !!record && editable && !record.data.customerName && !record.data.complaintNo && answered?.done === 0 && answered?.notRequired === 0;
 
+  const doCorrect = (reason: string) => {
+    const base = current();
+    if (!base) return;
+    setErrors([]);
+    setRecord(reopenForCorrection(base, currentUser, reason) as RecordInstance<ComplaintChecklistData>);
+    bump();
+  };
+
   useSetAssistantTarget(
     record
       ? {
           documentKind: "complaint-checklist",
           documentId: doc.id,
+          recordId: record.id,
+          status: record.status,
+          editable,
           currentData: record.data,
-          onApply: (p) => patch(p as Partial<ComplaintChecklistData>),
+          getData: () => current()?.data,
+          commit: (next, note) => setData(next as ComplaintChecklistData, { action: "assistant-edit", note }),
+          reopen: isCorrectableStatus(record.status) ? doCorrect : undefined,
           checklist: {
             recordId: record.id,
             title: `Complaint ${record.data.complaintNo || "(new)"}${record.data.customerName ? ` · ${record.data.customerName}` : ""}`,
@@ -376,20 +411,9 @@ export function ComplaintChecklistPage({ recordId }: { recordId: string }) {
         </div>
       </div>
 
-      {errors.length > 0 && (
-        <div className="card mb-4 no-print" style={{ borderColor: "var(--color-danger)", background: "var(--color-danger-bg)" }}>
-          <div className="card-pad">
-            <strong className="text-danger">Please fix the following:</strong>
-            <ul style={{ margin: "8px 0 0 18px" }}>
-              {errors.map((e, i) => (
-                <li key={i} className="text-danger text-sm">
-                  {e}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
+      {record.correction && <CorrectionBanner correction={record.correction} />}
+
+      <ErrorList errors={errors} heading={errorsFor === "verify" ? t("record.fixBeforeVerify") : t("record.fixBeforeSubmit")} />
 
       {record.status === "Rejected" && record.rejectionReason && (
         <div className="card mb-4" style={{ borderColor: "var(--color-danger)", background: "var(--color-danger-bg)" }}>
@@ -541,15 +565,19 @@ export function ComplaintChecklistPage({ recordId }: { recordId: string }) {
         Format number: {doc.formatNo} ({doc.revisionNo} / {formatDisplayDate(doc.revisionDate)}) · {COMPLAINT_ACTIVITY_COUNT} activities · Source: {doc.sourceFile}
       </div>
 
+      <RecordHistoryPanel record={record} />
+
       <RecordActionBar
         status={record.status}
         dirty={false}
         isDemo={record.isDemo}
-        onSave={() => persist(saveDraft(record, data) as RecordInstance<ComplaintChecklistData>)}
+        saveState="saved"
+        onSave={() => undefined}
         onSubmit={() => doSubmit()}
         onVerify={() => doApprove()}
         onReject={doSendBack}
-        onResume={() => persist(resumeAfterRejection(record) as RecordInstance<ComplaintChecklistData>)}
+        onResume={() => persist(resumeAfterRejection(record, currentUser) as RecordInstance<ComplaintChecklistData>)}
+        onCorrect={doCorrect}
         onPrint={() => window.print()}
         onDelete={() => {
           recordRepository.remove(record.id);

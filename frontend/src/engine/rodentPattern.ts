@@ -12,7 +12,7 @@ import { makeRng, type Rng } from "../utils/random";
 import { generateId } from "../utils/id";
 
 // What the rodent side of a given day's Daily Pest Control Monitoring Record
-// looks like, from the generated pattern (tools/rodent_pattern.py). Seeded
+// looks like, from the generated pattern (tools/pest_pattern.py). Seeded
 // by the calendar date, so the same day always gets the same answer — the
 // assistant's pre-fill, Demo Mode and a re-run "Fill again" all agree, and
 // an auditor reading a month sees one consistent story: mostly quiet days,

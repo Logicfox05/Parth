@@ -107,11 +107,47 @@ deviationReason and inspectedBy.
 Map what the user says onto column KEYS using the labels (e.g. "viscosity at
 11 o'clock was 20.4" -> the row whose time is "11:00", key "viscosity", value
 20.4 as a number). Numeric columns must be numbers, yesno columns exactly
-"Yes" or "No", time columns 24-hour "HH:MM". When changing rows, return the
-COMPLETE rows array with every existing row (and its id) preserved, only
-altering what the user mentioned; give any new row an id like "new-1". Never
-return the _layout object. ${DATE_TIME_RULE}`,
+"Yes" or "No", select columns one of the listed options, time columns 24-hour
+"HH:MM". Change cells with itemEdits (see the rules below) rather than
+returning the rows array; header/footer changes go in patch.header with only
+the keys that change. Only on a "free" sheet may rows be added — then return
+the COMPLETE rows array, giving a new row an id like "new-1". Never return the
+_layout object. ${DATE_TIME_RULE}`,
 };
+
+// How to change one row or item without resending a whole list — keeps the
+// reply small (the Groq plan allows 8000 tokens a minute, and a 24-row log
+// sheet echoed back costs a lot of them) and means the app changes exactly
+// the line named, nothing else.
+const ITEM_EDIT_RULE = `To change one row or item of a list, do NOT resend the whole list: put it in patch.itemEdits, an array of { "collection": <list field name>, "match": { <field>: <value identifying the item> }, "set": { <field>: <new value> } }. Identify items by: log-sheet rows → the time column (e.g. {"time": "14:00"}), the printed parameter (e.g. {"parameter": "Leak Test"}) or {"__row": 3} for the 3rd row; fly-catcher entries → {"pcId": "PC-05"}; service-report lines → {"slNo": 4} or {"areaName": "Canteen"}; CAPA findings → {"sNo": 2}; training attendees → {"employeeName": "Akash Patel"}; daily summaryActions / rodentCatches → {"id": "..."}. "set" holds only the fields that change. Example: {"itemEdits": [{"collection": "rows", "match": {"time": "14:00"}, "set": {"viscosity": 20.4}}]}. Plain top-level fields (checker, timeOfChecking, customerSign, trainingType, ...) go straight in patch. Daily check points go as {"checkpoints": {"3": {"value": "No"}}} with only the ones that change.`;
+
+/** Keeps only a well-formed patch: plain field names, and itemEdits shaped as the app applies them. */
+function sanitizePatch(patch: Record<string, unknown>): Record<string, unknown> | null {
+  const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(patch)) {
+    if (key === "_layout") continue;
+    if (key === "itemEdits") {
+      if (!Array.isArray(value)) continue;
+      const edits = value
+        .filter(
+          (e): e is Record<string, unknown> =>
+            isPlainObject(e) &&
+            typeof e.collection === "string" &&
+            e.collection.length > 0 &&
+            e.collection.length <= 40 &&
+            isPlainObject(e.set) &&
+            (e.match === undefined || isPlainObject(e.match))
+        )
+        .slice(0, 50);
+      if (edits.length > 0) out.itemEdits = edits;
+      continue;
+    }
+    if (!/^[A-Za-z][A-Za-z0-9_]{0,60}$/.test(key)) continue;
+    out[key] = value;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
 
 export const SUPPORTED_DOCUMENT_KINDS = Object.keys(FIELD_GUIDES);
 
@@ -221,12 +257,17 @@ export async function runAssistant({
   currentData,
   context,
   language,
+  recordStatus,
 }: {
   message: string;
   today: string;
   currentRoute: string;
   documentKind?: string;
   currentData?: unknown;
+  // The open record's status (e.g. "Verified"). The app itself asks the user
+  // before reopening a signed-off record, so the model still returns the
+  // change as a fill.
+  recordStatus?: string;
   // Plain-text digest of live app facts prepared by the frontend (today's
   // working-day status, the weekly off, upcoming holidays / adjustment days,
   // what's due) — see frontend/src/engine/assistantLocal.ts. Capped by the
@@ -273,15 +314,16 @@ export async function runAssistant({
       : "",
     'Questions about holidays, the weekly off, adjustment (make-up working) days, or what is due today are answered from the live facts above with action "reply" — do not navigate for them unless the user asks to open a screen.',
     canFill
-      ? `The user currently has a "${documentKind}" record open and editable. Field guide for it:${FIELD_GUIDES[documentKind]}\nIts current data (JSON): ${JSON.stringify(currentData ?? {})}`
-      : "No document is currently open for editing, so you cannot fill in fields right now — if the message describes data entry, explain (in `reply`) that they should open the relevant record first, and if you can tell which screen that is, also navigate them there.",
+      ? `The user currently has a "${documentKind}" record open${recordStatus ? ` (status: ${recordStatus})` : ""}. If it is already submitted or verified, the app itself asks the user to confirm reopening it for correction before applying your change — so still return the change as "fill". Field guide for it:${FIELD_GUIDES[documentKind]}\nIts current data (JSON): ${JSON.stringify(currentData ?? {})}`
+      : "No document is currently open, so you cannot fill in fields right now — if the message describes data entry, explain (in `reply`) that they should open the relevant record first, and if you can tell which screen that is, also navigate them there.",
     "Reply with ONLY a JSON object of the exact shape:",
     '{ "action": "fill" | "navigate" | "reply", "patch": {...}, "route": "/...", "reply": "..." }',
     '"reply" is ALWAYS required: one short, warm, plain-language sentence confirming what you did (or, for "reply", answering/explaining).',
     'Use "fill" only when a document is open (see above) and the message clearly states data to enter into it — "patch" then follows the field-filling rules below; omit "route".',
     'Use "navigate" when the message is asking to see/open a different screen, date, month\'s reports, or module — "route" must be one of the exact shapes listed above; omit "patch".',
     'Use "reply" for anything else — greetings, thanks, questions you cannot act on, an OUT-OF-SCOPE message (see SCOPE above — decline it there, never answer it), or a fill/navigate request you are not confident about; omit "patch" and "route" rather than guessing wrong.',
-    "Field-filling rules (only used with action \"fill\"): each patch value must be the COMPLETE new value for that top-level field — for array fields, include every item (changed and unchanged), not just a diff. Omit any field you are not changing. Never invent data the user did not state or clearly imply. If you add a new array item whose shape has an \"id\" field, set it to a short string like \"new-1\" (not for plain numeric fields like slNo/sNo — continue the existing sequence).",
+    "Field-filling rules (only used with action \"fill\"): put only what changes in patch. Omit any field you are not changing. Never invent data the user did not state or clearly imply. A correction (\"it was 20.4, not 21.4\", \"wrong checker\") is a fill like any other. To rebuild a whole list (e.g. adding several new items) give the COMPLETE new list with every existing item kept; if you add a new array item whose shape has an \"id\" field, set it to a short string like \"new-1\" (not for plain numeric fields like slNo/sNo — continue the existing sequence).",
+    canFill ? ITEM_EDIT_RULE : "",
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -297,14 +339,15 @@ export async function runAssistant({
   // without a route) shouldn't turn into a scary error for the user — it
   // should just fall back to showing whatever reply text it gave.
   let action = result.action as AssistantResult["action"];
-  const validPatch = result.patch && typeof result.patch === "object" && !Array.isArray(result.patch);
-  if (action === "fill" && (!canFill || !validPatch)) action = "reply";
+  const patch =
+    result.patch && typeof result.patch === "object" && !Array.isArray(result.patch) ? sanitizePatch(result.patch as Record<string, unknown>) : null;
+  if (action === "fill" && (!canFill || !patch)) action = "reply";
   if (action === "navigate" && typeof result.route !== "string") action = "reply";
   if (action !== "fill" && action !== "navigate" && action !== "reply") action = "reply";
 
   return {
     action,
-    patch: action === "fill" ? (result.patch as Record<string, unknown>) : undefined,
+    patch: action === "fill" && patch ? patch : undefined,
     route: action === "navigate" ? (result.route as string) : undefined,
     reply: typeof result.reply === "string" && result.reply.trim() ? result.reply.trim() : "Done.",
   };

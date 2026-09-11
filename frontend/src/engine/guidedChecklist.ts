@@ -56,7 +56,13 @@ export type ChipAction =
   | { type: "navigate"; route: string }
   | { type: "briefing" }
   | { type: "startGuided" }
-  | { type: "focusInput"; placeholder: string };
+  | { type: "focusInput"; placeholder: string }
+  // An assistant change to a submitted/verified record, waiting for the
+  // user's go-ahead to reopen it for correction.
+  | { type: "confirmCorrection" }
+  | { type: "cancelCorrection" }
+  // Put back what the record said before an assistant change.
+  | { type: "undo"; id: string };
 
 export interface Chip {
   label: string;

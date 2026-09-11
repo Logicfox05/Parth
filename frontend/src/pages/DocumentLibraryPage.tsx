@@ -7,6 +7,7 @@ import { getDocumentInfo } from "../engine/documentInfo";
 import { formatDisplayDate } from "../utils/date";
 import { moduleSlug } from "../utils/moduleSlug";
 import { useT } from "../i18n";
+import { PEST_CONTROL_SECTIONS } from "../data/seed/documentDefinitions";
 
 function openTarget(docId: string, kind: string): string {
   if (kind === "chemical-master") return "/chemical-master";
@@ -26,7 +27,7 @@ function openTarget(docId: string, kind: string): string {
 // Within a module, documents are listed in the order of their sections (the
 // department's own grouping — see DocumentDefinition.section); documents
 // without a section keep their seed order after any sectioned ones.
-const SECTION_ORDER = ["Daily Report", "Service Reports", "Trend Analysis", "Training & Reference"];
+const SECTION_ORDER: readonly string[] = PEST_CONTROL_SECTIONS;
 const sectionRank = (section: string | undefined) => {
   const i = section ? SECTION_ORDER.indexOf(section) : -1;
   return i === -1 ? SECTION_ORDER.length : i;

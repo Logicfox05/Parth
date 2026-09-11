@@ -258,6 +258,26 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
    column (VERIFIED BY) off the right edge with the sidebar open. */
 .doc-table .register-grid th { white-space: normal; }
 
+/* ---- Saving, correcting and the change history (RecordActionBar, RecordHistoryPanel.tsx) ---- */
+.save-state { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; padding: 4px 8px; border-radius: var(--radius-sm); }
+.save-state.saved { color: var(--color-success); }
+.save-state.saving { color: var(--color-text-muted); }
+.correction-banner { border-color: var(--color-warning); background: var(--color-warning-bg); }
+.record-history-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; cursor: pointer; list-style: none; }
+.record-history-summary::-webkit-details-marker { display: none; }
+.record-history[open] .record-history-summary { border-bottom: 1px solid var(--color-border); }
+.history-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.history-entry { border-left: 3px solid var(--color-border-strong); padding: 4px 0 4px 12px; }
+.history-entry.ok { border-left-color: var(--color-success); }
+.history-entry.bad { border-left-color: var(--color-danger); }
+.history-entry.warn { border-left-color: var(--color-warning); }
+.history-entry.ai { border-left-color: var(--color-primary); }
+.history-head { font-size: 13px; }
+.history-note { margin-top: 2px; }
+.history-changes-wrap { margin-top: 6px; }
+.history-changes td.before { color: var(--color-text-muted); text-decoration: line-through; text-decoration-color: rgba(194, 58, 58, 0.5); }
+.history-changes td.after { font-weight: 600; }
+
 /* ---- The company's trend report format (components/reports/CatchTrendSheet.tsx) ---- */
 .trend-head { border: 1.5px solid #2c3e50; border-radius: 2px; background: #fff; }
 .trend-head .company-name { text-align: center; font-weight: 700; font-size: 15px; padding: 9px; border-bottom: 1.5px solid #2c3e50; letter-spacing: 0.02em; }

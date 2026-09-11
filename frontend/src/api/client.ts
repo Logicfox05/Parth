@@ -59,6 +59,9 @@ export interface AssistantChatRequest {
   currentRoute: string;
   documentKind?: string;
   currentData?: unknown;
+  // The open record's status. A change to a submitted/verified record is
+  // still returned as a fill — the app asks the user to confirm reopening it.
+  recordStatus?: string;
   // Short plain-text digest of live app facts (today's working-day status,
   // the weekly off, upcoming holidays / adjustment days, what's due) so the
   // model answers from the app's own data — see engine/assistantLocal.ts.

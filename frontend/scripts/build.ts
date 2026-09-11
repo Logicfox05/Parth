@@ -1,8 +1,8 @@
 // Production build script.
 // Bundles the React/TypeScript app with esbuild and copies static assets to dist/.
 // (No Vite/Tailwind toolchain is available in this build sandbox — esbuild is used
-// directly. See DEPLOYMENT.md for details. Output is a fully static site: any static
-// web server can host it.)
+// directly. See DEPLOYMENT.md for details. The output is static, but the app needs the
+// backend's API for login and the assistant — `npm start` serves both from one process.)
 import * as esbuild from "esbuild";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -48,7 +48,7 @@ async function main(): Promise<void> {
 
   await fs.writeFile(path.join(dist, "meta.json"), JSON.stringify(result.metafile, null, 2));
 
-  // Copy static assets (index.html, styles.css, icons, manifest, public/*)
+  // Copy static assets (index.html, styles.css, public/*)
   await fs.copyFile(path.join(root, "src", "styles.css"), path.join(dist, "assets", "styles.css"));
   await fs.copyFile(path.join(root, "index.html"), path.join(dist, "index.html"));
 

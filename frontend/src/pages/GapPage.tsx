@@ -6,8 +6,19 @@ import { recordRepository } from "../data/repositories/recordRepository";
 import { documentRepository } from "../data/repositories/documentRepository";
 import { refreshGapFindingStatuses } from "../data/selectors";
 import type { GapFinding, GapInspectionData, RecordInstance } from "../types";
-import { saveDraft, submitRecord, verifyRecord, rejectRecord, resumeAfterRejection } from "../engine/recordLifecycle";
+import {
+  isCorrectableStatus,
+  isEditableStatus,
+  reopenForCorrection,
+  saveDraft,
+  submitRecord,
+  verifyRecord,
+  rejectRecord,
+  resumeAfterRejection,
+} from "../engine/recordLifecycle";
 import { RecordActionBar } from "../components/records/RecordActionBar";
+import { CorrectionBanner, ErrorList, RecordHistoryPanel } from "../components/records/RecordHistoryPanel";
+import { useT } from "../i18n";
 import { StatusBadge } from "../components/common/StatusBadge";
 import { DemoTag } from "../components/common/DemoTag";
 import { useSetAssistantTarget } from "../store/AssistantContext";
@@ -117,30 +128,52 @@ export function GapListPage() {
 export function GapRecordPage({ recordId }: { recordId: string }) {
   const { currentUser, bump } = useAppStore();
   const { navigate } = useRouter();
+  const t = useT();
   const [record, setRecord] = useState<RecordInstance<GapInspectionData> | undefined>(
     () => recordRepository.getById(recordId) as RecordInstance<GapInspectionData> | undefined
   );
   const [errors, setErrors] = useState<string[]>([]);
+  const [errorsFor, setErrorsFor] = useState<"submit" | "verify">("submit");
   const doc = documentRepository.getById(GAP_DOC_ID)!;
 
-  const editable = !!record && ["Scheduled", "Due", "In Progress"].includes(record.status);
+  const editable = !!record && isEditableStatus(record.status);
   // Closing a finding is a follow-up to a report that has already been
   // filed, so it stays possible while the report awaits verification —
   // otherwise the only way to clear a long-done action would be to reject
   // the whole report and resubmit it.
   const canClose = editable || (!!record && ["Submitted", "Pending Verification"].includes(record.status));
 
-  const applyPatch = (patch: Partial<GapInspectionData>) => {
-    if (!record) return;
-    const updated = { ...record, data: { ...record.data, ...patch } };
+  const current = () => (recordRepository.getById(recordId) as RecordInstance<GapInspectionData> | undefined) ?? record;
+
+  // Every change is saved as it's made, with a line in the record's history.
+  const applyPatch = (patch: Partial<GapInspectionData>, opts: { action?: "edited" | "assistant-edit"; note?: string } = {}) => {
+    const base = current();
+    if (!base) return;
+    const updated = saveDraft(base, { ...base.data, ...patch }, currentUser, opts) as RecordInstance<GapInspectionData>;
     setRecord(updated);
-    recordRepository.upsert(updated as RecordInstance);
     bump();
   };
 
   useSetAssistantTarget(
-    record && editable
-      ? { documentKind: "gap", documentId: doc.id, currentData: record.data, onApply: (patch) => applyPatch(patch as Partial<GapInspectionData>) }
+    record
+      ? {
+          documentKind: "gap",
+          documentId: doc.id,
+          recordId: record.id,
+          status: record.status,
+          editable,
+          currentData: record.data,
+          getData: () => current()?.data,
+          commit: (next, note) => applyPatch(next as GapInspectionData, { action: "assistant-edit", note }),
+          reopen: isCorrectableStatus(record.status)
+            ? (reason) => {
+                const base = current();
+                if (!base) return;
+                setRecord(reopenForCorrection(base, currentUser, reason) as RecordInstance<GapInspectionData>);
+                bump();
+              }
+            : undefined,
+        }
       : null
   );
 
@@ -192,21 +225,23 @@ export function GapRecordPage({ recordId }: { recordId: string }) {
     update({ findings: data.findings.map((f) => (f.status === "Open" || f.status === "Overdue" ? { ...f, status: "Closed", actualDateOfAction: f.actualDateOfAction ?? todayISO() } : f)) });
   };
 
-  const handleSave = () => {
-    const updated = saveDraft(record, data);
-    setRecord(updated);
-    bump();
-  };
+  const handleSave = () => undefined; // every change is already saved as it's made
   const handleSubmit = () => {
     const { record: updated, result } = submitRecord(doc, record, currentUser);
-    if (!result.valid) return setErrors(result.errors);
+    if (!result.valid) {
+      setErrorsFor("submit");
+      return setErrors(result.errors);
+    }
     setErrors([]);
     setRecord(updated as RecordInstance<GapInspectionData>);
     bump();
   };
   const handleVerify = () => {
     const { record: updated, result } = verifyRecord(doc, record, currentUser);
-    if (!result.valid) return setErrors(result.errors);
+    if (!result.valid) {
+      setErrorsFor("verify");
+      return setErrors(result.errors);
+    }
     setErrors([]);
     setRecord(updated as RecordInstance<GapInspectionData>);
     bump();
@@ -216,7 +251,12 @@ export function GapRecordPage({ recordId }: { recordId: string }) {
     bump();
   };
   const handleResume = () => {
-    setRecord(resumeAfterRejection(record) as RecordInstance<GapInspectionData>);
+    setRecord(resumeAfterRejection(record, currentUser) as RecordInstance<GapInspectionData>);
+    bump();
+  };
+  const handleCorrect = (reason: string) => {
+    setErrors([]);
+    setRecord(reopenForCorrection(record, currentUser, reason) as RecordInstance<GapInspectionData>);
     bump();
   };
   const handleDelete = () => {
@@ -237,20 +277,9 @@ export function GapRecordPage({ recordId }: { recordId: string }) {
         </div>
       </div>
 
-      {errors.length > 0 && (
-        <div className="card mb-4 no-print" style={{ borderColor: "var(--color-danger)", background: "var(--color-danger-bg)" }}>
-          <div className="card-pad">
-            <strong className="text-danger">Please fix the following:</strong>
-            <ul style={{ margin: "8px 0 0 18px" }}>
-              {errors.map((e, i) => (
-                <li key={i} className="text-danger text-sm">
-                  {e}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
+      {record.correction && <CorrectionBanner correction={record.correction} />}
+
+      <ErrorList errors={errors} heading={errorsFor === "verify" ? t("record.fixBeforeVerify") : t("record.fixBeforeSubmit")} />
 
       <div className="doc-header">
         <div className="company-name">CAPA — Internal: Pest Control Inspection Findings Report</div>
@@ -273,6 +302,13 @@ export function GapRecordPage({ recordId }: { recordId: string }) {
               value={data.premisesName}
               onChange={(e) => update({ premisesName: e.target.value })}
             />
+            <input
+              className="input input-sm mt-1"
+              disabled={!editable}
+              value={data.premisesAddress}
+              placeholder="Address"
+              onChange={(e) => update({ premisesAddress: e.target.value })}
+            />
           </div>
           <div className="meta-cell">
             <span className="k">Contact Person</span>
@@ -294,8 +330,11 @@ export function GapRecordPage({ recordId }: { recordId: string }) {
               <th>Finding</th>
               <th>Comments</th>
               <th>Corrective Action (Client)</th>
+              <th>Corrective Action (Contractor)</th>
+              <th style={{ width: 110 }}>Source</th>
               <th style={{ width: 120 }}>Target Date</th>
               <th style={{ width: 120 }}>Actual Date</th>
+              <th style={{ width: 130 }}>Verified by Service Provider</th>
               <th style={{ width: 100 }}>Status</th>
               {editable && <th></th>}
             </tr>
@@ -315,6 +354,20 @@ export function GapRecordPage({ recordId }: { recordId: string }) {
                 </td>
                 <td>
                   <input
+                    className="input input-sm"
+                    disabled={!editable}
+                    value={f.correctiveActionContractor}
+                    onChange={(e) => updateFinding(f.id, { correctiveActionContractor: e.target.value })}
+                  />
+                </td>
+                <td>
+                  <select className="input input-sm" disabled={!editable} value={f.source} onChange={(e) => updateFinding(f.id, { source: e.target.value as GapFinding["source"] })}>
+                    <option value="Internal">Internal</option>
+                    <option value="External">External</option>
+                  </select>
+                </td>
+                <td>
+                  <input
                     type="date"
                     className="input input-sm"
                     disabled={!editable}
@@ -329,6 +382,14 @@ export function GapRecordPage({ recordId }: { recordId: string }) {
                     disabled={!editable}
                     value={f.actualDateOfAction ?? ""}
                     onChange={(e) => updateFinding(f.id, { actualDateOfAction: e.target.value || null })}
+                  />
+                </td>
+                <td>
+                  <input
+                    className="input input-sm"
+                    disabled={!canClose}
+                    value={f.verifiedByServiceProvider}
+                    onChange={(e) => updateFinding(f.id, { verifiedByServiceProvider: e.target.value })}
                   />
                 </td>
                 <td>
@@ -350,7 +411,7 @@ export function GapRecordPage({ recordId }: { recordId: string }) {
             ))}
             {data.findings.length === 0 && (
               <tr>
-                <td colSpan={8} className="text-muted text-center" style={{ padding: 16 }}>
+                <td colSpan={11} className="text-muted text-center" style={{ padding: 16 }}>
                   No findings added.
                 </td>
               </tr>
@@ -407,15 +468,19 @@ export function GapRecordPage({ recordId }: { recordId: string }) {
         </div>
       </div>
 
+      <RecordHistoryPanel record={record} />
+
       <RecordActionBar
         status={record.status}
         dirty={false}
         isDemo={record.isDemo}
+        saveState="saved"
         onSave={handleSave}
         onSubmit={handleSubmit}
         onVerify={handleVerify}
         onReject={handleReject}
         onResume={handleResume}
+        onCorrect={handleCorrect}
         onPrint={() => window.print()}
         onDelete={handleDelete}
       />

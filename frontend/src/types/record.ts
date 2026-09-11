@@ -27,6 +27,56 @@ export interface RecordInstance<TData = unknown> {
   // record and in the login briefing. Kept after submission for the audit
   // trail ("prepared by the assistant, reviewed and submitted by <user>").
   prepared?: PreparedInfo;
+  // Append-only change history: every edit (with before -> after), submit,
+  // verify, rejection, resumption and correction, and who did it. Nothing is
+  // ever removed from it — this is what lets a verified record be corrected
+  // without losing what it said before. Records created before this field
+  // existed have none; engine/recordHistory.ts derives their timeline from
+  // the stamps above.
+  history?: HistoryEntry[];
+  // Set while a record that had been submitted or verified is reopened to
+  // correct a mistake — why, by whom, and what state it was in. Cleared on
+  // the next Submit (the history keeps it).
+  correction?: CorrectionInfo;
+}
+
+export interface FieldChange {
+  /** Stable path into the record's data, e.g. "rows[#row-abc].viscosity". */
+  field: string;
+  /** What a person reads, e.g. "Row 3 (11:00) · Viscosity". */
+  label: string;
+  before: string;
+  after: string;
+}
+
+export type HistoryAction =
+  | "prepared"
+  | "edited"
+  | "assistant-edit"
+  | "submitted"
+  | "verified"
+  | "rejected"
+  | "resumed"
+  | "reopened";
+
+export interface HistoryEntry {
+  id: string;
+  at: string; // ISO timestamp
+  by: string;
+  action: HistoryAction;
+  /** A reason (rejection, correction) or a one-line description. */
+  note?: string;
+  changes?: FieldChange[];
+  /** How many further changes were made but not listed (lists are capped). */
+  moreChanges?: number;
+  fromStatus?: RecordStatus;
+}
+
+export interface CorrectionInfo {
+  reason: string;
+  by: string;
+  at: string;
+  fromStatus: RecordStatus;
 }
 
 export interface PreparedInfo {

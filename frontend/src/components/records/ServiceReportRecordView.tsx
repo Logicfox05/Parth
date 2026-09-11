@@ -17,11 +17,16 @@ export function ServiceReportRecordView({
   doc,
   record,
   editable,
+  countersignEditable = false,
   onChange,
 }: {
   doc: DocumentDefinition;
   record: RecordInstance<ServiceReportData>;
   editable: boolean;
+  // While the report waits for verification, the customer's representative
+  // still countersigns it — and Verify requires that signature — so that one
+  // field stays writable then (everything else is locked).
+  countersignEditable?: boolean;
   onChange: (data: ServiceReportData) => void;
 }) {
   const data = record.data;
@@ -101,8 +106,12 @@ export function ServiceReportRecordView({
                     onChange={(e) => updateLine(l.slNo, { areaName: e.target.value })}
                   />
                 </td>
-                <td className="text-sm" title="Fixed — matches the SOP/Chemical Master for this service, not entered per visit">
-                  {l.materialName || <span className="text-faint">—</span>}
+                <td className="text-sm" title="Normally the SOP / Chemical Master material for this service — change it only if something else was used">
+                  {editable ? (
+                    <input className="input input-sm" value={l.materialName} onChange={(e) => updateLine(l.slNo, { materialName: e.target.value })} />
+                  ) : (
+                    l.materialName || <span className="text-faint">—</span>
+                  )}
                 </td>
                 <td>
                   <input
@@ -113,8 +122,12 @@ export function ServiceReportRecordView({
                     onChange={(e) => updateLine(l.slNo, { qtyUsed: e.target.value })}
                   />
                 </td>
-                <td className="text-sm" title="Fixed — matches the SOP/Chemical Master for this service, not entered per visit">
-                  {l.methodOfApplication || <span className="text-faint">—</span>}
+                <td className="text-sm" title="Normally the SOP method for this service — change it only if it was applied differently">
+                  {editable ? (
+                    <input className="input input-sm" value={l.methodOfApplication} onChange={(e) => updateLine(l.slNo, { methodOfApplication: e.target.value })} />
+                  ) : (
+                    l.methodOfApplication || <span className="text-faint">—</span>
+                  )}
                 </td>
                 <td>
                   <input
@@ -158,11 +171,15 @@ export function ServiceReportRecordView({
             <label>Customer's Representative Sign</label>
             <input
               className="input"
-              disabled={!editable}
+              data-field="customer-sign"
+              disabled={!(editable || countersignEditable)}
               value={data.customerSign}
               onChange={(e) => onChange({ ...data, customerSign: e.target.value })}
               placeholder="Customer representative name (required to verify)"
             />
+            {countersignEditable && !data.customerSign.trim() && (
+              <div className="text-xs text-muted mt-1">The customer's representative countersigns here — it's needed before this report can be verified.</div>
+            )}
           </div>
         </div>
       </div>

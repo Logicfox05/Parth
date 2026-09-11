@@ -2,7 +2,7 @@
 
 Per section 42 of the build brief, the application was actually built, run, and tested in a
 real Chromium browser (Playwright) against the production build — not just reviewed as source.
-Six scripts live in `tests/`:
+Seven scripts live in `tests/`:
 
 - `tests/e2e_smoke.py` — the core acceptance walkthrough (calendar → day → record →
   save/submit/verify → dashboard update → persistence → demo isolation → every module page
@@ -24,6 +24,12 @@ Six scripts live in `tests/`:
   (varied clock times, some rejections naming a reason and a rejector, verification not always
   same-day and never before submission), that nothing is filled in for a date that hasn't happened,
   and that a second browser reproduces the same day exactly. Network-independent.
+- `tests/e2e_editing.py` — every record can be corrected, safely: a manual edit saves itself and is
+  logged as before → after; a verified record is locked and offers "Correct this record", which needs
+  a reason, reopens it and keeps what it said; the assistant changes a field from a plain sentence,
+  lists the change and can undo it, refuses a value the form can't hold, and on a verified record asks
+  before reopening; Master Data rows are corrected in place and deletes take two taps.
+  Network-independent (common edits are understood locally).
 - `tests/visual_qa.py` — deeper per-module interaction checks (Fly Catcher, Service Report, CAPA
   creation, Training creation) plus full-page screenshots of every major screen for visual
   review, saved to `tests/shots/`, network-independent.
@@ -37,8 +43,8 @@ Six scripts live in `tests/`:
 
 ```bash
 npm run test:e2e     # builds, boots backend/index.ts on :8842, runs e2e_smoke.py THEN
-                      # e2e_backlog_regression.py THEN e2e_voice.py THEN e2e_realism.py
-                      # against it, tears down (see scripts/run-e2e.ts)
+                      # e2e_backlog_regression.py, e2e_voice.py, e2e_realism.py and
+                      # e2e_editing.py against it, tears down (see scripts/run-e2e.ts)
 ```
 
 `visual_qa.py` and `e2e_assistant_chat.py` aren't wired into an npm script (slower / make real Groq
@@ -51,6 +57,7 @@ python tests/e2e_smoke.py          # or python3, depending on platform
 python tests/e2e_backlog_regression.py
 python tests/e2e_voice.py
 python tests/e2e_realism.py
+python tests/e2e_editing.py
 python tests/visual_qa.py
 python tests/e2e_assistant_chat.py # needs backend/.env's GROQ_API_KEY to actually resolve; edit
                                     # the BASE constant at the top if your server isn't on :8844
@@ -59,7 +66,7 @@ python tests/e2e_assistant_chat.py # needs backend/.env's GROQ_API_KEY to actual
 Every suite signs up a fresh, randomly-emailed account at the start of the run (the app gates
 every page behind login — see `frontend/src/main.tsx`/`AuthProvider`) before exercising the rest of the app.
 
-## Results (last full run — 11-Sep-2026, on the TypeScript-only backend/scripts, after the F/HR/18 register and company trend-report formats)
+## Results (last full run — 11-Sep-2026, on the TypeScript-only backend/scripts, after the record-correction and change-history batch)
 
 The run below is the production shape end to end: `frontend/scripts/build.ts` builds the bundle,
 `backend/index.ts` (run directly by Node 23.6, no compile step) serves it plus the API, and every
@@ -265,6 +272,26 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   generated complete — 24 hourly readings already written down for next Tuesday — which would be a
   serious finding in a real register; a future record is now an empty shell, and a blank inspection
   form no longer arrives with its Lot Status box pre-set to "Accepted".
+- **Every record can be corrected — by hand or through the assistant** (11-Sep-2026, REQUIREMENTS
+  §27). A verified record could never be changed; resubmitting erased the rejection; unsaved edits were
+  lost on leaving; the service report's verifier couldn't type the countersignature Verify requires;
+  several fields (service material/method, four CAPA finding fields, new Master Data rows) could never
+  be corrected; and the assistant merged the model's reply unchecked, with no change list and no undo.
+  Now: drafts autosave; signed-off records are corrected through a reason-gated reopen and go through
+  verification again; every record keeps an append-only history of each edit (before → after) and
+  transition; every assistant change is checked and normalised first (`engine/recordPatch.ts`), saved,
+  listed and undoable, and asks before reopening a signed-off record; common edits are parsed locally.
+  Verified by 20 new browser checks (`tests/e2e_editing.py`, below), 28 unit checks of the edit
+  parser/checker and 14 of the history engine run from a scratch harness, and screenshots of the
+  correction banner, the history panel and the assistant's confirm-before-reopen. One defect found on
+  the way: "check point 2 is maybe" fell through to the AI service instead of being refused locally —
+  the local pattern now takes any answer and lets the checker refuse it, so the refusal needs no network.
+- **Clean-up:** the survey for unneeded items found every tracked file, route, dependency and test in
+  use. Removed: the never-called `resolveCurrentEmployee`; the Document Library's private copy of the
+  Pest Control section order (it now uses `PEST_CONTROL_SECTIONS`); and eight stale sentences in the
+  docs and comments (a "100% static" claim, the bundle size, a wrong tool name, the audit log listed as
+  future work). About 80 translation strings that are unused are finished Gujarati translations never
+  connected to their pages — left for connecting, not deleted.
 - **F/HR/18 and the Rodent Catch Report, in the company's own formats** (11-Sep-2026, from "Fly
   catcher reports .pdf" and "trend analysis .pdf"). `FlyCatcherRegisterSheet.tsx` reproduces the
   two-page monthly register and `CatchTrendSheet.tsx` the trend report with its bar chart, both filled
@@ -532,6 +559,31 @@ pause, inside the 2.5 s silence window), emit the rest, then go quiet. This is w
 | 11 | Composer was cleared | PASS |
 | 12 | The assistant answered the spoken question | PASS |
 | 13 | Pressing "Done" sends what was said instead of discarding it | PASS |
+
+### `tests/e2e_editing.py` — 20/20 checks passed
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Today's Live daily record exists | PASS |
+| 2 | The page says all changes are saved � no Save button to forget | PASS |
+| 3 | The edit is stored without pressing Save | PASS |
+| 4 | The record's history holds the edit as before -> after (Checker -> Vijay) | PASS |
+| 5 | Submitted (Pending Verification) | PASS |
+| 6 | Verified | PASS |
+| 7 | A verified record is locked and offers 'Correct this record' instead of Save / Submit | PASS |
+| 8 | Reopening needs a reason first | PASS |
+| 9 | Reopened: In Progress, with the reason recorded | PASS |
+| 10 | A banner says it is being corrected, by whom and why | PASS |
+| 11 | The history keeps the verification, the reopening and the correction's before/after | PASS |
+| 12 | The assistant changes a field from a plain sentence, saves it and lists the change | PASS |
+| 13 | The history marks it as the assistant's change | PASS |
+| 14 | Undo puts the old value back | PASS |
+| 15 | A value the form can't hold is refused, with the reason | PASS |
+| 16 | On a verified record the assistant asks before reopening it, and changes nothing yet | PASS |
+| 17 | After 'Yes': reopened for correction, changed, and the user's words recorded as the reason | PASS |
+| 18 | A Master Data row can be corrected in place, and it sticks | PASS |
+| 19 | One tap on delete only asks | PASS |
+| 20 | 'Keep' leaves the row | PASS |
 
 ### `tests/e2e_realism.py` — 22/22 checks passed
 

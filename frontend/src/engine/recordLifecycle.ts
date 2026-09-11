@@ -1,15 +1,35 @@
-import type { DocumentDefinition, RecordInstance } from "../types";
+import type { DocumentDefinition, RecordInstance, RecordStatus } from "../types";
 import { recordRepository } from "../data/repositories/recordRepository";
 import { validateForSubmit, validateForVerify, ValidationResult } from "./validation";
+import { appendHistory, makeEntry, withEditHistory } from "./recordHistory";
 
 // Scheduled -> Due -> In Progress -> Submitted -> Pending Verification -> Verified
 //                                        \-> Rejected -> (edit) -> Pending Verification
-// See DATA_MODEL.md for the full state diagram. A record can never reach
-// "Verified" without passing validateForVerify (section 16 requirement).
+// Any Submitted / Pending Verification / Verified / Rejected record can be
+// REOPENED FOR CORRECTION (with a reason) -> In Progress -> Submit -> verify
+// again. See DATA_MODEL.md for the full state diagram. A record can never
+// reach "Verified" without passing validateForVerify (section 16
+// requirement), and every transition and every edit is appended to the
+// record's history (engine/recordHistory.ts) — nothing is overwritten
+// without a trace.
 
-export function saveDraft<T>(record: RecordInstance<T>, newData: T): RecordInstance<T> {
+/** Statuses in which the record's own data can be edited directly. */
+export const EDITABLE_STATUSES: RecordStatus[] = ["Scheduled", "Due", "In Progress"];
+/** Statuses from which a record can be reopened to correct a mistake. */
+export const CORRECTABLE_STATUSES: RecordStatus[] = ["Submitted", "Pending Verification", "Verified", "Rejected"];
+
+export const isEditableStatus = (s: RecordStatus): boolean => EDITABLE_STATUSES.includes(s);
+export const isCorrectableStatus = (s: RecordStatus): boolean => CORRECTABLE_STATUSES.includes(s);
+
+export function saveDraft<T>(
+  record: RecordInstance<T>,
+  newData: T,
+  actorName = "User",
+  opts: { action?: "edited" | "assistant-edit"; note?: string; labels?: Record<string, string> } = {}
+): RecordInstance<T> {
   const nextStatus = record.status === "Due" || record.status === "Scheduled" ? "In Progress" : record.status;
-  const updated: RecordInstance<T> = { ...record, data: newData, status: nextStatus };
+  const withHistory = withEditHistory(record, newData, actorName, opts);
+  const updated: RecordInstance<T> = { ...withHistory, status: nextStatus };
   return recordRepository.upsert(updated as RecordInstance) as RecordInstance<T>;
 }
 
@@ -21,15 +41,24 @@ export function submitRecord(
   const result = validateForSubmit(doc, record);
   if (!result.valid) return { record, result };
   const now = new Date().toISOString();
-  const updated: RecordInstance = {
-    ...record,
-    status: "Pending Verification",
-    submittedBy: actorName,
-    submittedAt: now,
-    rejectedBy: undefined,
-    rejectedAt: undefined,
-    rejectionReason: undefined,
-  };
+  const wasCorrection = record.correction;
+  const updated: RecordInstance = appendHistory(
+    {
+      ...record,
+      status: "Pending Verification",
+      submittedBy: actorName,
+      submittedAt: now,
+      // The rejection / earlier verification stamps describe a version that
+      // no longer exists; the history keeps them.
+      rejectedBy: undefined,
+      rejectedAt: undefined,
+      rejectionReason: undefined,
+      verifiedBy: undefined,
+      verifiedAt: undefined,
+      correction: undefined,
+    },
+    makeEntry("submitted", actorName, { note: wasCorrection ? `Resubmitted after correction: ${wasCorrection.reason}` : undefined, fromStatus: record.status })
+  );
   return { record: recordRepository.upsert(updated), result };
 }
 
@@ -41,29 +70,43 @@ export function verifyRecord(
   const result = validateForVerify(doc, record);
   if (!result.valid) return { record, result };
   const now = new Date().toISOString();
-  const updated: RecordInstance = {
-    ...record,
-    status: "Verified",
-    verifiedBy: actorName,
-    verifiedAt: now,
-  };
+  const updated: RecordInstance = appendHistory(
+    { ...record, status: "Verified", verifiedBy: actorName, verifiedAt: now },
+    makeEntry("verified", actorName, { fromStatus: record.status })
+  );
   return { record: recordRepository.upsert(updated), result };
 }
 
 export function rejectRecord(record: RecordInstance, actorName: string, reason: string): RecordInstance {
   const now = new Date().toISOString();
-  const updated: RecordInstance = {
-    ...record,
-    status: "Rejected",
-    rejectedBy: actorName,
-    rejectedAt: now,
-    rejectionReason: reason,
-  };
+  const updated: RecordInstance = appendHistory(
+    { ...record, status: "Rejected", rejectedBy: actorName, rejectedAt: now, rejectionReason: reason },
+    makeEntry("rejected", actorName, { note: reason, fromStatus: record.status })
+  );
   return recordRepository.upsert(updated);
 }
 
-export function resumeAfterRejection(record: RecordInstance): RecordInstance {
-  const updated: RecordInstance = { ...record, status: "In Progress" };
+export function resumeAfterRejection(record: RecordInstance, actorName = "User"): RecordInstance {
+  const updated: RecordInstance = appendHistory({ ...record, status: "In Progress" }, makeEntry("resumed", actorName, { fromStatus: record.status }));
+  return recordRepository.upsert(updated);
+}
+
+/**
+ * Reopens a submitted, verified or rejected record so a mistake can be put
+ * right. A reason is required and recorded; the record goes back to In
+ * Progress, so it has to be submitted and verified again — a correction to a
+ * verified record is never quietly accepted. What the record said before
+ * stays in its history, field by field, as each edit is saved.
+ */
+export function reopenForCorrection(record: RecordInstance, actorName: string, reason: string): RecordInstance {
+  const why = reason.trim();
+  if (!why) throw new Error("A reason is required to correct a record.");
+  if (!isCorrectableStatus(record.status)) return record;
+  const now = new Date().toISOString();
+  const updated: RecordInstance = appendHistory(
+    { ...record, status: "In Progress", correction: { reason: why, by: actorName, at: now, fromStatus: record.status } },
+    makeEntry("reopened", actorName, { note: why, fromStatus: record.status })
+  );
   return recordRepository.upsert(updated);
 }
 

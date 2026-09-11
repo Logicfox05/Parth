@@ -143,6 +143,37 @@ settings, so they are copied exactly and what differs between records is the job
 them was also a random walk — each day centred on yesterday's jittered value — which wandered into
 the band edges within a few weeks and put a spurious excursion remark on most sheets.
 
+## Correcting a record: history, reopening, and checked edits
+
+```
+edit (form or assistant) ──► saveDraft(record, data, actor, {action, note, labels})
+                               └─ withEditHistory: diffRecordData(before, after) → FieldChange[]
+                                  appendHistory (folds quick edits by the same person)
+submit / verify / reject / resume ──► the same functions as before, each appending an entry
+Submitted | Pending Verification | Verified | Rejected
+        ──► reopenForCorrection(record, actor, reason)  → In Progress + record.correction
+        ──► (edit) ──► submitRecord clears .correction, stamps a "resubmitted after correction" entry
+```
+
+`RecordInstance.history: HistoryEntry[]` is append-only — `{ id, at, by, action, note?, changes?,
+moreChanges?, fromStatus? }` with `action` one of prepared / edited / assistant-edit / submitted /
+verified / rejected / resumed / reopened. `FieldChange { field, label, before, after }`: `field` is a
+stable path whose array elements are keyed by their own `id` (so inserting a row doesn't mark every
+row below it as changed); `label` is what a person reads. `historyOf(record)` returns the history, or
+a timeline reconstructed from the envelope's stamps for records saved before the field existed.
+`RecordInstance.correction { reason, by, at, fromStatus }` is set while a signed-off record is being
+corrected.
+
+Every change the assistant makes — whether from the model or from a plain-words sentence
+(`parseLocalEdit`) — goes through `applyAssistantPatch(kind, documentId, current, patch)` in
+`engine/recordPatch.ts`, which returns `{ data, problems }` and never mutates its input. A patch holds
+top-level fields (objects such as `header` and `checkpoints` are merged key by key) and/or
+`itemEdits: [{ collection, match, set }]`, which change exactly one matching item (or refuse, if none
+or several match; `__row` matches by position). Log-sheet values are typed by the layout column
+(number / yesno / select / time / date); other fields by what they hold. The page's `AssistantTarget`
+then decides: `editable` → `commit(next, note)`; otherwise, with the user's go-ahead, `reopen(reason)`
+first.
+
 ## Company-format sheets are views, never copies
 
 The printed formats that span many records are rendered over those records, not stored:

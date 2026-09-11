@@ -77,7 +77,13 @@ export function MasterDataPage() {
       {tab === "chemicals" && (
         <SimpleTable
           columns={["Name", "Active Ingredient", "Formulation"]}
-          rows={master.chemicals.map((c) => [c.name, c.activeIngredient ?? "—", c.formulation ?? "—"])}
+          rows={master.chemicals.map((c) => [c.name, c.activeIngredient ?? "", c.formulation ?? ""])}
+          editableCols={[0, 1, 2]}
+          onEdit={(i, col, value) => {
+            const field = (["name", "activeIngredient", "formulation"] as const)[col];
+            masterRepository.update({ chemicals: master.chemicals.map((c, idx) => (idx === i ? { ...c, [field]: value } : c)) });
+            bump();
+          }}
           onAdd={() => {
             masterRepository.update({ chemicals: [...master.chemicals, { id: generateId("chem"), name: "New Chemical" }] });
             bump();
@@ -93,8 +99,17 @@ export function MasterDataPage() {
         <SimpleTable
           columns={["PC ID", "Location", "Floor"]}
           rows={master.pcLocations.map((p) => [p.id, p.location, p.floor])}
+          // The PC ID is what every fly catcher record refers to, so it stays
+          // fixed; its location and floor can be corrected.
+          editableCols={[1, 2]}
+          onEdit={(i, col, value) => {
+            const field = (["id", "location", "floor"] as const)[col];
+            masterRepository.update({ pcLocations: master.pcLocations.map((p, idx) => (idx === i ? { ...p, [field]: value } : p)) });
+            bump();
+          }}
           onAdd={() => {
-            const nextNum = master.pcLocations.length + 1;
+            // Next free number — counting rows would reuse an ID after a delete.
+            const nextNum = Math.max(0, ...master.pcLocations.map((p) => Number(p.id.replace(/\D/g, "")) || 0)) + 1;
             masterRepository.update({
               pcLocations: [...master.pcLocations, { id: `PC-${String(nextNum).padStart(2, "0")}`, location: "TO BE CONFIRMED", floor: "TO BE CONFIRMED" }],
             });
@@ -121,6 +136,12 @@ export function MasterDataPage() {
           <SimpleTable
             columns={["Station ID", "Location", "Type", "Status"]}
             rows={master.rodentStations.map((r) => [r.id, r.location, r.type, r.status])}
+            editableCols={[1, 2, 3]}
+            onEdit={(i, col, value) => {
+              const field = (["id", "location", "type", "status"] as const)[col];
+              masterRepository.update({ rodentStations: master.rodentStations.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)) });
+              bump();
+            }}
             onAdd={() => {
               masterRepository.update({
                 rodentStations: [
@@ -531,6 +552,7 @@ function EmployeesTable({
   onRemove: (index: number) => void;
   onUpdate: (index: number, patch: Partial<Employee>) => void;
 }) {
+  const [confirming, setConfirming] = useState<number | null>(null);
   return (
     <div>
       <div className="doc-table">
@@ -573,10 +595,8 @@ function EmployeesTable({
                 <td style={{ textAlign: "center" }}>
                   <input type="checkbox" checked={e.active} onChange={(ev) => onUpdate(i, { active: ev.target.checked })} />
                 </td>
-                <td>
-                  <button className="btn btn-ghost btn-sm btn-icon" onClick={() => onRemove(i)}>
-                    <FiTrash2 size={13} />
-                  </button>
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <DeleteButton confirming={confirming === i} onAsk={() => setConfirming(i)} onCancel={() => setConfirming(null)} onConfirm={() => { setConfirming(null); onRemove(i); }} />
                 </td>
               </tr>
             ))}
@@ -590,17 +610,45 @@ function EmployeesTable({
   );
 }
 
+// Two taps to delete a master-data row — a row other records refer to
+// shouldn't vanish on one slip of the mouse.
+function DeleteButton({ confirming, onAsk, onCancel, onConfirm }: { confirming: boolean; onAsk: () => void; onCancel: () => void; onConfirm: () => void }) {
+  if (!confirming) {
+    return (
+      <button className="btn btn-ghost btn-sm btn-icon" onClick={onAsk} title="Delete this row">
+        <FiTrash2 size={13} />
+      </button>
+    );
+  }
+  return (
+    <span className="flex gap-1">
+      <button className="btn btn-danger btn-sm" data-action="confirm-delete" onClick={onConfirm}>
+        Delete
+      </button>
+      <button className="btn btn-ghost btn-sm" onClick={onCancel}>
+        Keep
+      </button>
+    </span>
+  );
+}
+
 function SimpleTable({
   columns,
   rows,
+  editableCols = [],
+  onEdit,
   onAdd,
   onRemove,
 }: {
   columns: string[];
   rows: string[][];
+  /** Column indexes whose cells can be typed into. */
+  editableCols?: number[];
+  onEdit?: (row: number, col: number, value: string) => void;
   onAdd: () => void;
   onRemove: (index: number) => void;
 }) {
+  const [confirming, setConfirming] = useState<number | null>(null);
   return (
     <div>
       <div className="doc-table">
@@ -616,15 +664,27 @@ function SimpleTable({
           <tbody>
             {rows.map((r, i) => (
               <tr key={i}>
-                {r.map((cell, ci) => (
-                  <td key={ci} className={cell === "TO BE CONFIRMED" ? "tbc" : ""}>
-                    {cell}
-                  </td>
-                ))}
-                <td>
-                  <button className="btn btn-ghost btn-sm btn-icon" onClick={() => onRemove(i)}>
-                    <FiTrash2 size={13} />
-                  </button>
+                {r.map((cell, ci) =>
+                  onEdit && editableCols.includes(ci) ? (
+                    <td key={ci}>
+                      <input
+                        className={`input input-sm ${cell === "TO BE CONFIRMED" ? "tbc" : ""}`}
+                        value={cell}
+                        onFocus={(e) => {
+                          // A placeholder is meant to be replaced — select it so typing replaces it.
+                          if (cell === "TO BE CONFIRMED" || cell === "New Chemical") e.target.select();
+                        }}
+                        onChange={(e) => onEdit(i, ci, e.target.value)}
+                      />
+                    </td>
+                  ) : (
+                    <td key={ci} className={cell === "TO BE CONFIRMED" ? "tbc" : ""}>
+                      {cell || <span className="text-faint">—</span>}
+                    </td>
+                  )
+                )}
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <DeleteButton confirming={confirming === i} onAsk={() => setConfirming(i)} onCancel={() => setConfirming(null)} onConfirm={() => { setConfirming(null); onRemove(i); }} />
                 </td>
               </tr>
             ))}

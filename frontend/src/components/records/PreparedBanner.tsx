@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { FiRefreshCw, FiZap } from "react-icons/fi";
 import type { PreparedInfo, RecordStatus } from "../../types";
+import { useT } from "../../i18n";
 
 // Shown at the top of any record the assistant pre-filled. Says exactly what
 // was filled in and where the values came from, so "review and confirm" is a
@@ -14,6 +15,8 @@ export function PreparedBanner({
   status: RecordStatus;
   onReprepare?: () => void;
 }) {
+  const t = useT();
+  const [confirming, setConfirming] = useState(false);
   const draft = ["Scheduled", "Due", "In Progress", "Rejected"].includes(status);
   const when = new Date(prepared.at);
   return (
@@ -37,10 +40,32 @@ export function PreparedBanner({
             </div>
           )}
         </div>
-        {draft && onReprepare && (
-          <button className="btn btn-secondary btn-sm no-print" onClick={onReprepare} title="Discard your edits and let the assistant fill it in again">
+        {draft && onReprepare && !confirming && (
+          <button className="btn btn-secondary btn-sm no-print" onClick={() => setConfirming(true)} title="Let the assistant fill it in again">
             <FiRefreshCw size={12} /> Fill again
           </button>
+        )}
+        {draft && onReprepare && confirming && (
+          // "Fill again" replaces the whole form — ask once, so a stray click
+          // can't wipe what someone just typed.
+          <div className="no-print text-sm" style={{ maxWidth: 260 }}>
+            <div className="mb-2">{t("record.fillAgainConfirm")}</div>
+            <div className="flex gap-2">
+              <button
+                className="btn btn-primary btn-sm"
+                data-action="confirm-fill-again"
+                onClick={() => {
+                  setConfirming(false);
+                  onReprepare();
+                }}
+              >
+                <FiRefreshCw size={12} /> {t("record.replace")}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setConfirming(false)}>
+                {t("common.cancel")}
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

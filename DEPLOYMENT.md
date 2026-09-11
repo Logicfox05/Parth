@@ -7,7 +7,7 @@ npm install
 npm run dev         # frontend dev server (5173) + auth API (4000) together, live rebuild
 npm run dev:frontend # frontend only (assumes something else is serving /api)
 npm run server       # auth API only, http://localhost:4000
-npm run build        # -> frontend/dist/ (static frontend, ~320KB JS + CSS)
+npm run build        # -> frontend/dist/ (static frontend bundle, ~0.7 MB JS + CSS)
 npm start            # build + serve frontend/dist/ AND the API from one Express process (production)
 npm run typecheck    # tsc --noEmit (see "TypeScript checking" note below)
 ```
