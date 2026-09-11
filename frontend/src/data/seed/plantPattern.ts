@@ -198,16 +198,6 @@ export const CHECKPOINT_ISSUES: Record<number, CheckpointIssueModel> = {
         "remarks": "Ref. GAP finding 3 (Dec-2023) — materials stored haphazardly."
       }
     ]
-  },
-  "10": {
-    "rate": 0.011,
-    "issues": [
-      {
-        "description": "Fly catcher tube lights of PC-09 past their one-year validity.",
-        "action": "Tubes replaced; new install date entered in F/HR/18.",
-        "remarks": ""
-      }
-    ]
   }
 };
 

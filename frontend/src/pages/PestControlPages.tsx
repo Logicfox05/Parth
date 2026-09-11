@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { FiActivity, FiArrowRight, FiAward, FiBookOpen, FiCalendar, FiClipboard, FiDroplet, FiFileText, FiTrendingUp, FiTruck } from "react-icons/fi";
+import { FiActivity, FiArrowRight, FiAward, FiBookOpen, FiCalendar, FiClipboard, FiDroplet, FiFileText, FiPrinter, FiTrendingUp, FiTruck } from "react-icons/fi";
 import { useAppStore } from "../store/AppStore";
 import { useRouter } from "../store/router";
 import { recordRepository } from "../data/repositories/recordRepository";
@@ -18,6 +18,7 @@ import { FlyCatcherTrendReport, RodentTrendReport } from "./ReportsPage";
 import { StatusBadge } from "../components/common/StatusBadge";
 import { DemoTag } from "../components/common/DemoTag";
 import { DailyRegisterSheet, FHR17_ORIGINAL_PAGES } from "../components/records/DailyRegisterSheet";
+import { FlyCatcherRegisterSheet } from "../components/records/FlyCatcherRegisterSheet";
 import { useT } from "../i18n";
 import { MONTH_NAMES, WEEKDAY_NAMES, compareISO, daysInMonth, formatDisplayDate, fromISODate, pad2, todayISO } from "../utils/date";
 import type { DailyPestMonitoringData, DocumentDefinition, FlyCatcherData, RecordInstance, ServiceReportData, TrainingRecordData } from "../types";
@@ -524,6 +525,8 @@ export function ServiceReportListPage({ slug, year: initialYear }: { slug: strin
   const isDemo = mode === "demo";
   const now = new Date();
   const [year, setYear] = useState(initialYear ?? now.getFullYear());
+  // Month of the F/HR/18 register shown on the Fly Control page.
+  const [registerMonth, setRegisterMonth] = useState(now.getMonth());
   const today = todayISO();
   useEnsureMonth(now.getFullYear(), now.getMonth(), version);
 
@@ -611,7 +614,9 @@ export function ServiceReportListPage({ slug, year: initialYear }: { slug: strin
       </div>
 
       <div className="doc-table">
-        <table>
+        {/* data-table: a stable hook, since this page now also carries the
+            company-format sheets, which are tables too. */}
+        <table data-table="visits">
           <thead>
             <tr>
               <th>Service date</th>
@@ -655,6 +660,30 @@ export function ServiceReportListPage({ slug, year: initialYear }: { slug: strin
           </tbody>
         </table>
       </div>
+
+      {/* The company's own formats that go with this service, filled from the
+          records: the F/HR/18 fly catcher register beside Fly Control, and the
+          Rodent Catch Report and Trend Analysis beside Rat / Mice. Same
+          components (and the same data) as Pest Control > Trend Analysis. */}
+      {slug === "fly" && (
+        <div className="mt-6" data-section="fhr18">
+          <div className="flex items-center justify-between wrap gap-2 mb-1">
+            <h2 className="text-lg">{t("pest.fhr18SectionTitle")}</h2>
+            <div className="flex gap-2 no-print">
+              <MonthSelect value={registerMonth} onChange={setRegisterMonth} />
+              <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+                <FiPrinter size={12} /> {t("pest.printRegister")}
+              </button>
+            </div>
+          </div>
+          <FlyCatcherRegisterSheet year={year} month={registerMonth} isDemo={isDemo} onOpenVisit={(r) => navigate(`/record/${r.id}`)} />
+        </div>
+      )}
+      {slug === "rodent" && (
+        <div className="mt-6" data-section="rodent-trend">
+          <RodentTrendReport isDemo={isDemo} year={year} />
+        </div>
+      )}
     </div>
   );
 }
@@ -705,6 +734,10 @@ export function FlyCatcherTrendPage({ year: initialYear }: { year?: number }) {
   const now = new Date();
   const [year, setYear] = useState(initialYear ?? now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
+  // The register (the company's own F/HR/18 layout) is the default, as on the
+  // Daily Report page; the trend and the visit list are views of the same
+  // records.
+  const [view, setView] = useState<"register" | "trend" | "list">("register");
   const today = todayISO();
   useEnsureMonth(now.getFullYear(), now.getMonth(), version);
 
@@ -756,8 +789,30 @@ export function FlyCatcherTrendPage({ year: initialYear }: { year?: number }) {
         </button>
       </div>
 
-      <FlyCatcherTrendReport isDemo={isDemo} year={year} month={month} />
+      <div className="flex items-center justify-between wrap gap-2 mb-2 no-print">
+        <div className="pill-tabs">
+          <div className={`pill-tab ${view === "register" ? "active" : ""}`} data-view="register" onClick={() => setView("register")}>
+            {t("pest.fhr18RegisterView")}
+          </div>
+          <div className={`pill-tab ${view === "trend" ? "active" : ""}`} data-view="trend" onClick={() => setView("trend")}>
+            {t("pest.trendView")}
+          </div>
+          <div className={`pill-tab ${view === "list" ? "active" : ""}`} data-view="list" onClick={() => setView("list")}>
+            {t("pest.visitListView")}
+          </div>
+        </div>
+        {view === "register" && (
+          <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+            <FiPrinter size={12} /> {t("pest.printRegister")}
+          </button>
+        )}
+      </div>
 
+      {view === "register" && <FlyCatcherRegisterSheet year={year} month={month} isDemo={isDemo} onOpenVisit={(r) => navigate(`/record/${r.id}`)} />}
+
+      {view === "trend" && <FlyCatcherTrendReport isDemo={isDemo} year={year} month={month} />}
+
+      {view === "list" && (
       <div className="card mt-4">
         <div className="card-header">
           <h3 className="text-lg">
@@ -808,6 +863,7 @@ export function FlyCatcherTrendPage({ year: initialYear }: { year?: number }) {
           </table>
         </div>
       </div>
+      )}
     </div>
   );
 }

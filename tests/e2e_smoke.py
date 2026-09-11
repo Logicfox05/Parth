@@ -284,7 +284,37 @@ def main():
         # compare case-insensitively.
         rodent_report = page.locator(".app-content").inner_text().lower()
         check("Rodent report uses the company's layout (Source / Unit / Target Pest / Year / Total)", "trapped on glue boards in roda-boxes" in rodent_report and "target pest" in rodent_report)
-        check("Rodent report shows the reported 2025 history (2 rodents, May & June)", "2025" in rodent_report and "(as reported)" in rodent_report)
+        # The company's own format ("trend analysis .pdf"): two-line header,
+        # one row per year, the bar chart JAN..DEC + Total underneath.
+        def trend_row(year):
+            return page.evaluate(
+                "(y) => { const tr = document.querySelector(`.trend-table tbody tr[data-year='${y}']`);"
+                " return tr ? { cells: Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim()),"
+                " tinted: Array.from(tr.querySelectorAll('td.from-register')).map(td => Number(td.dataset.month)) } : null; }",
+                year,
+            )
+
+        check(
+            "Rodent report is in the company's format: its title, one row per year from 2024, and the bar chart JAN-DEC + Total",
+            "RODENT CATCH REPORT AND TREND ANALYSIS" in page.locator(".trend-head").first.inner_text()
+            and all(page.locator(f".trend-table tbody tr[data-year='{y}']").count() == 1 for y in (2024, 2025, date.today().year))
+            and page.locator(".trend-chart .bar").count() == 13
+            and "Number or Quantity Trapped" in page.locator(".trend-chart").first.inner_text(),
+        )
+        r2025 = trend_row(2025)
+        # cells: source, unit, target pest, year, JAN..DEC (index 4..15), Total (16)
+        check(
+            "Rodent report carries the company's reported 2025 figures (May 1, June 1, total 2)",
+            r2025 is not None and r2025["cells"][8] == "1" and r2025["cells"][9] == "1" and r2025["cells"][16] == "2",
+        )
+        this_year = trend_row(date.today().year)
+        current_month_index = date.today().month - 1
+        check(
+            "This year's months held by the digital register are added up from it (tinted), not copied from paper",
+            this_year is not None and current_month_index in this_year["tinted"],
+        )
+        if date.today().month < 12:
+            check("A month that hasn't happened yet is left blank, as on the paper report", this_year is not None and this_year["cells"][4 + date.today().month] == "")
         digital_total = re.search(r"\((\d+) in total across (\d+) days?", rodent_report)
         check("Digital rodent total over the demo year is non-zero (pattern applied)", digital_total is not None and int(digital_total.group(1)) > 0)
         check("Rodent report breaks catches down by location", "where they were found" in rodent_report and ("canteen" in rodent_report or "rm inward" in rodent_report or "store" in rodent_report))
@@ -298,6 +328,43 @@ def main():
         fly_total = re.search(r"(\d+) flies caught in", fly_report)
         check("Fly Catcher Infestation trend has a non-zero yearly total in Demo Mode (seasonal fly pattern applied)", fly_total is not None and int(fly_total.group(1)) > 0)
         check("Fly Catcher Infestation trend lists all 13 units in the company's year layout", "target pest" in fly_report and page.locator("table.fly-units tbody tr").count() == 13)
+        check(
+            "Fly trend uses the same company format (title and the JAN-DEC + Total chart)",
+            "FLY CATCH REPORT AND TREND ANALYSIS" in page.locator(".trend-head").first.inner_text() and page.locator(".trend-chart .bar").count() == 13,
+        )
+
+        # The F/HR/18 register in the company's own two-page format, filled
+        # from last month's two demo visits ("Fly catcher reports .pdf").
+        if date.today().month > 1:
+            page.goto(f"{BASE}/index.html#/pest/trend/fly-catcher")
+            page.wait_for_timeout(500)
+            page.locator(".app-content select").nth(1).select_option(str(date.today().month - 2))
+            page.wait_for_timeout(500)
+            pc01 = page.evaluate(
+                "() => Array.from(document.querySelectorAll('tbody.fhr18-unit[data-pc=\"PC-01\"] tr'))"
+                ".map(tr => Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim()))"
+            )
+            first, second = (pc01 + [[], []])[:2]
+            check(
+                "F/HR/18 register is filled from the visit records, written as the specimen writes it (d/mm/yy, two-digit counts)",
+                len(first) == 7
+                and re.fullmatch(r"\d{1,2}/\d{2}/\d{2}", first[1]) is not None
+                and re.fullmatch(r"\d{2}", first[2]) is not None
+                and first[5] == "Vijay"
+                and first[6] == "Roshni",
+            )
+            check(
+                "Tube-light dates follow the specimen's annual cycle (installed 24/12, due 23/12), with ditto marks on the line below",
+                len(first) == 7 and first[3].startswith("24/12/") and first[4].startswith("23/12/") and len(second) == 6 and second[2] == '"' and second[3] == '"',
+            )
+
+        # The same formats beside the services they belong to.
+        page.goto(f"{BASE}/index.html#/pest/service/fly")
+        page.wait_for_timeout(500)
+        check("Fly Control service page carries the F/HR/18 register", page.locator("[data-section='fhr18'] .fhr18-sheet .register-page").count() == 2)
+        page.goto(f"{BASE}/index.html#/pest/service/rodent")
+        page.wait_for_timeout(500)
+        check("Rat / Mice service page carries the Rodent Catch Report and Trend Analysis", page.locator("[data-section='rodent-trend'] .trend-sheet").count() == 1)
 
         # Holiday-aware scheduling: Thursday is the weekly off, so a fortnightly
         # visit that falls on a Thursday moves to the next working day instead
@@ -306,7 +373,7 @@ def main():
         # is dated a Thursday, and some of them are NOT on the 4th/18th.
         page.goto(f"{BASE}/index.html#/pest/service/rodent/{date.today().year}")
         page.wait_for_timeout(400)
-        svc_dates = [datetime.strptime(m, "%d-%b-%Y").date() for m in re.findall(r"\b\d{2}-[A-Z][a-z]{2}-\d{4}\b", page.locator(".doc-table tbody").inner_text())]
+        svc_dates = [datetime.strptime(m, "%d-%b-%Y").date() for m in re.findall(r"\b\d{2}-[A-Z][a-z]{2}-\d{4}\b", page.locator("table[data-table='visits'] tbody").inner_text())]
         check(
             "Demo service visits never sit on the Thursday weekly off — a visit scheduled on a Thursday is dated the next working day",
             len(svc_dates) >= 4 and all(d.weekday() != 3 for d in svc_dates) and any(d.day not in (4, 18) for d in svc_dates),
@@ -493,7 +560,7 @@ def main():
         page.click("a:has-text('Rat / Mice')")
         page.wait_for_timeout(300)
         check("Rat / Mice service reports open on their own page", "#/pest/service/rodent" in page.url and "Rodent Control Service" in page.locator(".app-content").inner_text())
-        check("Service report list shows this month's fortnightly visit(s)", page.locator(".doc-table tbody tr").count() >= 1)
+        check("Service report list shows this month's fortnightly visit(s)", page.locator("table[data-table='visits'] tbody tr").count() >= 1)
         page.click("a:has-text('Daily Pest Control Monitoring')")
         page.wait_for_timeout(300)
         check("Daily Report page shows the month register with today's row", "#/pest/daily" in page.url and page.locator(".doc-table tbody tr.is-today").count() == 1)
@@ -508,7 +575,23 @@ def main():
         check("Register page 3 carries the Summary of Actions Taken if Pest Observed", page.locator(".register-summary-title").count() == 1)
         page.click("a:has-text('Fly Catcher Infestation')")
         page.wait_for_timeout(300)
-        check("Fly Catcher Infestation page renders the per-unit register (Live)", "#/pest/trend/fly-catcher" in page.url and page.locator("table.fly-units tbody tr").count() == 13)
+        check(
+            "Fly Catcher Infestation opens on the F/HR/18 register in the company's two-page format (Live)",
+            "#/pest/trend/fly-catcher" in page.url
+            and page.locator(".fhr18-sheet .register-page").count() == 2
+            and page.locator("tbody.fhr18-unit").count() == 13
+            and page.locator(".fhr18-legend").first.locator("tr").count() == 7
+            and "FORTNIGHTLY – FLY CATCHER INSPECTION & CLEANING RECORD" in page.locator(".fhr18-sheet .doc-header").first.inner_text()
+            and "F/HR/18" in page.locator(".fhr18-sheet .doc-header").first.inner_text(),
+        )
+        check(
+            "Register carries the form's own seven column headings",
+            [t.strip() for t in page.locator(".fhr18-grid").first.locator("thead th").all_inner_texts()]
+            == ["PC ID NO.", "DATE OF SERVICE", "FLIES CATCH COUNT APPROX.", "DATE OF TUBE LIGHT INSTALLATION", "DUE DATE FOR TUBE LIGHT REPLACEMENT", "CLEANING DONE BY", "VERIFIED BY"],
+        )
+        page.click(".pill-tab[data-view='trend']")
+        page.wait_for_timeout(300)
+        check("Its trend view still lists every unit PC-01..PC-13 (Live)", page.locator("table.fly-units tbody tr").count() == 13)
         page.click("a[href='#/pest-control']")
         page.wait_for_timeout(300)
         overview = page.locator(".app-content").inner_text()

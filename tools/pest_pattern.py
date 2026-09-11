@@ -206,4 +206,6 @@ print(f"wrote {OUT}")
 print("rodent daily rate by month:", dict(zip(MONTH_NAMES, [float(x) for x in daily_rate])))
 print("expected rodent catch days / year:", round(float((daily_rate * 30.4).sum()), 1))
 print("fly seasonal factor:", dict(zip(MONTH_NAMES, [float(x) for x in fly_seasonal])))
-print("fly peak-month mean per visit, all units:", round(sum(unit_base.values()), 1), "(specimen visits: 15 and 10)")
+specimen_visit_totals = [sum(v[i] for v in FLY_SPECIMEN.values()) for i in (0, 1)]
+print("fly peak-month mean per visit, all units:", round(sum(unit_base.values()), 1),
+      f"(specimen visits: {specimen_visit_totals[0]} and {specimen_visit_totals[1]})")

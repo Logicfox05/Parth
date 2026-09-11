@@ -173,7 +173,15 @@ def main():
         page.screenshot(path="tests/shots/15_pest_control_overview.png", full_page=True)
         page.click("a[href='#/pest/trend/fly-catcher']")
         page.wait_for_timeout(300)
+        check("Fly Catcher Infestation opens on the two-page F/HR/18 register", page.locator(".fhr18-sheet .register-page").count() == 2)
         page.screenshot(path="tests/shots/16_pest_fly_catcher_infestation.png", full_page=True)
+        page.click(".pill-tab[data-view='trend']")
+        page.wait_for_timeout(300)
+        page.screenshot(path="tests/shots/26_fly_catch_trend.png", full_page=True)
+        page.goto(f"{BASE}/index.html#/pest/trend/rodent")
+        page.wait_for_timeout(400)
+        check("Rodent Catch Report and Trend Analysis renders in the company format with its chart", page.locator(".trend-sheet .trend-chart .bar").count() == 13)
+        page.screenshot(path="tests/shots/27_rodent_catch_report.png", full_page=True)
 
         # --- The Assistant page (ChatGPT-style) and the working calendar ---
         page.click("a[href='#/assistant']")

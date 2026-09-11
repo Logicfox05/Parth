@@ -23,6 +23,19 @@ export function flyCatchFor(pcId: string, dateISO: string): number {
   return Math.min(k - 1, 9);
 }
 
+// Tube-light validity, as the F/HR/18 specimen records it: all thirteen units
+// installed on 24/12/25, all due for replacement on 23/12/26 — the tubes are
+// changed together once a year, at the December service. So for any service
+// date the current tubes went in on the most recent 24 December and are due on
+// the 23 December a year after. (An earlier version staggered the dates across
+// the year on the assumption that thirteen identical dates was a data-entry
+// artefact; the company's own register shows it is simply how they do it.)
+export function tubeLightCycleFor(serviceDateISO: string): { installed: string; due: string } {
+  const year = Number(serviceDateISO.slice(0, 4));
+  const installYear = serviceDateISO >= `${year}-12-24` ? year : year - 1;
+  return { installed: `${installYear}-12-24`, due: `${installYear + 1}-12-23` };
+}
+
 export function flySeasonLabel(month: number): string {
   const f = FLY_MONTHLY_FACTOR[month] ?? 1;
   return f >= 0.85 ? "peak fly season" : f >= 0.55 ? "moderate fly season" : "low fly season";

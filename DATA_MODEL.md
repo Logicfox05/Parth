@@ -143,6 +143,26 @@ settings, so they are copied exactly and what differs between records is the job
 them was also a random walk — each day centred on yesterday's jittered value — which wandered into
 the band edges within a few weeks and put a spurious excursion remark on most sheets.
 
+## Company-format sheets are views, never copies
+
+The printed formats that span many records are rendered over those records, not stored:
+
+- `components/records/DailyRegisterSheet.tsx` — F/HR/17, a month of daily records.
+- `components/records/FlyCatcherRegisterSheet.tsx` — F/HR/18, a month of fortnightly visit records
+  (one line per unit per visit; each visit record holds all 13 units' entries for its date).
+- `components/reports/CatchTrendSheet.tsx` — the Rodent Catch Report and Trend Analysis layout, fed
+  `TrendRow`s by `data/selectors.ts`:
+  - `rodentTrendRows(isDemo)` takes each month from exactly one source — the digital F/HR/17
+    register when it holds that month's days (a day counts once it is actually filled in), else the
+    paper figures in `RODENT_HISTORY_REPORTED`, else null (blank; every future month is blank).
+    `fromRegister[]` records which, and drives a screen-only tint so a computed figure is always
+    distinguishable from a transcribed one.
+  - `flyTrendRows(isDemo)` adds up the F/HR/18 visits (there is no paper history for flies).
+
+Editing happens only in the per-record forms; a sheet line opens its record. Tube-light dates follow
+the specimen's annual cycle — installed 24 December, due 23 December, all units together
+(`tubeLightCycleFor`, `engine/flyPattern.ts`).
+
 ## Seed synchronisation (existing installs pick up new documents)
 
 Each repository's `ensureSeeded()` now merges rather than only seeding an empty store:

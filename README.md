@@ -82,8 +82,16 @@ The app behaves like a personal assistant rather than a blank form:
   fortnightly visit reports, Rat / Mice (Rodent Control Service), Ants & Cockroaches (General Pest
   Control Services) and Fly Control (`/pest/service/{rodent|general|fly}`), each with last visit,
   next due, materials and areas; **Trend Analysis** — the Rodent Catch Report and Trend Analysis and
-  the Fly Catcher Infestation trend (`/pest/trend/{rodent|fly-catcher}`), both in the company's own
-  Source / Unit / Target Pest / Year / Jan–Dec / Total layout; **Training & Reference** — Training
+  the Fly Catcher Infestation trend (`/pest/trend/{rodent|fly-catcher}`). Both are reproduced in the
+  company's own printed formats, filled from the records: the **Rodent Catch Report and Trend
+  Analysis** exactly as on "trend analysis .pdf" (two-line header, one row per year — Source / Unit /
+  Target Pest / YEAR / JAN–DEC / Total — and the "Number or Quantity Trapped" bar chart), each month
+  added up from the Daily Pest Control Monitoring Records where the register holds it and taken from
+  the paper report before that; and the **Fortnightly Fly Catcher Inspection & Cleaning Record
+  (F/HR/18)** as its two-page monthly register exactly as on "Fly catcher reports .pdf" (Month &
+  Year, the PC location legend, PC-01–08 on page 1 and PC-09–13 on page 2, one line per unit per
+  visit, dates written d/mm/yy and tube-light dates dittoed down). The same two sheets also sit
+  beside the services they belong to, on the Fly Control and Rat / Mice service pages; **Training & Reference** — Training
   Records, Chemical Master, SOP. The assistant navigates there from plain speech ("show me the rat
   reports", "fly catcher infestation for this year").
 - **Two languages — English and ગુજરાતી — chosen on the Dashboard.** The whole interface switches

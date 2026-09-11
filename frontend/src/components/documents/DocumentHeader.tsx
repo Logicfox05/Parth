@@ -12,17 +12,23 @@ export function DocumentHeader({
   extraTitle,
   dateLabel,
   pageLabel,
+  companyName,
+  title,
 }: {
   doc: DocumentDefinition;
   extraTitle?: string;
   dateLabel?: string;
   pageLabel?: string;
+  /** The company name exactly as THIS form prints it (spellings differ between forms). */
+  companyName?: string;
+  /** The title exactly as the form prints it, when it differs from doc.name. */
+  title?: string;
 }) {
   return (
     <div className="doc-header">
-      <div className="company-name">{COMPANY.name}</div>
+      <div className="company-name">{companyName ?? COMPANY.name}</div>
       <div className="doc-title">
-        {doc.name.toUpperCase()}
+        {title ?? doc.name.toUpperCase()}
         {extraTitle ? ` — ${extraTitle}` : ""}
       </div>
       <div className="meta-row">

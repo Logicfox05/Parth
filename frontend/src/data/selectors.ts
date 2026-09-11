@@ -6,6 +6,7 @@ import { documentRepository } from "./repositories/documentRepository";
 import { masterRepository } from "./repositories/masterRepository";
 import { todayISO, compareISO, pad2 } from "../utils/date";
 import { totalRodents } from "../engine/rodentPattern";
+import { RODENT_HISTORY_REPORTED } from "./seed/pestPattern";
 
 // Rodents recorded on the Daily Pest Control Monitoring Record (checkpoint 7
 // + catch details) — what Reports > Rodent Trend and the Dashboard add up.
@@ -39,7 +40,10 @@ export function rodentStatsForYear(year: number, isDemo: boolean): RodentYearSta
   const byBox = new Map<string, { location: string; rodents: number }>();
   let daysRecorded = 0;
   for (const r of records) {
-    if (r.data.isHoliday) continue;
+    // A day counts once it has actually been filled in. Blank shells for the
+    // days still to come used to be counted too, so the report could say
+    // "from 18 recorded days" on a fresh install with nothing recorded.
+    if (!dailyRecordFilled(r)) continue;
     daysRecorded += 1;
     const catches = r.data.rodentCatches ?? [];
     const n = r.data.checkpoints[7]?.value === "Yes" ? Math.max(totalRodents(catches), catches.length ? 0 : 1) : 0;
@@ -150,6 +154,104 @@ export function flyStatsForYear(year: number, isDemo: boolean): FlyYearStats {
 
 export function fliesInMonth(year: number, month: number, isDemo: boolean): number {
   return flyStatsForYear(year, isDemo).months[month] ?? 0;
+}
+
+// ---------------------------------------------------------------------------
+// The year rows of the company's "Rodent Catch Report and Trend Analysis"
+// (components/reports/CatchTrendSheet.tsx), filled from the data the other
+// records actually hold.
+//
+// For each month the figure comes from ONE place, never both, so nothing is
+// counted twice:
+//   * the digital Daily Pest Control Monitoring Record, when the register
+//     holds that month's days (rodents from checkpoint 7's catch details);
+//   * otherwise the company's paper report, as transcribed
+//     (RODENT_HISTORY_REPORTED — 2024, 2025, Jan-Jun 2026);
+//   * otherwise blank — including every month that hasn't happened yet, the
+//     way the paper report leaves Jul-Dec 2026 empty.
+// In Live mode the register only starts at go-live (the launch-date floor), so
+// the paper figures stand for everything before it; in Demo Mode the demo year
+// supplies its own months.
+
+export interface TrendYearRow {
+  year: number;
+  months: (number | null)[];
+  fromRegister: boolean[];
+}
+
+function monthKey(iso: string): string {
+  return iso.slice(0, 7);
+}
+
+function dailyRecordFilled(r: RecordInstance<DailyPestMonitoringData>): boolean {
+  return !r.data.isHoliday && Object.values(r.data.checkpoints ?? {}).some((c) => c && c.value !== null && c.value !== "");
+}
+
+export function rodentTrendRows(isDemo: boolean, today = todayISO()): TrendYearRow[] {
+  const records = recordRepository.query({ documentId: "daily-pest-monitoring", isDemo }) as RecordInstance<DailyPestMonitoringData>[];
+  const registerMonths = new Set<string>();
+  const rodentsByMonth = new Map<string, number>();
+  for (const r of records) {
+    if (!dailyRecordFilled(r)) continue;
+    const key = monthKey(r.dueDate);
+    registerMonths.add(key);
+    const n = r.data.checkpoints[7]?.value === "Yes" ? Math.max(totalRodents(r.data.rodentCatches), r.data.rodentCatches?.length ? 0 : 1) : 0;
+    rodentsByMonth.set(key, (rodentsByMonth.get(key) ?? 0) + n);
+  }
+  const reported = new Map(RODENT_HISTORY_REPORTED.map((h) => [h.year, h.months]));
+  const thisMonth = monthKey(today);
+  const currentYear = Number(today.slice(0, 4));
+  const years = new Set<number>([...reported.keys(), ...Array.from(registerMonths, (k) => Number(k.slice(0, 4)))]);
+  return Array.from(years)
+    .filter((y) => y <= currentYear)
+    .sort((a, b) => a - b)
+    .map((year) => {
+      const months: (number | null)[] = [];
+      const fromRegister: boolean[] = [];
+      for (let m = 0; m < 12; m++) {
+        const key = `${year}-${pad2(m + 1)}`;
+        if (key > thisMonth) {
+          months.push(null);
+          fromRegister.push(false);
+        } else if (registerMonths.has(key)) {
+          months.push(rodentsByMonth.get(key) ?? 0);
+          fromRegister.push(true);
+        } else {
+          months.push(reported.get(year)?.[m] ?? null);
+          fromRegister.push(false);
+        }
+      }
+      return { year, months, fromRegister };
+    });
+}
+
+// The same year rows for the flies counted on the fortnightly F/HR/18
+// register. There is no paper history for flies, so every figure is added up
+// from the visits recorded; a month with no inspection carried out is blank.
+export function flyTrendRows(isDemo: boolean, today = todayISO()): TrendYearRow[] {
+  const records = recordRepository.query({ documentId: "fly-catcher", isDemo }) as RecordInstance<FlyCatcherData>[];
+  const byMonth = new Map<string, number>();
+  for (const r of records) {
+    const counts = r.data.entries.filter((e) => e.catchCountApprox !== null && e.catchCountApprox !== undefined);
+    if (counts.length === 0) continue;
+    const key = monthKey(r.dueDate);
+    byMonth.set(key, (byMonth.get(key) ?? 0) + counts.reduce((s, e) => s + (Number(e.catchCountApprox) || 0), 0));
+  }
+  const currentYear = Number(today.slice(0, 4));
+  const years = new Set<number>([currentYear, ...Array.from(byMonth.keys(), (k) => Number(k.slice(0, 4)))]);
+  return Array.from(years)
+    .filter((y) => y <= currentYear)
+    .sort((a, b) => a - b)
+    .map((year) => {
+      const months: (number | null)[] = [];
+      const fromRegister: boolean[] = [];
+      for (let m = 0; m < 12; m++) {
+        const v = byMonth.get(`${year}-${pad2(m + 1)}`);
+        months.push(v ?? null);
+        fromRegister.push(v !== undefined);
+      }
+      return { year, months, fromRegister };
+    });
 }
 
 export function allGapFindings(isDemo: boolean): { record: RecordInstance<GapInspectionData>; finding: GapFinding }[] {

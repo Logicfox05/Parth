@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { FiDownload } from "react-icons/fi";
+import { FiDownload, FiPrinter } from "react-icons/fi";
 import { useAppStore } from "../store/AppStore";
 import { recordRepository } from "../data/repositories/recordRepository";
 import { documentRepository } from "../data/repositories/documentRepository";
@@ -9,9 +9,11 @@ import { countFindings } from "../engine/checkpoints";
 import { logSheetOutOfBandCount } from "../engine/validation";
 import { summarise } from "../engine/guidedChecklist";
 import { COMPLAINT_DOC_ID } from "../data/seed/complaintChecklist";
-import { flyStatsForYear, rodentStatsForYear, type RodentMonth } from "../data/selectors";
+import { flyStatsForYear, flyTrendRows, rodentStatsForYear, rodentTrendRows } from "../data/selectors";
 import { totalRodents } from "../engine/rodentPattern";
-import { FLY_REPORT_SOURCE, RODENT_HISTORY_REPORTED, RODENT_HISTORY_SOURCE, RODENT_REPORT_MONTHS } from "../data/seed/pestPattern";
+import { FLY_REPORT_SOURCE, RODENT_HISTORY_SOURCE, RODENT_REPORT_MONTHS } from "../data/seed/pestPattern";
+import { COMPANY } from "../data/seed/masterData";
+import { CatchTrendSheet, rowTotal, type TrendRow } from "../components/reports/CatchTrendSheet";
 import { MONTH_NAMES, daysInMonth, pad2, formatDisplayDate } from "../utils/date";
 import { toCSV, downloadCSV } from "../utils/csv";
 import { MiniBarChart } from "../components/reports/MiniBarChart";
@@ -370,267 +372,248 @@ function DailyMonitoringReport({ isDemo, year, month }: { isDemo: boolean; year:
   );
 }
 
-// The company's own "Rodent Catch Report and Trend Analysis" (source PDF,
-// page 1), reproduced: Source | Unit | Target Pest | Year | Jan..Dec | Total.
-// The reported history rows are transcribed verbatim from that page; the
-// digital row is added up from the Daily Pest Control Monitoring Records'
-// checkpoint-7 catch details (box, location, number of rodents).
-// Exported: also rendered by Pest Control > Trend Analysis (src/pages/PestControlPages.tsx).
+// The company's own "Rodent Catch Report and Trend Analysis" ("trend analysis
+// .pdf" / page 1 of "Kapila mam department reports .pdf"), reproduced in its
+// own format by CatchTrendSheet: the two-line header, one row per year (Source
+// | Unit | Target Pest | YEAR | JAN..DEC | Total), and the bar chart. Each
+// month's figure comes from exactly one place (data/selectors.ts
+// rodentTrendRows): the Daily Pest Control Monitoring Records where the
+// register holds that month, the paper report's own figures before that.
+// Below the sheet, the app-side detail the paper doesn't have room for — where
+// the rodents were found and in which box.
+// Exported: also rendered by Pest Control > Trend Analysis and the Rat / Mice
+// service report page (src/pages/PestControlPages.tsx).
 export function RodentTrendReport({ isDemo, year }: { isDemo: boolean; year: number }) {
   const stats = rodentStatsForYear(year, isDemo);
-  const reported = RODENT_HISTORY_REPORTED;
+  const rows: TrendRow[] = rodentTrendRows(isDemo).map((r) => ({
+    source: "Trapped on Glue boards in Roda-boxes",
+    unit: "Number",
+    targetPest: "Rodents",
+    ...r,
+  }));
   const exportCSV = () => {
-    const rows: (string | number)[][] = [
-      ...reported.map((h) => ["Trapped on Glue boards in Roda-boxes (as reported)", "Number", "Rodents", h.year, ...h.months.map((m) => m ?? ""), h.total ?? ""]),
-      ["Daily Pest Control Monitoring Record (digital)", "Number", "Rodents", year, ...stats.months.map((m) => m.rodents), stats.total],
-    ];
-    downloadCSV(`rodent-trend-${year}.csv`, toCSV(["Source", "Unit", "Target Pest", "Year", ...RODENT_REPORT_MONTHS, "Total"], rows));
+    downloadCSV(
+      `rodent-catch-report-and-trend-analysis.csv`,
+      toCSV(
+        ["Source", "Unit", "Target Pest", "YEAR", ...RODENT_REPORT_MONTHS, "Total"],
+        rows.map((r) => [r.source, r.unit, r.targetPest, r.year, ...r.months.map((m) => m ?? ""), rowTotal(r.months) ?? ""])
+      )
+    );
   };
-  const daysLabel = (m: RodentMonth) => (m.catchDays ? `${m.rodents} (${m.catchDays}d)` : "0");
 
   return (
-    <div className="card">
-      <div className="card-header">
-        <h3 className="text-lg">Rodent Catch Report and Trend Analysis — {year}</h3>
-        <button className="btn btn-secondary btn-sm" onClick={exportCSV}>
-          <FiDownload size={13} /> Export CSV
-        </button>
-      </div>
-      <div className="doc-table" style={{ border: "none", borderBottom: "1px solid var(--color-border)" }}>
-        <table className="compact">
-          <thead>
-            <tr>
-              <th>Source</th>
-              <th>Unit</th>
-              <th>Target Pest</th>
-              <th>Year</th>
-              {RODENT_REPORT_MONTHS.map((m) => (
-                <th key={m} style={{ textAlign: "center" }}>
-                  {m}
-                </th>
-              ))}
-              <th style={{ textAlign: "center" }}>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reported.map((h) => (
-              <tr key={h.year}>
-                <td className="text-sm">Trapped on Glue boards in Roda-boxes <span className="text-faint text-xs">(as reported)</span></td>
-                <td className="text-sm">Number</td>
-                <td className="text-sm">Rodents</td>
-                <td className="text-sm">{h.year}</td>
-                {h.months.map((m, i) => (
-                  <td key={i} className="text-sm" style={{ textAlign: "center" }}>
-                    {m === null ? <span className="text-faint">—</span> : m}
-                  </td>
-                ))}
-                <td className="text-sm font-semibold" style={{ textAlign: "center" }}>
-                  {h.total ?? <span className="text-faint">—</span>}
-                </td>
-              </tr>
-            ))}
-            <tr style={{ background: "var(--color-surface-alt)" }}>
-              <td className="text-sm font-semibold">Daily Pest Control Monitoring Record — checkpoint 7 catch details <span className="text-faint text-xs">(digital)</span></td>
-              <td className="text-sm">Number</td>
-              <td className="text-sm">Rodents</td>
-              <td className="text-sm">{year}</td>
-              {stats.months.map((m) => (
-                <td key={m.month} className={`text-sm ${m.rodents ? "text-danger font-semibold" : ""}`} style={{ textAlign: "center" }} title={m.catchDays ? `${m.catchDays} day(s) with a catch` : undefined}>
-                  {daysLabel(m)}
-                </td>
-              ))}
-              <td className="text-sm font-semibold" style={{ textAlign: "center" }}>
-                {stats.total}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div className="card-pad">
-        <p className="text-xs text-muted mb-2">
-          Number of rodents trapped per month in {year} ({stats.total} in total across {stats.catchDays} day{stats.catchDays === 1 ? "" : "s"}, from{" "}
-          {stats.daysRecorded} recorded day{stats.daysRecorded === 1 ? "" : "s"}). "(3d)" = number of days that month with a catch. Reported rows are the company's own
-          figures from the source page; the digital row is added up from each day's record.
-        </p>
-        <MiniBarChart labels={MONTH_NAMES.map((n) => n.slice(0, 3))} values={stats.months.map((m) => m.rodents)} color="var(--color-danger)" />
-        <div className="flex gap-4 wrap mt-4" style={{ alignItems: "flex-start" }}>
-          <div className="doc-table" style={{ flex: "1 1 320px", minWidth: 0 }}>
-            <table className="compact">
-              <thead>
-                <tr>
-                  <th>Where they were found — {year}</th>
-                  <th style={{ textAlign: "center" }}>Rodents</th>
-                  <th style={{ textAlign: "center" }}>Days</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.byLocation.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="text-muted text-center text-sm" style={{ padding: 12 }}>
-                      No rodents recorded in {year}.
-                    </td>
-                  </tr>
-                )}
-                {stats.byLocation.map((l) => (
-                  <tr key={l.location}>
-                    <td className="text-sm">{l.location}</td>
-                    <td className="text-sm font-semibold" style={{ textAlign: "center" }}>{l.rodents}</td>
-                    <td className="text-sm" style={{ textAlign: "center" }}>{l.catchDays}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="doc-table" style={{ flex: "1 1 260px", minWidth: 0 }}>
-            <table className="compact">
-              <thead>
-                <tr>
-                  <th>Trap box</th>
-                  <th>Location</th>
-                  <th style={{ textAlign: "center" }}>Rodents</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.byBox.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="text-muted text-center text-sm" style={{ padding: 12 }}>
-                      —
-                    </td>
-                  </tr>
-                )}
-                {stats.byBox.slice(0, 12).map((b) => (
-                  <tr key={b.trapBoxNo}>
-                    <td className="text-sm font-semibold">{b.trapBoxNo}</td>
-                    <td className="text-sm">{b.location}</td>
-                    <td className="text-sm" style={{ textAlign: "center" }}>{b.rodents}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+    <>
+      <div className="card">
+        <div className="card-header">
+          <h3 className="text-lg">Rodent Catch Report and Trend Analysis</h3>
+          <div className="flex gap-2 no-print">
+            <button className="btn btn-secondary btn-sm" onClick={exportCSV}>
+              <FiDownload size={13} /> Export CSV
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+              <FiPrinter size={13} /> Print
+            </button>
           </div>
         </div>
-        <p className="text-xs text-faint mt-3">Reported history source: {RODENT_HISTORY_SOURCE}.</p>
+        <div className="card-pad">
+          <CatchTrendSheet
+            companyName={COMPANY.name}
+            title="RODENT CATCH REPORT AND TREND ANALYSIS"
+            rows={rows}
+            chartYear={year}
+            yAxisLabel="Number or Quantity Trapped"
+            unitWord="rodent(s)"
+            registerName="Daily Pest Control Monitoring Records (F/HR/17, check point 7)"
+          />
+        </div>
       </div>
-    </div>
+
+      <div className="card mt-4 no-print">
+        <div className="card-header">
+          <h3 className="text-lg">Where they were found — {year}</h3>
+        </div>
+        <div className="card-pad">
+          <p className="text-xs text-muted mb-3">
+            From the digital register: ({stats.total} in total across {stats.catchDays} day{stats.catchDays === 1 ? "" : "s"}, from {stats.daysRecorded} recorded day
+            {stats.daysRecorded === 1 ? "" : "s"}) — each catch with the trap box and location written on that day's record.
+          </p>
+          <div className="flex gap-4 wrap" style={{ alignItems: "flex-start" }}>
+            <div className="doc-table" style={{ flex: "1 1 320px", minWidth: 0 }}>
+              <table className="compact">
+                <thead>
+                  <tr>
+                    <th>Location</th>
+                    <th style={{ textAlign: "center" }}>Rodents</th>
+                    <th style={{ textAlign: "center" }}>Days</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.byLocation.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="text-muted text-center text-sm" style={{ padding: 12 }}>
+                        No rodents recorded in {year}.
+                      </td>
+                    </tr>
+                  )}
+                  {stats.byLocation.map((l) => (
+                    <tr key={l.location}>
+                      <td className="text-sm">{l.location}</td>
+                      <td className="text-sm font-semibold" style={{ textAlign: "center" }}>
+                        {l.rodents}
+                      </td>
+                      <td className="text-sm" style={{ textAlign: "center" }}>
+                        {l.catchDays}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="doc-table" style={{ flex: "1 1 260px", minWidth: 0 }}>
+              <table className="compact">
+                <thead>
+                  <tr>
+                    <th>Trap box</th>
+                    <th>Location</th>
+                    <th style={{ textAlign: "center" }}>Rodents</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.byBox.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="text-muted text-center text-sm" style={{ padding: 12 }}>
+                        —
+                      </td>
+                    </tr>
+                  )}
+                  {stats.byBox.slice(0, 12).map((b) => (
+                    <tr key={b.trapBoxNo}>
+                      <td className="text-sm font-semibold">{b.trapBoxNo}</td>
+                      <td className="text-sm">{b.location}</td>
+                      <td className="text-sm" style={{ textAlign: "center" }}>
+                        {b.rodents}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p className="text-xs text-faint mt-3">Paper figures transcribed from: {RODENT_HISTORY_SOURCE}.</p>
+        </div>
+      </div>
+    </>
   );
 }
 
-// Fly Catcher Infestation — the same Source / Unit / Target Pest / Year /
-// Jan..Dec / Total layout the company uses for its Rodent Catch Report,
-// applied to the fortnightly F/HR/18 counts: one overall row, then every
-// unit PC-01..PC-13 with its location. Exported: also rendered by Pest
-// Control > Trend Analysis (src/pages/PestControlPages.tsx).
+// Fly Catcher Infestation — in the same format as the company's Rodent Catch
+// Report and Trend Analysis (the layout the department already reads trends
+// in), added up from the fortnightly F/HR/18 visits: one row per year, the bar
+// chart, then every unit PC-01..PC-13 month by month below.
+// Exported: also rendered by Pest Control > Trend Analysis (src/pages/PestControlPages.tsx).
 export function FlyCatcherTrendReport({ isDemo, year, month }: { isDemo: boolean; year: number; month: number }) {
   const stats = flyStatsForYear(year, isDemo);
+  const rows: TrendRow[] = flyTrendRows(isDemo).map((r) => ({
+    source: "Caught on Glue boards of Fly catchers (PC-01 to PC-13)",
+    unit: "Number",
+    targetPest: "Flies",
+    ...r,
+  }));
   const monthUnits = stats.byUnit.map((u) => ({ label: u.pcId, value: u.months[month] }));
   const monthTotal = stats.months[month];
   const exportCSV = () => {
-    const header = ["Source", "Unit", "Target Pest", "Year", ...RODENT_REPORT_MONTHS, "Total"];
-    const rows: (string | number)[][] = [
-      ["Fly catcher glue boards, PC-01 to PC-13 (F/HR/18) — all units", "Number (approx. flies)", "Flies", year, ...stats.months, stats.total],
-      ...stats.byUnit.map((u) => [`${u.pcId} — ${u.location}`, "Number (approx. flies)", "Flies", year, ...u.months, u.total]),
+    const header = ["Source", "Unit", "Target Pest", "YEAR", ...RODENT_REPORT_MONTHS, "Total"];
+    const csvRows: (string | number)[][] = [
+      ...rows.map((r) => [r.source, r.unit, r.targetPest, r.year, ...r.months.map((m) => m ?? ""), rowTotal(r.months) ?? ""]),
+      ...stats.byUnit.map((u) => [`${u.pcId} — ${u.location}`, "Number", "Flies", year, ...u.months, u.total]),
     ];
-    downloadCSV(`fly-catcher-infestation-${year}.csv`, toCSV(header, rows));
+    downloadCSV(`fly-catch-report-and-trend-analysis-${year}.csv`, toCSV(header, csvRows));
   };
   const busiest = stats.byUnit.slice().sort((a, b) => b.total - a.total)[0];
 
   return (
-    <div className="card">
-      <div className="card-header">
-        <h3 className="text-lg">Fly Catcher Infestation Trend — {year}</h3>
-        <button className="btn btn-secondary btn-sm" onClick={exportCSV}>
-          <FiDownload size={13} /> Export CSV
-        </button>
-      </div>
-      <div className="doc-table" style={{ border: "none", borderBottom: "1px solid var(--color-border)" }}>
-        <table className="compact">
-          <thead>
-            <tr>
-              <th>Source</th>
-              <th>Unit</th>
-              <th>Target Pest</th>
-              <th>Year</th>
-              {RODENT_REPORT_MONTHS.map((m) => (
-                <th key={m} style={{ textAlign: "center" }}>
-                  {m}
-                </th>
-              ))}
-              <th style={{ textAlign: "center" }}>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr style={{ background: "var(--color-surface-alt)" }}>
-              <td className="text-sm font-semibold">
-                Fly catcher glue boards, PC-01 … PC-13 (F/HR/18) <span className="text-faint text-xs">(digital, all units)</span>
-              </td>
-              <td className="text-sm">Number (approx. flies)</td>
-              <td className="text-sm">Flies</td>
-              <td className="text-sm">{year}</td>
-              {stats.months.map((n, i) => (
-                <td key={i} className={`text-sm ${n ? "font-semibold" : "text-faint"}`} style={{ textAlign: "center" }}>
-                  {n}
-                </td>
-              ))}
-              <td className="text-sm font-semibold" style={{ textAlign: "center" }}>
-                {stats.total}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div className="card-pad">
-        <p className="text-xs text-muted mb-2">
-          {stats.total} flies caught in {year} across {stats.visits} inspection{stats.visits === 1 ? "" : "s"}
-          {busiest && busiest.total > 0 ? `; busiest unit ${busiest.pcId} (${busiest.location}) with ${busiest.total}` : ""}. Counts are the technician's approximate
-          per-board count at each fortnightly cleaning, added up per month.
-        </p>
-        <MiniBarChart labels={MONTH_NAMES.map((n) => n.slice(0, 3))} values={stats.months} color="var(--color-warning)" />
-
-        <h4 className="text-sm font-semibold mt-4 mb-2">Per unit — {year}</h4>
-        <div className="doc-table">
-          <table className="compact fly-units">
-            <thead>
-              <tr>
-                <th>PC ID</th>
-                <th>Location</th>
-                {RODENT_REPORT_MONTHS.map((m) => (
-                  <th key={m} style={{ textAlign: "center" }}>
-                    {m}
-                  </th>
-                ))}
-                <th style={{ textAlign: "center" }}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats.byUnit.map((u) => (
-                <tr key={u.pcId}>
-                  <td className="text-sm font-semibold">{u.pcId}</td>
-                  <td className="text-sm">{u.location}</td>
-                  {u.months.map((n, i) => (
-                    <td key={i} className={`text-sm ${n ? "" : "text-faint"}`} style={{ textAlign: "center" }}>
-                      {n}
-                    </td>
-                  ))}
-                  <td className="text-sm font-semibold" style={{ textAlign: "center" }}>
-                    {u.total}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <>
+      <div className="card">
+        <div className="card-header">
+          <h3 className="text-lg">Fly Catch Report and Trend Analysis</h3>
+          <div className="flex gap-2 no-print">
+            <button className="btn btn-secondary btn-sm" onClick={exportCSV}>
+              <FiDownload size={13} /> Export CSV
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+              <FiPrinter size={13} /> Print
+            </button>
+          </div>
         </div>
-
-        <h4 className="text-sm font-semibold mt-4 mb-2">
-          {MONTH_NAMES[month]} {year} — flies per unit
-        </h4>
-        {monthTotal === 0 ? (
-          <p className="text-muted text-sm">No flies counted in {MONTH_NAMES[month]} {year} yet (no inspection recorded, or every board was clean).</p>
-        ) : (
-          <MiniBarChart labels={monthUnits.map((u) => u.label)} values={monthUnits.map((u) => u.value)} color="var(--color-warning)" />
-        )}
-        <p className="text-xs text-faint mt-3">Layout follows the company's Rodent Catch Report; source register: {FLY_REPORT_SOURCE}.</p>
+        <div className="card-pad">
+          <CatchTrendSheet
+            companyName={COMPANY.name}
+            title="FLY CATCH REPORT AND TREND ANALYSIS"
+            rows={rows}
+            chartYear={year}
+            yAxisLabel="Number or Quantity Trapped"
+            unitWord="flies"
+            registerName="Fortnightly Fly Catcher Inspection & Cleaning Records (F/HR/18)"
+            footnote="Laid out as the company's Rodent Catch Report and Trend Analysis."
+          />
+        </div>
       </div>
-    </div>
+
+      <div className="card mt-4 no-print">
+        <div className="card-header">
+          <h3 className="text-lg">Per unit — {year}</h3>
+        </div>
+        <div className="card-pad">
+          <p className="text-xs text-muted mb-2">
+            {stats.total} flies caught in {year} across {stats.visits} inspection{stats.visits === 1 ? "" : "s"}
+            {busiest && busiest.total > 0 ? `; busiest unit ${busiest.pcId} (${busiest.location}) with ${busiest.total}` : ""}. Counts are the approximate per-board
+            count written at each fortnightly cleaning (F/HR/18), added up per month.
+          </p>
+          <div className="doc-table">
+            <table className="compact fly-units">
+              <thead>
+                <tr>
+                  <th>PC ID</th>
+                  <th>Location</th>
+                  {RODENT_REPORT_MONTHS.map((m) => (
+                    <th key={m} style={{ textAlign: "center" }}>
+                      {m}
+                    </th>
+                  ))}
+                  <th style={{ textAlign: "center" }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.byUnit.map((u) => (
+                  <tr key={u.pcId}>
+                    <td className="text-sm font-semibold">{u.pcId}</td>
+                    <td className="text-sm">{u.location}</td>
+                    {u.months.map((n, i) => (
+                      <td key={i} className={`text-sm ${n ? "" : "text-faint"}`} style={{ textAlign: "center" }}>
+                        {n}
+                      </td>
+                    ))}
+                    <td className="text-sm font-semibold" style={{ textAlign: "center" }}>
+                      {u.total}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <h4 className="text-sm font-semibold mt-4 mb-2">
+            {MONTH_NAMES[month]} {year} — flies per unit
+          </h4>
+          {monthTotal === 0 ? (
+            <p className="text-muted text-sm">No flies counted in {MONTH_NAMES[month]} {year} yet (no inspection recorded, or every board was clean).</p>
+          ) : (
+            <MiniBarChart labels={monthUnits.map((u) => u.label)} values={monthUnits.map((u) => u.value)} color="var(--color-warning)" />
+          )}
+          <p className="text-xs text-faint mt-3">Source register: {FLY_REPORT_SOURCE}.</p>
+        </div>
+      </div>
+    </>
   );
 }
 

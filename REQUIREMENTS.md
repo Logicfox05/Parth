@@ -803,8 +803,8 @@ generated seed module. Every rate and every line of wording is measured or quote
   (F-QC-32), the operator's wording goes in it — "Viscosity high — ethyl acetate added and
   re-circulated; re-checked after 15 min." Where the form has none (F-QC-30 has no remark column
   and it is a controlled format, so none was added), the flag goes in the assistant's notes.
-- **Check-point findings are the plant's own.** The wording for check points 1, 2, 3, 5, 6 and 10
-  is taken from the Dec-2023 GAP Analysis Report: the utility-area opening, the fly killer machine
+- **Check-point findings are the plant's own.** The wording for check points 1, 2, 3, 5 and 6
+  is taken from the Dec-2023 GAP Analysis Report (check point 10 is not modelled — see §26): the utility-area opening, the fly killer machine
   found switched off, the missing RBS numbering, material stacked against the wall, the torn PVC
   strip curtain. About 1.7 a month, each with its Summary of Actions row, as the form asks.
 - **Lots are dispositioned.** 93% Accepted, 4.5% Accepted on Deviation, 1.8% Segregation, 0.7%
@@ -837,6 +837,64 @@ the document beside it.
 **What the model does NOT do:** it never signs, submits or verifies; it never ticks an attendance;
 it never fabricates a CAPA finding in Live mode. Demo records remain `isDemo: true` and are
 watermarked "DEMO / SYNTHETIC DATA — NOT AUDIT EVIDENCE" on every screen.
+
+## 26. Fly Catcher register (F/HR/18) and the Rodent Catch Report, in the company's own formats (11-Sep-2026)
+
+```
+SOURCE DOCUMENT      "Fly catcher reports .pdf" (F/HR/18 Rev 02, 15.12.2024, August-26, 2 pages) and
+                      "trend analysis .pdf" (Rodent Catch Report and Trend Analysis) — received
+                      11-Sep-2026; the same pages as "Kapila mam department reports .pdf" pp. 5-6 and 1
+DIGITAL TEMPLATE     src/components/records/FlyCatcherRegisterSheet.tsx,
+                      src/components/reports/CatchTrendSheet.tsx; data from
+                      data/selectors.ts rodentTrendRows / flyTrendRows
+SHOWN ON             Pest Control > Trend Analysis > Fly Catcher Infestation (register is the default
+                      view) and > Rodent Catch Trend; Reports > Rodent Catch Trend / Fly Catcher
+                      Infestation; and beside the services — Fly Control and Rat / Mice service pages
+```
+
+**F/HR/18, as printed.** Both pages carry the header (company as *this* form spells it —
+"GUJARAT PRINT PACK PUBLICATION PRIVATE LIMITED", two words — then "FORTNIGHTLY – FLY CATCHER
+INSPECTION & CLEANING RECORD", Format No. F/HR/18, Rev No. 02, Date 15.12.2024, Page 1 of 2 / 2 of
+2), the Month & Year box, and the location legend in the printed two-column order (PC-01..04 beside
+PC-05..08, then 09/10, 11/12, 13 — PC-10 printed as plain "Warehouse office wall", with no floor).
+Page 1 holds PC-01 to PC-08, page 2 PC-09 to PC-13, one line per unit per fortnightly visit under
+the form's seven headings. Cells are written the way the specimen writes them: dates d/mm/yy
+("3/08/26"), counts in two digits ("01"), tube-light dates on a unit's first line and a ditto mark
+(") below while unchanged. Each visit is still its own record (the 13 units' counts for that date);
+the register is a view over them, so nothing is stored twice and a line opens its visit.
+
+**Rodent Catch Report and Trend Analysis, as printed.** A two-line header box (company, title — this
+report has no Format No. row, so none was added), one row per year — Source "Trapped on Glue boards
+in Roda-boxes" | Unit "Number" | Target Pest "Rodents" | YEAR | JAN–DEC | Total — and beneath it the
+bar chart of one year, JAN–DEC plus Total, y axis "Number or Quantity Trapped" (0–5 in halves, as
+printed, widening only when the numbers need it), x axis "Months". The Fly Catcher Infestation trend
+uses the same layout ("FLY CATCH REPORT AND TREND ANALYSIS", Target Pest "Flies"), because that is the
+format the department already reads trends in; the sheet says so in its screen-only key.
+
+**How each figure is filled — from exactly one place.** For rodents, a month is added up from the
+Daily Pest Control Monitoring Records (check point 7's catch details) when the digital register holds
+that month's days; otherwise it is the company's own paper figure (2024, 2025, Jan–Jun 2026,
+transcribed verbatim); otherwise blank — including every month that hasn't happened yet, exactly as
+the paper leaves Jul–Dec 2026 empty. Never both, so nothing is counted twice. In Live mode the
+register starts at go-live, so the paper figures stand for everything before it. On screen only, the
+cells the system added up are tinted, with a key, so an auditor can always tell a computed figure
+from a transcribed one; the tint does not print. Flies have no paper history, so every fly figure is
+added up from the F/HR/18 visits.
+
+**A correction this required.** The specimen shows all thirteen tube lights installed on 24/12/25
+and due on 23/12/26 — changed together at the December service. §25's first cut had staggered the
+dates across the year on the assumption that thirteen identical dates was a data-entry artefact; the
+company's register shows it is simply how they do it. Restored (`tubeLightCycleFor`,
+`src/engine/flyPattern.ts`): the assistant and Demo Mode now use the most recent 24 December and the
+23 December after it, exactly as printed, and cleaning by Vijay / verification by Roshni on every
+line as on the specimen (an invented second cleaner was removed). For the same reason check point 10
+on F/HR/17 ("tube lights having validity of usage?") is no longer generated as a finding — a tube past
+its validity mid-year would contradict the register printed beside it; a tube that simply fails is
+check point 3.
+
+**Also fixed:** the rodent report's "recorded days" counted the blank shells for days still to come
+(a fresh install read "from 18 recorded days" with nothing recorded); only days actually filled in
+count now.
 
 ## Master data provenance summary
 

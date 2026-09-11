@@ -21,7 +21,7 @@ import { fixedMaterialForServiceArea } from "../engine/serviceMaterials";
 import { autoFillRecord } from "../engine/autoFill";
 import { createDefaultData } from "../engine/recordDefaults";
 import { describeRodentEvent, rodentEventFor } from "../engine/rodentPattern";
-import { flyCatchFor } from "../engine/flyPattern";
+import { flyCatchFor, tubeLightCycleFor } from "../engine/flyPattern";
 import {
   checkpointFindingsFor,
   findingScheduleFor,
@@ -112,21 +112,22 @@ function buildFlyCatcherData(dueDate: string): FlyCatcherData {
   return {
     // Same "August-26" style as the paper register's Month & Year box.
     monthYear: `${MONTH_LONG[month]}-${String(year).slice(2)}`,
-    entries: master.pcLocations.map((pc, i) => {
-      const rng = rngFor("fly", pc.id, dueDate);
-      // Tubes are replaced as they fail, so their one-year validity dates
-      // fall across the year rather than all landing on the same day (which
-      // is what the register used to show for all 13 units).
-      const install = addDays("2025-10-01", (i * 29) % 330);
+    entries: master.pcLocations.map((pc) => {
+      // Exactly as the F/HR/18 specimen records it: every unit's tubes were
+      // installed together on 24/12/25 and fall due together on 23/12/26 —
+      // they are changed at the December service each year
+      // (engine/flyPattern.ts tubeLightCycleFor). Cleaning by Vijay and
+      // verification by Roshni on every line, as on the specimen.
+      const tubes = tubeLightCycleFor(dueDate);
       return {
         pcId: pc.id,
         // The same seasonal per-unit pattern the Live assistant uses, so the
         // demo year's Fly Catcher Infestation trend has a believable shape.
         catchCountApprox: flyCatchFor(pc.id, dueDate),
-        tubeLightInstallDate: install,
-        tubeLightDueDate: addDays(install, 364),
-        cleaningDoneBy: rng.pick(["Vijay", "Ramesh"]),
-        verifiedBy: rng.chance(0.8) ? DEMO_CHECKERS[0] : rng.pick(DEMO_CHECKERS),
+        tubeLightInstallDate: tubes.installed,
+        tubeLightDueDate: tubes.due,
+        cleaningDoneBy: "Vijay",
+        verifiedBy: DEMO_CHECKERS[0],
       };
     }),
   };

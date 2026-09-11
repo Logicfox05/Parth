@@ -59,7 +59,7 @@ python tests/e2e_assistant_chat.py # needs backend/.env's GROQ_API_KEY to actual
 Every suite signs up a fresh, randomly-emailed account at the start of the run (the app gates
 every page behind login — see `frontend/src/main.tsx`/`AuthProvider`) before exercising the rest of the app.
 
-## Results (last full run — 09-Sep-2026, on the TypeScript-only backend/scripts, after the navigation-panel and plant-behaviour-model batch)
+## Results (last full run — 11-Sep-2026, on the TypeScript-only backend/scripts, after the F/HR/18 register and company trend-report formats)
 
 The run below is the production shape end to end: `frontend/scripts/build.ts` builds the bundle,
 `backend/index.ts` (run directly by Node 23.6, no compile step) serves it plus the API, and every
@@ -265,6 +265,24 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   generated complete — 24 hourly readings already written down for next Tuesday — which would be a
   serious finding in a real register; a future record is now an empty shell, and a blank inspection
   form no longer arrives with its Lot Status box pre-set to "Accepted".
+- **F/HR/18 and the Rodent Catch Report, in the company's own formats** (11-Sep-2026, from "Fly
+  catcher reports .pdf" and "trend analysis .pdf"). `FlyCatcherRegisterSheet.tsx` reproduces the
+  two-page monthly register and `CatchTrendSheet.tsx` the trend report with its bar chart, both filled
+  from the records — see REQUIREMENTS §26. Checked against the specimens on screen and in print
+  emulation (PC-01 reads `3/08/26 · 01 · 24/12/25 · 23/12/26 · Vijay · Roshni`, then `17/08/26 · 03 ·
+  " · "`; the Live rodent sheet shows 2024 all 0, 2025 May 1 + Jun 1 = 2, 2026 Jan–Jun as reported,
+  Jul–Aug blank, September from the register). Eleven new smoke assertions: the sheet's title, year
+  rows and 13-bar chart; the 2025 paper figures; register months tinted; future months blank; the fly
+  trend in the same format; the register's two pages, legend, seven headings and header; its cells
+  written as the specimen writes them, with the annual tube cycle and ditto marks; and both sheets on
+  their service pages. Two new visual-QA checks and screenshots. Three things this surfaced: (1) the
+  register's VERIFIED BY column was clipped with the sidebar open — a generic `.doc-table th { nowrap }`
+  rule later in the stylesheet was beating the register's wrapping headings; (2) §25 had staggered the
+  tube-light dates across the year, which the specimen contradicts (all 13 installed 24/12/25, due
+  23/12/26) — restored, and check point 10 is no longer generated as a finding; (3) the rodent report
+  counted blank future shells as "recorded days". The service page now also holds sheet tables, so its
+  visit list got a `data-table="visits"` hook: the old `.doc-table tbody` selector hit four tables and
+  crashed the smoke suite in strict mode on the first run.
 - **Briefing dismissal is now a helper in the smoke suite** (`dismiss_briefing`). A reload inside the
   morning or evening briefing window pops that slot's briefing — a modal that swallows clicks — and
   the suite reloads in four places. This surfaced as a one-off timeout at 17:0x on `text=Record
@@ -331,7 +349,9 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   Python's `print` raised `UnicodeEncodeError` mid-run. Labels are ASCII-only now (em dashes are
   fine in cp1252; arrows are not).
 
-### `e2e_smoke.py` — all 132 checks passed, 0 unexpected console errors
+### `e2e_smoke.py` — all 142 checks passed, 0 unexpected console errors
+
+(Two checks are date-conditional and are skipped on the days they can't apply: the "month that hasn't happened yet is blank" check in December, and the F/HR/18 fill checks in January, when last month's demo visits belong to the previous year.)
 
 | # | Check | Result |
 |---|---|---|
@@ -363,110 +383,120 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
 | 26 | Demo mode banner visible | PASS |
 | 27 | Demo calendar shows completed (filled) records, not blank shells | PASS |
 | 28 | Rodent report uses the company's layout (Source / Unit / Target Pest / Year / Total) | PASS |
-| 29 | Rodent report shows the reported 2025 history (2 rodents, May & June) | PASS |
-| 30 | Digital rodent total over the demo year is non-zero (pattern applied) | PASS |
-| 31 | Rodent report breaks catches down by location | PASS |
-| 32 | Fly Catcher Infestation trend has a non-zero yearly total in Demo Mode (seasonal fly pattern applied) | PASS |
-| 33 | Fly Catcher Infestation trend lists all 13 units in the company's year layout | PASS |
-| 34 | Demo service visits never sit on the Thursday weekly off � a visit scheduled on a Thursday is dated the next working day | PASS |
-| 35 | Live mode banner visible after switch | PASS |
-| 36 | CAPA home offers exactly the two options, Internal and External | PASS |
-| 37 | CAPA Internal list shows seeded Dec-2023 inspection | PASS |
-| 38 | CAPA External list shows the F/MKT/05 checklist | PASS |
-| 39 | New complaint auto-starts the assistant walk-through | PASS |
-| 40 | Assistant asks for the customer first | PASS |
-| 41 | Header details captured on the form | PASS |
-| 42 | Assistant announces Section A | PASS |
-| 43 | Section B is announced after A's five activities | PASS |
-| 44 | Section C is announced next | PASS |
-| 45 | Section D is announced next | PASS |
-| 46 | Section E is announced next | PASS |
-| 47 | After E the assistant asks for approval | PASS |
-| 48 | Form shows all 31 activities done | PASS |
-| 49 | Assistant confirms submission | PASS |
-| 50 | Checklist status is Pending Verification (awaiting approval) | PASS |
-| 51 | Prepared By was stamped with the logged-in user | PASS |
-| 52 | Assistant offers to approve | PASS |
-| 53 | Assistant confirms approval | PASS |
-| 54 | Checklist status is Verified (approved) | PASS |
-| 55 | Training list shows seeded record | PASS |
-| 56 | Training list shows the Dec-2025 awareness programme | PASS |
-| 57 | SOC list shows both statements | PASS |
-| 58 | SOC detail renders the declaration | PASS |
-| 59 | Chemical master shows pesticide chart | PASS |
-| 60 | SOP reference shows Lizard quarterly frequency | PASS |
-| 61 | Reports page renders tabs | PASS |
-| 62 | Lamination QC report renders | PASS |
-| 63 | Reports > Daily Monitoring Summary reproduces the F/HR/17 three-page register | PASS |
-| 64 | Document Library lists all 22 documents | PASS |
-| 65 | Document Library shows the lamination module | PASS |
-| 66 | Document Library shows the QC inspection module | PASS |
-| 67 | Document Library groups both CAPA documents under the CAPA module | PASS |
-| 68 | Sidebar has a collapsible Pest Control module header | PASS |
-| 69 | Sidebar has a CAPA module with Internal and External links | PASS |
-| 70 | Pest Control module starts expanded (Training link visible) | PASS |
-| 71 | Collapsing the module header hides its links | PASS |
-| 72 | A collapsed module stays collapsed after navigating elsewhere | PASS |
-| 73 | Expanding it again restores the links | PASS |
-| 74 | Navigation panel is a column beside the content by default | PASS |
-| 75 | Closing the panel gives the page the full window | PASS |
-| 76 | A closed panel is hidden from keyboard and screen readers too, not just narrowed | PASS |
-| 77 | The panel stays closed after a reload (the choice is remembered) | PASS |
-| 78 | The top-bar button brings the panel back | PASS |
-| 79 | Collapse-all closes every module at once | PASS |
-| 80 | A collapsed module still marks the one holding the current page | PASS |
-| 81 | Expand-all opens them again | PASS |
-| 82 | Module link deep-links Document Library filtered to that module | PASS |
-| 83 | Filtered library shows only that module's documents | PASS |
-| 84 | Pest Control module lists its report groups in the sidebar | PASS |
-| 85 | Rat / Mice service reports open on their own page | PASS |
-| 86 | Service report list shows this month's fortnightly visit(s) | PASS |
-| 87 | Daily Report page shows the month register with today's row | PASS |
-| 88 | Daily Report is laid out as the F/HR/17 three-page register (10 check points, 31 date rows) | PASS |
-| 89 | Register carries the format's own instruction wording (Yes / No, except point no. 7) | PASS |
-| 90 | Register page 3 carries the Summary of Actions Taken if Pest Observed | PASS |
-| 91 | Fly Catcher Infestation page renders the per-unit register (Live) | PASS |
-| 92 | Pest Control overview shows the four groups | PASS |
-| 93 | Service Provider Licence page shows both scanned licence pages | PASS |
-| 94 | Scanned licence pages are actually served by the app (first image loaded) | PASS |
-| 95 | Licence transcription carries Form III, the licensee and the licence number | PASS |
-| 96 | Licence terms are listed exactly as printed (12 numbered conditions) | PASS |
-| 97 | The original licence PDF is served by the app exactly as supplied (byte-for-byte) | PASS |
-| 98 | Licence page links to that original PDF | PASS |
-| 99 | Opened the F/QC/37 pouching inspection from Day View | PASS |
-| 100 | Inspection shows the 11 printed test parameters | PASS |
-| 101 | Inspection observations were pre-filled from the specimen | PASS |
-| 102 | Lot status pre-set to Accepted and inspector signed | PASS |
-| 103 | Inspection record submitted | PASS |
-| 104 | Search returns results for PC-01 | PASS |
-| 105 | Search finds the lamination operator on the prepared log sheets | PASS |
-| 106 | Calendar marks every Thursday of September 2026 as the weekly off | PASS |
-| 107 | Calendar shows Janmashtami (04-Sep-2026) from the leave calendar | PASS |
-| 108 | Adjustment day 22-Oct-2026 is a working Thursday (October: 4 weekly offs + 1 working day) | PASS |
-| 109 | Day View explains a Thursday as the weekly off | PASS |
-| 110 | Daily Report register pre-marks the next weekly-off Thursday as a HOLIDAY row | PASS |
-| 111 | Master Data shows the weekly off (Thursday) and the leave calendar's five adjustment days | PASS |
-| 112 | Assistant page opens from the sidebar with suggestions and a composer | PASS |
-| 113 | Assistant page offers voice input (press-to-talk) and a read-aloud toggle | PASS |
-| 114 | Pressing the microphone starts listening (or explains why it can't) | PASS |
-| 115 | Assistant answers a weekly-off date from the working calendar (no network needed) | PASS |
-| 116 | Assistant explains an adjustment day as a working Thursday | PASS |
-| 117 | Assistant lists what's next on the leave calendar (or says the year's list is done) and names the weekly off | PASS |
-| 118 | Assistant conversation persists across a reload | PASS |
-| 119 | Assistant lists a document's records for an explicit single-day range, not the whole month | PASS |
-| 120 | Assistant scopes a module's listing to the exact multi-day span asked for | PASS |
-| 121 | Assistant declines a general (non-software) question | PASS |
-| 122 | Declining a general question does not navigate away | PASS |
-| 123 | A general request that mentions a pest-control word is still declined | PASS |
-| 124 | An in-scope question straight after is still answered normally (scope guard does not over-block) | PASS |
-| 125 | Dashboard offers both languages | PASS |
-| 126 | Choosing Gujarati translates the Dashboard | PASS |
-| 127 | ...and the sidebar's module names | PASS |
-| 128 | ...and the top bar / mode banner | PASS |
-| 129 | Other pages follow the same language without a reload | PASS |
-| 130 | Controlled document text (F/HR/17 and its check points) stays exactly as issued | PASS |
-| 131 | The Record Calendar is translated too | PASS |
-| 132 | Switching back to English restores it everywhere | PASS |
+| 29 | Rodent report is in the company's format: its title, one row per year from 2024, and the bar chart JAN-DEC + Total | PASS |
+| 30 | Rodent report carries the company's reported 2025 figures (May 1, June 1, total 2) | PASS |
+| 31 | This year's months held by the digital register are added up from it (tinted), not copied from paper | PASS |
+| 32 | A month that hasn't happened yet is left blank, as on the paper report | PASS |
+| 33 | Digital rodent total over the demo year is non-zero (pattern applied) | PASS |
+| 34 | Rodent report breaks catches down by location | PASS |
+| 35 | Fly Catcher Infestation trend has a non-zero yearly total in Demo Mode (seasonal fly pattern applied) | PASS |
+| 36 | Fly Catcher Infestation trend lists all 13 units in the company's year layout | PASS |
+| 37 | Fly trend uses the same company format (title and the JAN-DEC + Total chart) | PASS |
+| 38 | F/HR/18 register is filled from the visit records, written as the specimen writes it (d/mm/yy, two-digit counts) | PASS |
+| 39 | Tube-light dates follow the specimen's annual cycle (installed 24/12, due 23/12), with ditto marks on the line below | PASS |
+| 40 | Fly Control service page carries the F/HR/18 register | PASS |
+| 41 | Rat / Mice service page carries the Rodent Catch Report and Trend Analysis | PASS |
+| 42 | Demo service visits never sit on the Thursday weekly off � a visit scheduled on a Thursday is dated the next working day | PASS |
+| 43 | Live mode banner visible after switch | PASS |
+| 44 | CAPA home offers exactly the two options, Internal and External | PASS |
+| 45 | CAPA Internal list shows seeded Dec-2023 inspection | PASS |
+| 46 | CAPA External list shows the F/MKT/05 checklist | PASS |
+| 47 | New complaint auto-starts the assistant walk-through | PASS |
+| 48 | Assistant asks for the customer first | PASS |
+| 49 | Header details captured on the form | PASS |
+| 50 | Assistant announces Section A | PASS |
+| 51 | Section B is announced after A's five activities | PASS |
+| 52 | Section C is announced next | PASS |
+| 53 | Section D is announced next | PASS |
+| 54 | Section E is announced next | PASS |
+| 55 | After E the assistant asks for approval | PASS |
+| 56 | Form shows all 31 activities done | PASS |
+| 57 | Assistant confirms submission | PASS |
+| 58 | Checklist status is Pending Verification (awaiting approval) | PASS |
+| 59 | Prepared By was stamped with the logged-in user | PASS |
+| 60 | Assistant offers to approve | PASS |
+| 61 | Assistant confirms approval | PASS |
+| 62 | Checklist status is Verified (approved) | PASS |
+| 63 | Training list shows seeded record | PASS |
+| 64 | Training list shows the Dec-2025 awareness programme | PASS |
+| 65 | SOC list shows both statements | PASS |
+| 66 | SOC detail renders the declaration | PASS |
+| 67 | Chemical master shows pesticide chart | PASS |
+| 68 | SOP reference shows Lizard quarterly frequency | PASS |
+| 69 | Reports page renders tabs | PASS |
+| 70 | Lamination QC report renders | PASS |
+| 71 | Reports > Daily Monitoring Summary reproduces the F/HR/17 three-page register | PASS |
+| 72 | Document Library lists all 22 documents | PASS |
+| 73 | Document Library shows the lamination module | PASS |
+| 74 | Document Library shows the QC inspection module | PASS |
+| 75 | Document Library groups both CAPA documents under the CAPA module | PASS |
+| 76 | Sidebar has a collapsible Pest Control module header | PASS |
+| 77 | Sidebar has a CAPA module with Internal and External links | PASS |
+| 78 | Pest Control module starts expanded (Training link visible) | PASS |
+| 79 | Collapsing the module header hides its links | PASS |
+| 80 | A collapsed module stays collapsed after navigating elsewhere | PASS |
+| 81 | Expanding it again restores the links | PASS |
+| 82 | Navigation panel is a column beside the content by default | PASS |
+| 83 | Closing the panel gives the page the full window | PASS |
+| 84 | A closed panel is hidden from keyboard and screen readers too, not just narrowed | PASS |
+| 85 | The panel stays closed after a reload (the choice is remembered) | PASS |
+| 86 | The top-bar button brings the panel back | PASS |
+| 87 | Collapse-all closes every module at once | PASS |
+| 88 | A collapsed module still marks the one holding the current page | PASS |
+| 89 | Expand-all opens them again | PASS |
+| 90 | Module link deep-links Document Library filtered to that module | PASS |
+| 91 | Filtered library shows only that module's documents | PASS |
+| 92 | Pest Control module lists its report groups in the sidebar | PASS |
+| 93 | Rat / Mice service reports open on their own page | PASS |
+| 94 | Service report list shows this month's fortnightly visit(s) | PASS |
+| 95 | Daily Report page shows the month register with today's row | PASS |
+| 96 | Daily Report is laid out as the F/HR/17 three-page register (10 check points, 31 date rows) | PASS |
+| 97 | Register carries the format's own instruction wording (Yes / No, except point no. 7) | PASS |
+| 98 | Register page 3 carries the Summary of Actions Taken if Pest Observed | PASS |
+| 99 | Fly Catcher Infestation opens on the F/HR/18 register in the company's two-page format (Live) | PASS |
+| 100 | Register carries the form's own seven column headings | PASS |
+| 101 | Its trend view still lists every unit PC-01..PC-13 (Live) | PASS |
+| 102 | Pest Control overview shows the four groups | PASS |
+| 103 | Service Provider Licence page shows both scanned licence pages | PASS |
+| 104 | Scanned licence pages are actually served by the app (first image loaded) | PASS |
+| 105 | Licence transcription carries Form III, the licensee and the licence number | PASS |
+| 106 | Licence terms are listed exactly as printed (12 numbered conditions) | PASS |
+| 107 | The original licence PDF is served by the app exactly as supplied (byte-for-byte) | PASS |
+| 108 | Licence page links to that original PDF | PASS |
+| 109 | Opened the F/QC/37 pouching inspection from Day View | PASS |
+| 110 | Inspection shows the 11 printed test parameters | PASS |
+| 111 | Inspection observations were pre-filled from the specimen | PASS |
+| 112 | Lot status pre-set to Accepted and inspector signed | PASS |
+| 113 | Inspection record submitted | PASS |
+| 114 | Search returns results for PC-01 | PASS |
+| 115 | Search finds the lamination operator on the prepared log sheets | PASS |
+| 116 | Calendar marks every Thursday of September 2026 as the weekly off | PASS |
+| 117 | Calendar shows Janmashtami (04-Sep-2026) from the leave calendar | PASS |
+| 118 | Adjustment day 22-Oct-2026 is a working Thursday (October: 4 weekly offs + 1 working day) | PASS |
+| 119 | Day View explains a Thursday as the weekly off | PASS |
+| 120 | Daily Report register pre-marks the next weekly-off Thursday as a HOLIDAY row | PASS |
+| 121 | Master Data shows the weekly off (Thursday) and the leave calendar's five adjustment days | PASS |
+| 122 | Assistant page opens from the sidebar with suggestions and a composer | PASS |
+| 123 | Assistant page offers voice input (press-to-talk) and a read-aloud toggle | PASS |
+| 124 | Pressing the microphone starts listening (or explains why it can't) | PASS |
+| 125 | Assistant answers a weekly-off date from the working calendar (no network needed) | PASS |
+| 126 | Assistant explains an adjustment day as a working Thursday | PASS |
+| 127 | Assistant lists what's next on the leave calendar (or says the year's list is done) and names the weekly off | PASS |
+| 128 | Assistant conversation persists across a reload | PASS |
+| 129 | Assistant lists a document's records for an explicit single-day range, not the whole month | PASS |
+| 130 | Assistant scopes a module's listing to the exact multi-day span asked for | PASS |
+| 131 | Assistant declines a general (non-software) question | PASS |
+| 132 | Declining a general question does not navigate away | PASS |
+| 133 | A general request that mentions a pest-control word is still declined | PASS |
+| 134 | An in-scope question straight after is still answered normally (scope guard does not over-block) | PASS |
+| 135 | Dashboard offers both languages | PASS |
+| 136 | Choosing Gujarati translates the Dashboard | PASS |
+| 137 | ...and the sidebar's module names | PASS |
+| 138 | ...and the top bar / mode banner | PASS |
+| 139 | Other pages follow the same language without a reload | PASS |
+| 140 | Controlled document text (F/HR/17 and its check points) stays exactly as issued | PASS |
+| 141 | The Record Calendar is translated too | PASS |
+| 142 | Switching back to English restores it everywhere | PASS |
 
 (One benign console entry — the pre-login `GET /api/auth/me` 401, expected on every fresh
 session — is filtered out of the "unexpected console errors" check rather than counted as a
@@ -534,7 +564,7 @@ Run against a generated demo year (2687 demo records: {'Verified': 1806, 'Pendin
 
 Measured on that year: 121/8904 readings outside the printed band = 1.4%; lot status: {'Accepted': 584, 'Accepted on Deviation': 35, 'Segregation': 14, 'Reject / Scrap': 3}; printing grades: {'A': 661, 'B': 325, '-': 212, 'C': 68, 'F': 6}; 21 check-point findings recorded; 8 CAPA records, 20 findings: 15 closed, 5 overdue; 578 distinct submission clock times; 86 rejected records; 451 records dated in the future; same day on a second browser: 2026-01-02.
 
-### `visual_qa.py` — 18/18 interaction checks passed (18 `check()` calls at run time), 0 JS errors
+### `visual_qa.py` — 20/20 interaction checks passed (20 `check()` calls at run time), 0 JS errors
 
 | # | Check | Result |
 |---|---|---|
@@ -546,16 +576,18 @@ Measured on that year: 121/8904 readings outside the printed band = 1.4%; lot st
 | 6 | Created a new CAPA record, added a finding | PASS |
 | 7 | Created a new Training record, added an attendee | PASS |
 | 8 | Pest Control overview renders its four groups — Daily Report / Service Reports / Trend Analysis / Training & Reference (captured as `15_pest_control_overview.png`; the Fly Catcher Infestation page as `16_pest_fly_catcher_infestation.png`) | PASS |
-| 9 | Assistant page renders its suggestions and composer (captured as `17_assistant_page.png`; the October-2026 Record Calendar with its Weekly off / Working day chips as `18_calendar_october_holidays.png`) | PASS |
-| 10 | Licence page shows both scanned pages of the Form III licence (captured as `20_service_provider_licence.png`; the Daily Report in its F/HR/17 three-page register layout as `19_daily_register_fhr17.png`) | PASS |
-| 11 | Dashboard switches to Gujarati — the whole interface (captured as `21_dashboard_gujarati.png`; Pest Control in Gujarati as `22_pest_control_gujarati.png`) | PASS |
-| 12 | Assistant page shows voice input and a read-aloud toggle (captured as `23_assistant_voice.png`) | PASS |
-| 13 | Every module collapses to one row, with the current one still marked (captured as `24_sidebar_modules_collapsed.png`) | PASS |
-| 14 | Closing the panel gives the register the full window (captured as `25_sidebar_closed.png`) | PASS |
-| 15 | SOC detail page renders | PASS |
-| 16 | Print media emulation renders a clean original-style layout (no sidebar/topbar/buttons) | PASS |
-| 17 | 27 full-page screenshots captured for visual review (`tests/shots/`) | PASS |
-| 18 | No JS errors across the whole pass | PASS |
+| 9 | Fly Catcher Infestation opens on the two-page F/HR/18 register (captured as `16_pest_fly_catcher_infestation.png`; its trend view as `26_fly_catch_trend.png`) | PASS |
+| 10 | Rodent Catch Report and Trend Analysis renders in the company format with its chart (captured as `27_rodent_catch_report.png`) | PASS |
+| 11 | Assistant page renders its suggestions and composer (captured as `17_assistant_page.png`; the October-2026 Record Calendar with its Weekly off / Working day chips as `18_calendar_october_holidays.png`) | PASS |
+| 12 | Licence page shows both scanned pages of the Form III licence (captured as `20_service_provider_licence.png`; the Daily Report in its F/HR/17 three-page register layout as `19_daily_register_fhr17.png`) | PASS |
+| 13 | Dashboard switches to Gujarati — the whole interface (captured as `21_dashboard_gujarati.png`; Pest Control in Gujarati as `22_pest_control_gujarati.png`) | PASS |
+| 14 | Assistant page shows voice input and a read-aloud toggle (captured as `23_assistant_voice.png`) | PASS |
+| 15 | Every module collapses to one row, with the current one still marked (captured as `24_sidebar_modules_collapsed.png`) | PASS |
+| 16 | Closing the panel gives the register the full window (captured as `25_sidebar_closed.png`) | PASS |
+| 17 | SOC detail page renders | PASS |
+| 18 | Print media emulation renders a clean original-style layout (no sidebar/topbar/buttons) | PASS |
+| 19 | 29 full-page screenshots captured for visual review (`tests/shots/`) | PASS |
+| 20 | No JS errors across the whole pass | PASS |
 
 ### `e2e_assistant_chat.py` — 12/12 checks passed, 0 JS errors (real Groq calls, paced ~22 s apart)
 

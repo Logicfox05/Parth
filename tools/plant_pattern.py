@@ -231,16 +231,13 @@ CHECKPOINT_ISSUES = {
             },
         ],
     },
-    10: {
-        "rate": 0.011,
-        "issues": [
-            {
-                "description": "Fly catcher tube lights of PC-09 past their one-year validity.",
-                "action": "Tubes replaced; new install date entered in F/HR/18.",
-                "remarks": "",
-            },
-        ],
-    },
+    # Check point 10 ("Are Fly catcher tube lights having validity of
+    # usage?") is deliberately NOT here. The F/HR/18 register shows all
+    # thirteen units' tubes installed together on 24/12/25 and due together on
+    # 23/12/26 — changed at the December service each year — so a tube past
+    # its validity mid-year would contradict the fly catcher register printed
+    # beside it. A tube that simply fails is check point 3 above ("One tube
+    # light of PC-07 not glowing").
 }
 
 # =============================================================================
