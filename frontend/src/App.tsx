@@ -10,6 +10,7 @@ import { AssistantBriefingPopup } from "./components/common/AssistantBriefingPop
 import { DashboardPage } from "./pages/DashboardPage";
 import { ProcessFlowPage } from "./pages/ProcessFlowPage";
 import { DocumentLibraryPage } from "./pages/DocumentLibraryPage";
+import { FileBrowserPage } from "./pages/FileBrowserPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { DayViewPage } from "./pages/DayViewPage";
 import { RecordPage } from "./pages/RecordPage";
@@ -54,6 +55,10 @@ function RouteSwitch() {
       return <ProcessFlowPage />;
     case "library":
       return <DocumentLibraryPage moduleSlug={rest[0]} />;
+    case "files":
+      // Document Files: the records for exactly one date span, filed by
+      // module → document → month. Keyed so a new span remounts cleanly.
+      return <FileBrowserPage key={rest.join("/")} scope={rest[0]} from={rest[1]} to={rest[2]} />;
     case "calendar":
       // key forces a full remount on a genuine route change (e.g. the
       // assistant sending you to a specific month while already on this

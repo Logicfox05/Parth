@@ -732,8 +732,17 @@ def main():
         # A single explicit day (today's WORK_DAY, computed at the top of this
         # file) always has a Daily Pest Control Monitoring Record by now — it
         # was opened, filled and submitted in section 3.
+        # The answer opens the Document Files view for exactly that span
+        # (pages/FileBrowserPage.tsx); the written list stays in the chat.
         page.fill("textarea.assistant-input", f"show me daily pest control monitoring record documents from {WORK_DAY} to {WORK_DAY}")
         page.click("button[data-action='send']")
+        page.wait_for_timeout(700)
+        check(
+            "Asking for a document's records over a span opens the files view for exactly that span",
+            page.url.endswith(f"#/files/daily-pest-monitoring/{WORK_DAY}/{WORK_DAY}")
+            and page.locator("[data-section='file-browser'] .file-row").count() == 1,
+        )
+        page.go_back()
         page.wait_for_timeout(500)
         reply_single = page.locator(".assistant-page .chat-msg.bot").last.inner_text()
         check(
@@ -745,6 +754,15 @@ def main():
         span_end = date.fromisoformat(WORK_DAY) + timedelta(days=6)
         page.fill("textarea.assistant-input", f"i want pest control records from {WORK_DAY} to {span_end.isoformat()}")
         page.click("button[data-action='send']")
+        page.wait_for_timeout(700)
+        span_dates = page.locator("[data-section='file-browser'] .file-row").evaluate_all("rows => rows.map(r => r.dataset.fileDate)")
+        check(
+            "A module's files view holds only files dated inside the span asked for",
+            page.url.endswith(f"#/files/pest-control/{WORK_DAY}/{span_end.isoformat()}")
+            and len(span_dates) > 0
+            and all(WORK_DAY <= d <= span_end.isoformat() for d in span_dates),
+        )
+        page.go_back()
         page.wait_for_timeout(500)
         reply_span = page.locator(".assistant-page .chat-msg.bot").last.inner_text()
         check(

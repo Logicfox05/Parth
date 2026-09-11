@@ -3,10 +3,9 @@ import type { DailyPestMonitoringData, DocumentDefinition } from "../types";
 import { masterRepository } from "../data/repositories/masterRepository";
 import { recordRepository } from "../data/repositories/recordRepository";
 import { documentRepository } from "../data/repositories/documentRepository";
-import { ensureDemoRecordsGeneratedForYear } from "../data/demoGenerator";
 import { computeBriefing } from "./assistantBriefing";
-import { ensureRecordsGeneratedForMonth } from "./recordGenerator";
 import { routeForRecord } from "./reminders";
+import { filesRoute, recordsInRange, scopeForDocuments } from "./fileScope";
 import { dayInfo, describeDay, nextWeeklyOff, upcomingHolidays, weeklyOffDay, WEEKDAY_LONG, type DayInfo } from "./holidays";
 import { t } from "../i18n";
 import { addDays, compareISO, daysInMonth, formatDisplayDate, fromISODate, MONTH_NAMES, pad2, todayISO } from "../utils/date";
@@ -27,14 +26,18 @@ import { addDays, compareISO, daysInMonth, formatDisplayDate, fromISODate, MONTH
 //    monitoring record from 1 January to 19 January", "pest records for
 //    September", "fly catcher inspections this week": enumerates exactly the
 //    records due in the date span the user named (never a whole month unless
-//    they asked for one), for the document(s)/module they named. Only fires
-//    when BOTH a document/module is recognisable AND a date is present —
-//    "show me all reports of august" (no document named) still goes to the
-//    model and navigates to the Reports page, unchanged.
+//    they asked for one), for the document(s)/module they named, and OPENS
+//    the Document Files view for exactly that span (pages/FileBrowserPage.tsx)
+//    — "from June to August" is 1 June to 31 August. Only fires when a date
+//    is present AND a document/module is recognisable (or it says "all
+//    documents/records/files") — "show me all reports of august" still goes
+//    to the model and navigates to the Reports page, unchanged.
 
 export interface LocalAnswer {
   reply: string;
   chips?: Chip[];
+  /** A screen to open straight away — e.g. the Document Files view for the span asked for. */
+  navigate?: string;
 }
 
 // OUT OF SCOPE — this assistant answers about this record system and nothing
@@ -282,6 +285,12 @@ function extractExplicitDates(text: string, yearFallback: number): string[] {
   return Array.from(out);
 }
 
+// A month as people write it — "jan", "January", "sept." — and nothing that
+// merely starts like one: "marked", "decided", "augment" and "may I" are not
+// months. Capture group 1 is the word; its first three letters index MONTHS.
+const MONTH_WORD =
+  "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may(?!\\s+(?:i|we|you)\\b)|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
+
 function monthRange(year: number, month: number, label: string): DateRange {
   return { from: `${year}-${pad2(month + 1)}-01`, to: `${year}-${pad2(month + 1)}-${pad2(daysInMonth(year, month))}`, label };
 }
@@ -334,9 +343,30 @@ function parseDateRange(text: string, today: string): DateRange | null {
     return monthRange(y, m, `${MONTH_NAMES[m]} ${y}`);
   }
 
-  const monthMatch = lower.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/);
+  // Month to month — "from January to March", "June-August 2026",
+  // "between Nov 2025 and Feb 2026": the first day of the first month to the
+  // last day of the second. With no year on the second month and it coming
+  // earlier in the year than the first ("November to February"), it means
+  // the following year.
+  const span = lower.match(new RegExp(`\\b${MONTH_WORD}\\.?(?:\\s+(20\\d{2}))?\\s*(?:to|till|until|through|thru|and|-|–|—)\\s*${MONTH_WORD}\\.?(?:\\s+(20\\d{2}))?\\b`));
+  if (span) {
+    const m1 = MONTHS.indexOf(span[1].slice(0, 3));
+    const m2 = MONTHS.indexOf(span[3].slice(0, 3));
+    const trailingYear = lower.match(/\b(20\d{2})\b/g)?.map(Number) ?? [];
+    let y1 = span[2] ? Number(span[2]) : span[4] && !span[2] ? Number(span[4]) : trailingYear[0] ?? year0;
+    let y2 = span[4] ? Number(span[4]) : y1;
+    if (!span[4] && m2 < m1) y2 = y1 + 1;
+    if (span[4] && !span[2] && m1 > m2) y1 = y2 - 1;
+    const from = monthRange(y1, m1, "").from;
+    const to = monthRange(y2, m2, "").to;
+    if (compareISO(from, to) <= 0) {
+      return { from, to, label: `${MONTH_NAMES[m1]} ${y1} to ${MONTH_NAMES[m2]} ${y2}` };
+    }
+  }
+
+  const monthMatch = lower.match(new RegExp(`\\b${MONTH_WORD}\\b`));
   if (monthMatch) {
-    const mi = MONTHS.indexOf(monthMatch[1]);
+    const mi = MONTHS.indexOf(monthMatch[1].slice(0, 3));
     const yearMatch = lower.match(/\b(20\d{2})\b/);
     const year = yearMatch ? Number(yearMatch[1]) : year0;
     return monthRange(year, mi, `${MONTH_NAMES[mi]} ${year}`);
@@ -347,29 +377,10 @@ function parseDateRange(text: string, today: string): DateRange | null {
   return null;
 }
 
-const LIST_INTENT_RE = /\b(document|documents|record|records|report|reports|register|registers)\b/i;
-// A safety bound, not a normal truncation — a real request never approaches
-// it (a year is 12 months); it only stops a wildly wide accidental range
-// (e.g. a typo'd year) from generating three years of records inline.
-const MAX_MONTHS_GENERATED = 36;
-
-function monthsBetween(fromISO: string, toISO: string): { year: number; month: number }[] {
-  const out: { year: number; month: number }[] = [];
-  let y = fromISODate(fromISO).getFullYear();
-  let m = fromISODate(fromISO).getMonth();
-  const endY = fromISODate(toISO).getFullYear();
-  const endM = fromISODate(toISO).getMonth();
-  while ((y < endY || (y === endY && m <= endM)) && out.length < MAX_MONTHS_GENERATED) {
-    out.push({ year: y, month: m });
-    m += 1;
-    if (m > 11) {
-      m = 0;
-      y += 1;
-    }
-  }
-  return out;
-}
-
+// "Reports" is left out on purpose: "all reports of August" means the monthly
+// Reports page, which the model routes to.
+const ALL_DOCUMENTS_RE = /\b(?:all|every)\s+(?:the\s+)?(?:documents?|records?|files?|registers?|paperwork)\b/i;
+const LIST_INTENT_RE = /\b(document|documents|record|records|report|reports|register|registers|file|files|folder|folders|paperwork)\b/i;
 // Rows for this many days fit comfortably on screen without needing "…and N
 // more" — a bounded date range the user themselves named (never "everything
 // pending") is meant to be shown in full, so this is generous compared to
@@ -379,38 +390,35 @@ const MAX_LISTED_RECORDS = 40;
 function listDocumentsAnswer(text: string, isDemo: boolean): LocalAnswer | null {
   const lower = text.toLowerCase();
   if (!LIST_INTENT_RE.test(lower)) return null;
-  const docIds = matchDocuments(lower);
+  // "all documents from 1 to 5 August" — every module — is the one request
+  // that names no document or module and still means a listing.
+  const everything = ALL_DOCUMENTS_RE.test(lower);
+  const named = matchDocuments(lower);
+  const docIds = named.length > 0 ? named : everything ? documentRepository.getRecordable().map((d) => d.id) : [];
   if (docIds.length === 0) return null; // no document/module named — let the model handle plain navigation requests
   const today = todayISO();
   const range = parseDateRange(text, today);
   if (!range) return null; // no date reference — e.g. "open the rat and mice service reports" navigates instead
 
-  const months = monthsBetween(range.from, range.to);
-  if (isDemo) {
-    for (const year of Array.from(new Set(months.map((m) => m.year)))) ensureDemoRecordsGeneratedForYear(year);
-  } else {
-    // Scoped to just the named document(s) — cheap even across many months,
-    // and the launch-date floor still applies (see engine/recordGenerator.ts),
-    // so a range before this browser went live correctly comes back empty.
-    for (const { year, month } of months) ensureRecordsGeneratedForMonth(year, month, { documentIds: docIds, isDemo: false });
-  }
-
+  // Scoped to just the named document(s) — cheap even across many months,
+  // and the launch-date floor still applies (see engine/recordGenerator.ts),
+  // so a range before this browser went live correctly comes back empty.
+  const records = recordsInRange(docIds, range.from, range.to, isDemo);
   const docs = docIds.map((id) => documentRepository.getById(id)).filter((x): x is DocumentDefinition => !!x);
-  const records = recordRepository
-    .query({ isDemo, fromDate: range.from, toDate: range.to })
-    .filter((r) => docIds.includes(r.documentId))
-    .sort((a, b) => compareISO(a.dueDate, b.dueDate) || a.documentId.localeCompare(b.documentId));
 
-  const scopeLabel = docs.length === 1 ? docs[0].name : docs.length > 0 ? `${docs.length} matching documents` : "matching documents";
-  const calendarChip: Chip = {
-    label: t("ai.chip.openCalendar"),
-    action: { type: "navigate", route: `/calendar/${fromISODate(range.from).getFullYear()}/${fromISODate(range.from).getMonth()}` },
-  };
+  // The answer OPENS the Document Files view for exactly this span — module →
+  // document → month → the dated files, nothing outside the dates asked for
+  // (pages/FileBrowserPage.tsx) — and the chat keeps a short written list.
+  const files = filesRoute(scopeForDocuments(docIds), range.from, range.to);
+  const filesChip: Chip = { label: t("ai.chip.openFiles"), action: { type: "navigate", route: files }, tone: "primary" };
+  const scopeLabel =
+    named.length === 0 ? "All documents" : docs.length === 1 ? docs[0].name : docs.length > 0 ? `${docs.length} matching documents` : "matching documents";
 
   if (records.length === 0) {
     return {
       reply: `No ${scopeLabel} records between ${formatDisplayDate(range.from)} and ${formatDisplayDate(range.to)}${isDemo ? " (demo)" : ""}.`,
-      chips: [calendarChip],
+      chips: [filesChip],
+      navigate: files,
     };
   }
 
@@ -422,18 +430,16 @@ function listDocumentsAnswer(text: string, isDemo: boolean): LocalAnswer | null 
     const prefix = docs.length > 1 ? `${formatDisplayDate(r.dueDate)} — ${doc?.name ?? r.documentId}` : formatDisplayDate(r.dueDate);
     return `• ${prefix} — ${status}${r.isDemo ? " (demo)" : ""}`;
   });
-  const more = records.length > shown.length ? `\n…and ${records.length - shown.length} more — open the calendar for the rest.` : "";
+  const more = records.length > shown.length ? `\n…and ${records.length - shown.length} more — all of them are in the files view.` : "";
   const reply = `${scopeLabel} — ${range.label} (${records.length} record${records.length === 1 ? "" : "s"}):\n${lines.join("\n")}${more}`;
 
-  const chips: Chip[] = [];
+  const chips: Chip[] = [filesChip];
   if (shown.length === 1) {
-    chips.push({ label: t("ai.chip.openIt"), action: { type: "navigate", route: routeForRecord(documentRepository.getById(shown[0].documentId), shown[0].id) }, tone: "primary" });
+    chips.push({ label: t("ai.chip.openIt"), action: { type: "navigate", route: routeForRecord(documentRepository.getById(shown[0].documentId), shown[0].id) } });
   } else if (shown.length <= 6) {
     for (const r of shown) chips.push({ label: formatDisplayDate(r.dueDate), action: { type: "navigate", route: routeForRecord(documentRepository.getById(r.documentId), r.id) } });
-  } else {
-    chips.push(calendarChip);
   }
-  return { reply, chips };
+  return { reply, chips, navigate: files };
 }
 
 function answerForDay(info: DayInfo, phrase: string, today: string): string {

@@ -22,6 +22,7 @@ import {
   FiTrendingUp,
   FiActivity,
   FiHome,
+  FiHardDrive,
   FiLayers,
   FiMessageSquare,
   FiPackage,
@@ -56,6 +57,8 @@ const NAV_MAIN: NavItem[] = [
   { to: "/assistant", labelKey: "nav.assistant", icon: FiMessageSquare },
   { to: "/process-flow", labelKey: "nav.processFlow", icon: FiGitBranch },
   { to: "/library", labelKey: "nav.documentLibrary", icon: FiBookOpen },
+  // Every record filed by module → document → month, for any date span.
+  { to: "/files", labelKey: "nav.files", icon: FiHardDrive },
   { to: "/calendar", labelKey: "nav.recordCalendar", icon: FiCalendar },
   { to: "/search", labelKey: "nav.search", icon: FiSearch },
 ];

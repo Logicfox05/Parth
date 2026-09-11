@@ -198,6 +198,8 @@ export function AssistantPage() {
     if (local) {
       append(convId, { id: generateId("msg"), role: "bot", text: local.reply, at: stamp(), chips: local.chips });
       readOut(local.reply);
+      // e.g. "pest control documents from 1 to 19 January" opens exactly those files.
+      if (local.navigate && isValidAppRoute(local.navigate)) navigate(local.navigate);
       return;
     }
 

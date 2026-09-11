@@ -30,6 +30,13 @@ Seven scripts live in `tests/`:
   lists the change and can undo it, refuses a value the form can't hold, and on a verified record asks
   before reopening; Master Data rows are corrected in place and deletes take two taps.
   Network-independent (common edits are understood locally).
+- `tests/e2e_files.py` — Document Files: "all document of pest control module from June to August"
+  opens `#/files/pest-control/…` for exactly 1 June – 31 August (one folder per month, every file a
+  pest control document inside the span, the summary counting exactly what's shown); a day-to-day
+  span holds only files between those days; "November to February" runs into next year; "all
+  documents from 1 to 5 …" opens every module; a folder narrows the list, From changes the span and
+  the address, a file opens its record; a broken `/files` address falls back to this month; "may I
+  … marked …" isn't read as May or March. Network-independent.
 - `tests/visual_qa.py` — deeper per-module interaction checks (Fly Catcher, Service Report, CAPA
   creation, Training creation) plus full-page screenshots of every major screen for visual
   review, saved to `tests/shots/`, network-independent.
@@ -43,8 +50,9 @@ Seven scripts live in `tests/`:
 
 ```bash
 npm run test:e2e     # builds, boots backend/index.ts on :8842, runs e2e_smoke.py THEN
-                      # e2e_backlog_regression.py, e2e_voice.py, e2e_realism.py and
-                      # e2e_editing.py against it, tears down (see scripts/run-e2e.ts)
+                      # e2e_backlog_regression.py, e2e_voice.py, e2e_realism.py,
+                      # e2e_editing.py and e2e_files.py against it, tears down
+                      # (see scripts/run-e2e.ts)
 ```
 
 `visual_qa.py` and `e2e_assistant_chat.py` aren't wired into an npm script (slower / make real Groq
@@ -58,6 +66,7 @@ python tests/e2e_backlog_regression.py
 python tests/e2e_voice.py
 python tests/e2e_realism.py
 python tests/e2e_editing.py
+python tests/e2e_files.py
 python tests/visual_qa.py
 python tests/e2e_assistant_chat.py # needs backend/.env's GROQ_API_KEY to actually resolve; edit
                                     # the BASE constant at the top if your server isn't on :8844
@@ -376,7 +385,11 @@ suite runs against that. `npm run typecheck` is clean for the frontend and for t
   Python's `print` raised `UnicodeEncodeError` mid-run. Labels are ASCII-only now (em dashes are
   fine in cp1252; arrows are not).
 
-### `e2e_smoke.py` — all 142 checks passed, 0 unexpected console errors
+### `e2e_smoke.py` — all 144 checks passed, 0 unexpected console errors
+
+(11-Sep-2026: section 15b gained two checks — asking for a document's or a module's records over a
+span now opens `#/files/{scope}/{from}/{to}` holding only files dated inside it; the chat reply is
+read after going back. The numbered table below predates them.)
 
 (Two checks are date-conditional and are skipped on the days they can't apply: the "month that hasn't happened yet is blank" check in December, and the F/HR/18 fill checks in January, when last month's demo visits belong to the previous year.)
 
@@ -559,6 +572,32 @@ pause, inside the 2.5 s silence window), emit the rest, then go quiet. This is w
 | 11 | Composer was cleared | PASS |
 | 12 | The assistant answered the spoken question | PASS |
 | 13 | Pressing "Done" sends what was said instead of discarding it | PASS |
+
+### `tests/e2e_files.py` — 17/17 checks passed, 0 JS errors (11-Sep-2026)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Document Files opens on this month by itself | PASS |
+| 2 | A `/files` address with an impossible date falls back to this month, without an error | PASS |
+| 3 | "November to February" runs from 1 November to the end of February next year | PASS |
+| 4 | …and every file in it is a fly catcher file inside that span | PASS |
+| 5 | "all document of pest control module from June to August" opens exactly that span | PASS |
+| 6 | One month folder per month asked for — no more, no fewer | PASS |
+| 7 | The folders are the pest control documents only | PASS |
+| 8 | Every file is a pest control document dated inside the span | PASS |
+| 9 | The summary counts exactly the files shown | PASS |
+| 10 | Opening the fly catcher folder shows its files only | PASS |
+| 11 | The breadcrumb names the folder | PASS |
+| 12 | Changing From narrows the span and the address follows | PASS |
+| 13 | The chat keeps a written list with the span it covered | PASS |
+| 14 | A day-to-day span holds only files between those two days | PASS |
+| 15 | "All documents from 1 to 5 …" opens every module for those five days | PASS |
+| 16 | Opening a file opens that record | PASS |
+| 17 | "may I … marked …" is read as this week, not as May or March | PASS |
+
+Also checked by screenshot: desktop (module → document → month → dated files, date in its own
+column) and 420 px wide (the folder tree and file list fit; the page's remaining sideways scroll at
+that width comes from the top bar and is the same on the Dashboard).
 
 ### `tests/e2e_editing.py` — 20/20 checks passed
 

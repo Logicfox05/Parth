@@ -258,6 +258,56 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
    column (VERIFIED BY) off the right edge with the sidebar open. */
 .doc-table .register-grid th { white-space: normal; }
 
+/* ---- Document Files (pages/FileBrowserPage.tsx) ---- */
+.file-controls { margin: 12px 0 10px; }
+.file-breadcrumb { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; margin-bottom: 12px; }
+.file-breadcrumb .crumb { background: none; border: none; padding: 2px 4px; font: inherit; color: var(--color-text); }
+.file-breadcrumb button.crumb { color: var(--color-primary); cursor: pointer; }
+.file-breadcrumb button.crumb:hover { text-decoration: underline; }
+.file-breadcrumb .crumb.range { font-weight: 600; }
+.file-breadcrumb .sep { color: var(--color-text-faint); }
+.file-browser { display: grid; grid-template-columns: minmax(220px, 290px) 1fr; gap: 16px; align-items: start; }
+.file-tree { padding: 8px; position: sticky; top: 76px; max-height: calc(100vh - 96px); overflow-y: auto; }
+.file-node { width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 8px; border: none; background: none; border-radius: var(--radius-sm);
+  font: inherit; font-size: 13px; color: var(--color-text); cursor: pointer; text-align: left; }
+.file-node:hover { background: var(--color-surface-alt); }
+.file-node.active { background: var(--color-primary-light); color: var(--color-primary-dark); font-weight: 600; }
+.file-node svg { flex-shrink: 0; color: var(--color-warning); }
+.file-node.root svg { color: var(--color-primary); }
+.file-node.module { font-weight: 600; margin-top: 4px; }
+.file-node.nested { padding-left: 24px; }
+.file-node.empty { color: var(--color-text-faint); }
+.file-node-name { flex: 1; min-width: 0; line-height: 1.3; }
+.file-count { flex-shrink: 0; font-size: 11px; font-weight: 600; color: var(--color-text-muted); background: var(--color-surface-alt); border-radius: 999px; padding: 1px 8px; }
+.file-summary { margin-bottom: 10px; color: var(--color-text-muted); }
+.file-month { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); margin-bottom: 10px; overflow: hidden; }
+.file-month-head { width: 100%; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: none; background: var(--color-surface-alt);
+  font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; text-align: left; color: var(--color-text); }
+.file-month-head:disabled { cursor: default; }
+.file-month-head svg { color: var(--color-warning); }
+.file-month-head svg:first-child { color: var(--color-text-muted); }
+.file-month.empty .file-month-head { color: var(--color-text-faint); background: var(--color-surface); }
+.file-month-name { flex: 1; }
+.file-browser > * { min-width: 0; }
+.file-table-wrap { border: none; border-top: 1px solid var(--color-border); border-radius: 0; overflow-x: auto; }
+.file-table td { vertical-align: middle; }
+.file-row { cursor: pointer; }
+.file-row:hover td { background: var(--color-primary-light); }
+.file-when { white-space: nowrap; width: 1%; }
+.file-icon { color: var(--color-primary); vertical-align: -2px; margin-right: 8px; }
+.file-date { font-weight: 600; font-variant-numeric: tabular-nums; }
+.file-name { min-width: 180px; }
+.file-doc { color: var(--color-text); }
+.file-format { display: inline-block; margin-left: 8px; white-space: nowrap; font-size: 11px; color: var(--color-text-muted); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 0 5px; }
+.file-status { white-space: nowrap; width: 1%; }
+.file-by { white-space: nowrap; width: 1%; }
+.file-open { text-align: right; width: 1%; }
+.file-empty { padding: 40px 16px; }
+@media (max-width: 900px) {
+  .file-browser { grid-template-columns: 1fr; }
+  .file-tree { position: static; max-height: none; }
+}
+
 /* ---- Saving, correcting and the change history (RecordActionBar, RecordHistoryPanel.tsx) ---- */
 .save-state { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; padding: 4px 8px; border-radius: var(--radius-sm); }
 .save-state.saved { color: var(--color-success); }

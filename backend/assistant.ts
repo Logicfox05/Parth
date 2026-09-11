@@ -164,6 +164,15 @@ Valid navigation targets (use EXACTLY this shape, "path/param" meaning substitut
 - /library/{moduleSlug} — Document Library filtered to one module. moduleSlug is the module name,
   lowercased, non-letters/digits turned into single hyphens: "pest-control", "lamination-quality-control",
   "lamination-production", "quality-control-inspection-records", "quality-compliance"
+- /files/{scope}/{from}/{to} — Document Files: every record filed by module → document → month, for EXACTLY the
+  dates from..to (ISO YYYY-MM-DD). scope is "all", a moduleSlug (as above), or comma-separated document ids
+  (daily-pest-monitoring, fly-catcher, service-report-rodent, service-report-general, service-report-fly,
+  gap-inspection, capa-customer-complaint, training-record, qc-viscosity, qc-adhesive-mixing, qc-temperature,
+  prd-process-parameter, prd-alc-production, qc-inspection-pouching, qc-inspection-slitting,
+  qc-inspection-printed-film, qc-inprocess-printing). Use it whenever the user asks for the documents / records /
+  files of a module or document between two dates or two months ("pest control documents from 1 to 19 January",
+  "lamination files from June to August" → from = the 1st of the first month, to = the last day of the last) —
+  NOT the calendar, which would show the whole month.
 - /calendar — this month's Record Calendar
 - /calendar/{year}/{month0} — Record Calendar for a specific month. month0 is 0-based (January=0 ... December=11)
 - /day/{YYYY-MM-DD} — everything due on one specific date

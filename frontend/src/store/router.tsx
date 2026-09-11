@@ -83,6 +83,10 @@ export function isValidAppRoute(path: string): boolean {
       return rest.length === 2 || (rest.length === 3 && REPORT_TABS.has(rest[2]));
     case "library":
       return rest.length === 0 || (rest.length === 1 && SLUG_RE.test(rest[0]));
+    case "files":
+      // /files, or /files/{scope}/{from}/{to} — scope is "all", a module slug
+      // or comma-separated document ids (see engine/fileScope.ts).
+      return rest.length === 0 || (rest.length === 3 && /^[a-z0-9,-]+$/.test(rest[0]) && ISO_DATE_RE.test(rest[1]) && ISO_DATE_RE.test(rest[2]));
     case "gap":
       // /gap (chooser), /gap/internal, /gap/external, /gap/complaint/{id}, /gap/{id}
       if (rest.length === 0) return true;

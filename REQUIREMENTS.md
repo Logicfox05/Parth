@@ -961,6 +961,37 @@ change"), the Statements of Compliance and the SOP — issued documents reproduc
 and a fly catcher's PC ID, which every fly catcher record refers to (its location and floor are
 editable).
 
+## 28. Document Files — any span, opened like a file system (11-Sep-2026)
+
+```
+DIGITAL TEMPLATE     src/pages/FileBrowserPage.tsx (#/files/{scope}/{from}/{to}, sidebar
+                      "Document Files"), src/engine/fileScope.ts; opened by the assistant through
+                      listDocumentsAnswer() → LocalAnswer.navigate (src/engine/assistantLocal.ts)
+```
+
+The department's request: "if user search in chat bot like for example i want all document of pest
+control module from any date to any date or any month to month then it will open like that only, not
+whole calendar of that particular month — like file system."
+
+- **What opens**: the Document Files view for exactly the span asked for — a folder per module, a
+  folder per document inside it, a folder per month, one dated file per record (status, who
+  submitted/verified). Nothing dated outside the span is shown, and no other module's documents.
+- **Spans understood**: day to day ("from 3 June to 17 July", "1 to 19 January", ISO or dd-mm-yyyy
+  dates), month to month ("June to August" = 1 June – 31 August; "Nov 2025 to Feb 2026";
+  "November to February" with no year runs into the next year), a single month, this/last/next
+  week or month, and a single day. Month words are matched as whole words, so "marked" is not March
+  and "may I" is not May.
+- **Scope**: a named document, a named module (all of its documents), or "all documents / records /
+  files" for every module. "All reports of August" still goes to the monthly Reports page.
+- **In the view**: the folder tree narrows the list (breadcrumb shows where you are), From/To and
+  the folder picker change the span (the address follows, so it can be bookmarked), This month /
+  Last month / This year shortcuts, CSV export and print. A file opens its record, where it can be
+  read or corrected (§27). A year of records paints only the first month's files until the other
+  month folders are opened.
+- **Safety**: a view covers at most 36 months; a broken address falls back to this month; Live
+  records are never created before the system went live (§ launch-date floor), so browsing old
+  months never invents a backlog.
+
 ## Master data provenance summary
 
 | Master list | Source | Notes |

@@ -140,6 +140,15 @@ The app behaves like a personal assistant rather than a blank form:
   unmistakably-general phrasings declined instantly with no network call
   (`offTopicReply`, `src/engine/assistantLocal.ts`). Greetings and "what can you do?" are still
   answered warmly — and questions about the plant's own work are, of course, in scope.
+- **Document Files — every record filed like a file system, for exactly the dates you ask for.**
+  Ask the assistant "i want all documents of pest control module from June to August" (or "from 3
+  June to 17 July", "November to February", "all documents from 1 to 5 August") and it opens
+  `#/files/{module}/{from}/{to}`: a folder per module, a folder per document, a folder per month,
+  and one dated file per record — only inside that span, never the whole calendar of the month.
+  Month to month means the 1st of the first month to the last day of the last; "November to
+  February" runs into the next year. Folders narrow the list, From/To boxes change the span, a file
+  opens its record (to view or correct it), and the list exports to CSV or prints. Also in the
+  sidebar as **Document Files** (`src/pages/FileBrowserPage.tsx`, `src/engine/fileScope.ts`).
 - **The assistant lists a document's records for exactly the date span you name** — "I want documents
   of daily pest control monitoring record from 1 to 19 January", "pest control records for this
   week", "fly catcher documents for September". Answered locally (`src/engine/assistantLocal.ts`), so

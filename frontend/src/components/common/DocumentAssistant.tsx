@@ -478,6 +478,8 @@ export function DocumentAssistant() {
     if (local) {
       bot(local.reply, local.chips);
       readOut(local.reply);
+      // e.g. "pest control documents from 1 to 19 January" opens exactly those files.
+      if (local.navigate && isValidAppRoute(local.navigate)) navigate(local.navigate);
       return;
     }
     setLoading(true);

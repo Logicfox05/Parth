@@ -316,6 +316,19 @@ data to fill in). Anything ambiguous — "treatment", "recipe", "translate" (F/Q
 "weather" on its own (it drives pest activity) — is deliberately left to the model: a false positive
 would refuse real work, which is worse than one model call spent declining.
 
+**Document Files (`#/files/{scope}/{from}/{to}`).** No new storage — a view over `dcrs:v1:records`.
+`engine/fileScope.ts` resolves the scope (`"all"`, a `moduleSlug`, or comma-separated document ids;
+`scopeForDocuments()` picks the shortest that names a set exactly), normalises the range
+(`normaliseRange()`: an impossible start date → this month, ends swapped into order, at most 36
+months), and `recordsInRange()` first makes sure the records that should exist do (demo: the year;
+live: `ensureRecordsGeneratedForMonth` for just those documents, under the launch-date floor) and
+returns the records due in the span, oldest first. `pages/FileBrowserPage.tsx` groups them module →
+document → month; a file opens `routeForRecord()`. `LocalAnswer.navigate` is how the assistant opens
+it: `listDocumentsAnswer()` returns the files route for the span it listed, and both chat surfaces
+navigate there. `parseDateRange()` also reads month-to-month spans ("June to August", "Nov 2025 to
+Feb 2026"; a later month with no year of its own rolls into the next year), and month words match
+whole words only (`MONTH_WORD` — "marked" is not March, "may I" is not May).
+
 **Date-range document listing.** `listDocumentsAnswer()` (called from `localAnswer()`, after the
 holiday/due-today/briefing intents, before help) answers "documents of X from date to date" entirely
 on the client: `matchDocuments(lower)` maps free text to document ids via a static alias table
